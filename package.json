@@ -1,0 +1,41 @@
+{
+  "name": "alpine-component-loader",
+  "version": "0.0.0-beta.1",
+  "description": "A lightweight, build-free component loader for Alpine.js.",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "clean": "rm -rf dist",
+    "compile": "npx swc src/index.js -o dist/AlpineComponentLoader.js -s ",
+    "compile-min": "npx swc src/index.js -o dist/AlpineComponentLoader.min.js -C minify=true -C jsc.minify.mangle=true -C jsc.minify.compress=true -C jsc.minify.format.comments=some -s",
+    "compile-watch": " npm run clean ; npm run compile -- -w",
+    "compile-min-watch": " npm run clean ; npm run compile-min -- -w",
+    "serve": "npm run clean ; npm run compile-watch & sleep 2 && npx reload -b",
+    "build": "npm run clean ; npm run compile && npm run compile-min",
+    "prepare": "husky"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LTDev-LLC/alpine-component-loader.git"
+  },
+  "keywords": [
+    "alpine",
+    "alpinejs",
+    "component",
+    "loader",
+    "resuable",
+    "reuse"
+  ],
+  "author": "LTDev LLC",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/LTDev-LLC/alpine-component-loader/issues"
+  },
+  "homepage": "https://github.com/LTDev-LLC/alpine-component-loader#readme",
+  "devDependencies": {
+    "@swc/cli": "^0.7.10",
+    "@swc/core": "^1.15.8",
+    "chokidar": "^4.0.1",
+    "husky": "^9.1.7"
+  }
+}

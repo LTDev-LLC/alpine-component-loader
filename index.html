@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Demo showcase for AlpineComponentLoader - A lightweight, build-free component loader for Alpine.js">
+  <title>AlpineComponentLoader Showcase</title>
+
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+
+  <style>
+    :root {
+      --primary: #3b82f6;
+      --bg: #f3f4f6;
+      --text: #1f2937;
+    }
+
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.8rem, 4vw, 2.5rem);
+      letter-spacing: -0.05em;
+      line-height: 1.2;
+    }
+
+    main {
+      flex: 1;
+      width: 100%;
+      box-sizing: border-box;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    section {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    h2 {
+      margin-top: 0;
+      font-size: 1.5rem;
+      border-bottom: 2px solid #f3f4f6;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    details {
+      margin-top: 1.5rem;
+      background: #1f2937;
+      border-radius: 8px;
+      overflow: hidden;
+      max-width: 100%;
+    }
+
+    summary {
+      color: #d1d5db;
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      user-select: none;
+      background: #374151;
+    }
+
+    summary:hover {
+      background: #4b5563;
+    }
+
+    pre {
+      margin: 0;
+      padding: 1rem;
+      overflow-x: auto;
+      color: #e5e7eb;
+      font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+      font-size: 0.85em;
+      line-height: 1.4;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25em 0.6em;
+      font-size: 0.75em;
+      font-weight: 700;
+      border-radius: 999px;
+      background: #e0e7ff;
+      color: #3730a3;
+      margin-left: 0.5rem;
+      vertical-align: middle;
+    }
+
+    .grid-responsive {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    @media (min-width: 640px) {
+      .grid-responsive {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      main {
+        padding: 1rem;
+      }
+
+      section {
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+      }
+
+      h2 {
+        font-size: 1.25rem;
+      }
+
+      .badge {
+        display: block;
+        width: fit-content;
+        margin: 0.25rem 0 0 0;
+      }
+    }
+
+    .debug-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 9999;
+      background: #1f2937;
+      color: white;
+      border: 1px solid #374151;
+      padding: 8px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: bold;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+  </style>
+
+  <script>
+    console.log('[boot]', performance.timeOrigin);
+    document.addEventListener('alpine:init', () => {
+      Alpine.store('theme', {
+        mode: 'Light Mode',
+      });
+    });
+  </script>
+
+  <script type="module">
+    import AlpineComponentLoader from './dist/AlpineComponentLoader.js';
+    window.AlpineComponentLoader = AlpineComponentLoader;
+
+    AlpineComponentLoader.config({
+      basePath: '/components/',
+    })
+
+    AlpineComponentLoader.define('shadow-card', '#tpl-shadow-card', {
+      shadow: true,
+      attributes: {
+        'title': String,
+        'active': Boolean
+      }
+    });
+
+    AlpineComponentLoader.define('light-alert', '#tpl-light-alert', {
+      shadow: false,
+      attributes: {
+        'type': String
+      }
+    });
+
+    AlpineComponentLoader.define('event-button', '#tpl-event-button', {
+      shadow: true,
+      forwardEvents: ['action']
+    });
+
+    AlpineComponentLoader.define('lifecycle-logger', '#tpl-lifecycle-logger', {
+      shadow: true,
+      attributes: {
+        'logs': Array,
+        'title': String
+      },
+      hooks: {
+        beforeMount() {
+          this.$props.logs.push('beforeMount: DOM prepared');
+        },
+        mounted() {
+          this.$props.logs.push('mounted: Alpine initialized');
+        },
+        updated({
+          name,
+          oldVal,
+          newVal
+        }) {
+          const msg = `updated: ${name} changed from ${oldVal} to ${newVal}`;
+          console.log('[lifecycle-logger]', msg);
+          this.$props.logs.push(msg);
+        }
+      }
+    });
+
+    AlpineComponentLoader.define('external-icon', '#tpl-external-icon', {
+      shadow: true,
+      externalCss: [
+        'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
+      ],
+      attributes: {
+        'name': String
+      }
+    });
+
+    AlpineComponentLoader.define('confetti-btn', '#tpl-confetti', {
+      shadow: true,
+      externalScripts: ['https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js']
+    });
+
+    AlpineComponentLoader.define('strict-progress', '#tpl-strict-progress', {
+      shadow: true,
+      attributes: {
+        'percent': {
+          type: Number,
+          required: true,
+          default: 0,
+          validator: (val) => val >= 0 && val <= 100
+        }
+      }
+    });
+
+    AlpineComponentLoader.define('lazy-image', 'lazy-image.html', {
+      loading: 'lazy'
+    });
+
+    AlpineComponentLoader.define('boundary-demo', '#tpl-404', {
+      fallback: '#tpl-fallback-error'
+    });
+
+    const sharedTheme = new CSSStyleSheet();
+    sharedTheme.replaceSync(`
+      .theme-box {
+        background: linear-gradient(135deg, #6366f1, #a855f7);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        font-family: sans-serif;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255,255,255,0.2);
+        box-sizing: border-box;
+      }
+      .theme-title {
+        font-weight: 800;
+        font-size: 1.1rem;
+        margin-bottom: 0.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .theme-badge {
+        display: inline-block;
+        background: rgba(0,0,0,0.3);
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-family: monospace;
+      }
+    `);
+
+    AlpineComponentLoader.config({
+      sharedStyleSheets: [sharedTheme]
+    });
+
+    AlpineComponentLoader.define('shared-demo', '#tpl-shared-demo', {
+      shadow: true
+    });
+  </script>
+</head>
+
+<body>
+  <span x-data>
+    <button class="debug-btn" @click="AlpineComponentLoader.toggleDebug()">
+      🐞 Debug Mode
+    </button>
+  </span>
+
+  <site-header id="top" title="AlpineComponentLoader" github="https://github.com/LTDev-LLC/alpine-component-loader" @loaded="console.log('[site-header] loaded')">
+    A lightweight, build-free component loader for <a href="https://alpinejs.dev/" target="_blank">Alpine.js</a>
+  </site-header>
+
+  <main>
+
+    <section>
+      <h2>1. Inline Templates <span class="badge">Auto Discovery</span></h2>
+      <p>Define components directly in HTML. No JavaScript registration needed.</p>
+
+      <template acl-component="inline-counter" acl-props='{ "count": "Number", "title": { "type": "String", "default": "Default Counter" } }'>
+        <style>
+          .box {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            max-width: 100%;
+            margin-bottom: 1rem;
+            box-sizing: border-box;
+          }
+
+          h3 {
+            margin: 0 0 0.75rem 0;
+            color: #1f2937;
+            font-size: 1.1rem;
+          }
+
+          button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+          }
+
+          button:hover {
+            background: #2563eb;
+          }
+
+          .count-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2px 6px;
+            border-radius: 4px;
+            min-width: 1.2em;
+            text-align: center;
+          }
+        </style>
+        <div x-data="{ props: $el.$props }" class="box">
+          <h3 x-text="props.title || 'Default Counter'"></h3>
+          <button @click="props.count++">
+            Clicks
+            <span class="count-badge" x-text="props.count"></span>
+          </button>
+        </div>
+      </template>
+
+      <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 250px;">
+          <inline-counter persist="session"></inline-counter>
+        </div>
+        <div style="flex: 1; min-width: 250px;">
+          <inline-counter title="Interactive Widget" count="5"></inline-counter>
+        </div>
+      </div>
+
+      <details>
+        <summary>View Source</summary>
+        <pre>&lt;!-- Definition --&gt;
+&lt;template acl-component="inline-counter" acl-props='{ "count": "Number", "title": { "type": "String" } }'&gt;
+    &lt;style&gt;
+        .box { background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #eee; }
+        button { background: #3b82f6; color: white; padding: 0.5rem 1rem; border-radius: 6px; border: none; }
+    &lt;/style&gt;
+    &lt;div x-data="{ props: $el.$props }" class="box"&gt;
+        &lt;h3 x-text="props.title || 'Default Counter'"&gt;&lt;/h3&gt;
+        &lt;button @click="props.count++"&gt;
+            Count: &lt;span x-text="props.count"&gt;&lt;/span&gt;
+        &lt;/button&gt;
+    &lt;/div&gt;
+&lt;/template&gt;
+
+&lt;!-- Usage --&gt;
+&lt;inline-counter&gt;&lt;/inline-counter&gt;
+&lt;inline-counter title="Interactive Widget" count="5"&gt;&lt;/inline-counter&gt;</pre>
+      </details>
+    </section>
+
+    <section>
+      <h2>2. Shadow DOM & Typed Props</h2>
+      <p>Styles are encapsulated. Attributes `active="true"` are converted to real Booleans.</p>
+
+      <shadow-card title="Shadow Component" active="true" id="test"></shadow-card>
+      <shadow-card title="Inactive Card"></shadow-card>
+
+      <details>
+        <summary>View Source</summary>
+        <pre>AlpineComponentLoader.define('shadow-card', '#tpl-shadow-card', {
+    shadow: true,
+    attributes: { 'title': String, 'active': Boolean }
+});</pre>
+      </details>
+    </section>
+
+    <section>
+      <h2>3. Lifecycle Hooks</h2>
+      <p>Hook into component events: `beforeMount`, `mounted`, `updated`, and `unmounted`.</p>
+
+      <lifecycle-logger title="Watcher Demo"></lifecycle-logger>
+
+      <script>
+        // Simulating an attribute update
+        setTimeout(() => {
+          const el = document.querySelector('lifecycle-logger');
+          if (el) el.setAttribute('title', 'Updated Title!');
+        }, 2000);
+      </script>
+
+      <details>
+        <summary>View Source</summary>
+        <pre>AlpineComponentLoader.define('lifecycle-logger', '#tpl', {
+    hooks: {
+        mounted() { this.$props.logs.push('Mounted!'); },
+        updated({ name, newVal }) { this.$props.logs.push(`${name} -> ${newVal}`); }
+    }
+});</pre>
+      </details>
+    </section>
+
+    <section>
+      <h2>4. External Dependencies</h2>
+      <p>Load external CSS/JS (like FontAwesome) automatically. Works in Shadow DOM!</p>
+
+      <div style="display:flex; gap:10px; flex-wrap: wrap;">
+        <external-icon name="fa-brands fa-google"></external-icon>
+        <external-icon name="fa-brands fa-facebook"></external-icon>
+        <external-icon name="fa-brands fa-youtube"></external-icon>
+      </div>
+
+      <p style="margin-top: 1rem">Loads <code>canvas-confetti</code> automatically before mounting.</p>
+      <confetti-btn></confetti-btn>
+
+      <details>
+        <summary>View Source</summary>
+        <pre>AlpineComponentLoader.define('external-icon', '#tpl-external-icon', {
+    shadow: true,
+    externalCss: ['https://.../all.min.css'],
+    attributes: { 'name': String }
+});
+
+AlpineComponentLoader.define('confetti-btn', '#tpl-confetti', {
+    shadow: true,
+    externalScripts: ['https://.../confetti.browser.min.js']
+});</pre>
+      </details>
+    </section>
+
+    <section>
+      <h2>5. Strict Validation</h2>
+      <p>Props can now enforce `required`, `default` values, and use custom `validator` functions.</p>
+
+      <strict-progress percent="75"></strict-progress>
+
+      <strict-progress percent="150"></strict-progress>
+
+      <details>
+        <summary>View Source</summary>
+        <pre>attributes: {
+    'percent': {
+        type: Number,
+        required: true,
+        default: 0,
+        validator: (v) => v >= 0 && v <= 100
+    }
+}</pre>
+      </details>
+    </section>
+
+    <section>
+      <h2>6. Light DOM Slots <span class="badge">Polyfill</span></h2>
+      <p>Use named `&lt;slot&gt;` elements even without Shadow DOM. CSS is auto-scoped.</p>
+
+      <light-alert type="success">
+        <span slot="title">Success!</span>
+        Data saved successfully.
+      </light-alert>
+
+      <light-alert type="error">
+        <span slot="title">Error!</span>
+        Data save failed.
+      </light-alert>
+
+      <details>
+        <summary>View Source</summary>
+        <pre>&lt;!-- Definition --&gt;
+AlpineComponentLoader.define('light-alert', '#tpl-light-alert', {
+    shadow: false,
+    attributes: { 'type': String }
+});
+
+&lt;!-- Usage --&gt;
+&lt;light-alert type="success"&gt;
+  &lt;span slot="title"&gt;Success!&lt;/span&gt;
+  Data saved successfully.
+&lt;/light-alert&gt;</pre>
+      </details>
+    </section>
+
+    <section>
+      <h2>7. Lazy Loading</h2>
+      <p>This component won't initialize until you scroll it into view.</p>
+
+      <div style="border: 2px dashed #ccc; height: 150px; display: flex; align-items: center; justify-content: center; background: #fafafa;">
+        <lazy-image loading="lazy" @loaded="console.log('[lazy-image] loaded')"></lazy-image>
+      </div>
+
+      <details>
+        <summary>View Source</summary>
+        <pre>AlpineComponentLoader.define('lazy-image', '/components/lazy-image.html', {
+    loading: 'lazy'
+});
+
+&lt;!-- Won't load until scrolled into view --&gt;
+&lt;lazy-image&gt;&lt;/lazy-image&gt;</pre>
+      </details>
+    </section>
+
+    <section>
+      <h2>8. Declarative Loading <span class="badge">acl-component</span></h2>
+      <p>Load components purely via HTML without writing `define()` in JS. Props are inferred automatically.</p>
+
+      <acl-component src="#tpl-declarative-card" tag="declarative-card" shadow="true" title="Declarative Component" description="I was loaded via <acl-component> without any JS config." tags="['HTML', 'Easy', 'NoJS']"></acl-component>
+
+      <acl-component src="#tpl-declarative-card" tag="declarative-card" shadow="true" title="Another Instance" description="Attributes are auto-detected as types." tags="['Reuse', 'Components']"></acl-component>
+
+      <details>
+        <summary>View Source</summary>
+        <pre>&lt;acl-component
+    src="/components/card.html"
+    tag="my-card"
+    shadow="true"
+    title="Hello"
+    tags="['one', 'two']"
+&gt;&lt;/acl-component&gt;</pre>
+      </details>
+    </section>
+
+    <section>
+      <h2>9. Declarative Fetching <span class="badge">data-src</span></h2>
+      <p>Provide a `data-src` attribute to automatically fetch JSON and inject it into `props.$data`.</p>
+
+      <acl-component src="#tpl-user-card" tag="api-user" shadow="true" data-src="https://jsonplaceholder.typicode.com/users/1"></acl-component>
+
+      <details>
+        <summary>View Source</summary>
+        <pre>&lt;acl-component
+  src="#tpl-user-card"
+  tag="api-user"
+  data-src="https://jsonplaceholder.typicode.com/users/1"
+&gt;&lt;/acl-component&gt;</pre>
+      </details>
+    </section>
+
+    <section>
+      <h2>10. Global Store Binding <span class="badge">Two-Way</span></h2>
+      <p>Components can bind directly to an Alpine Global Store. Updates sync automatically in both directions (Store ↔ Component).</p>
+
+      <div style="margin-bottom: 10px; padding: 10px; background: #eee; border-radius: 6px;">
+        <div style="margin-bottom:5px; font-weight:bold; font-size:0.9em; color:#555;">External Control:</div>
+        <button onclick="Alpine.store('theme').mode = (Alpine.store('theme').mode === 'Dark Mode' ? 'Light Mode' : 'Dark Mode')">Toggle Global Store</button>
+      </div>
+
+      <div class="grid-responsive">
+        <acl-component src="#tpl-theme-display" tag="theme-display" shadow="true" bind-store="theme"></acl-component>
+        <acl-component src="#tpl-theme-display" tag="theme-display" shadow="true" bind-store="theme"></acl-component>
+      </div>
+
+      <details>
+        <summary>View Source</summary>
+        <pre>&lt;!-- Initialize Global Store --&gt;
+document.addEventListener('alpine:init', () => {
+    Alpine.store('theme', { mode: 'Light Mode' });
+});
+
+&lt;!-- Bind Component --&gt;
+&lt;acl-component
+    src="#tpl-theme-display"
+    tag="theme-display"
+    bind-store="theme"
+&gt;&lt;/acl-component&gt;
+
+&lt;!-- Inside Component Template --&gt;
+&lt;!-- Modifying 'props' now updates the Global Store --&gt;
+&lt;button @click="props.mode = 'Dark Mode'"&gt;
+    Update Prop
+&lt;/button&gt;</pre>
+      </details>
+    </section>
+
+    <section>
+      <h2>11. Error Boundaries <span class="badge">fallback</span></h2>
+      <p>If a component fails to load (e.g. 404), it renders the fallback template instead of an error message.</p>
+
+      <boundary-demo></boundary-demo>
+
+      <details>
+        <summary>View Source</summary>
+        <pre>AlpineComponentLoader.define('boundary-demo', '/404.html', {
+    fallback: '#tpl-fallback-error'
+});</pre>
+      </details>
+    </section>
+
+    <section>
+      <h2>12. Idle Loading</h2>
+      <p>Uses <code>requestIdleCallback</code> to load low-priority components when the CPU is idle.</p>
+
+      <acl-component src="#tpl-declarative-card" tag="idle-card" loading="idle" title="Idle Loaded" description="I loaded when the browser was idle."></acl-component>
+
+      <details>
+        <summary>View Source</summary>
+        <pre>&lt;acl-component
+    src="#tpl-declarative-card"
+    tag="idle-card"
+    loading="idle"
+    title="Idle Loaded"
+&gt;&lt;/acl-component&gt;</pre>
+      </details>
+    </section>
+
+    <section>
+      <h2>13. Dynamic Component Switching</h2>
+      <p>Dynamically swap components using the <code>is</code> attribute (similar to Vue's <code>&lt;component :is&gt;</code>). Attributes are automatically forwarded to the active component.</p>
+
+      <div x-data="{ currentView: 'shadow-card' }" style="padding: 1rem; border: 1px dashed #ccc; border-radius: 8px; background: #fafafa;">
+        <div style="margin-bottom: 1rem; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <strong>Select View:</strong>
+          <select x-model="currentView" style="padding: 5px; border-radius: 4px; border: 1px solid #ddd; flex: 1;">
+            <option value="shadow-card">Shadow Card</option>
+            <option value="strict-progress">Strict Progress</option>
+            <option value="inline-counter">Inline Counter</option>
+          </select>
+        </div>
+
+        <div style="padding: 1rem; background: white; border: 1px solid #eee; border-radius: 6px; min-height: 80px; display: flex; align-items: center; justify-content: center;">
+          <acl-dynamic :is="currentView" title="Dynamic Component" active="true" percent="70" style="width: 100%" count="4" keep-alive></acl-dynamic>
+        </div>
+      </div>
+
+      <details>
+        <summary>View Source</summary>
+        <pre>&lt;div x-data="{ view: 'shadow-card' }"&gt;
+  &lt;select x-model="view"&gt;
+    &lt;option value="shadow-card"&gt;Card&lt;/option&gt;
+    &lt;option value="strict-progress"&gt;Progress&lt;/option&gt;
+  &lt;/select&gt;
+
+  &lt;!-- Attributes are forwarded to the rendered component --&gt;
+  &lt;acl-dynamic
+    :is="view"
+    title="Dynamic Component"
+    percent="70"
+    keep-alive
+  &gt;&lt;/acl-dynamic&gt;
+&lt;/div&gt;</pre>
+      </details>
+    </section>
+
+    <section>
+      <h2>14. Emits Helper <span class="badge">$emit</span></h2>
+      <p>Components can now use <code>props.$emit('name', detail)</code> to dispatch events easily. This bubbles out of the Shadow DOM automatically.</p>
+
+      <template acl-component="emit-demo">
+        <style>
+          :host {
+            display: inline-block;
+          }
+
+          button {
+            background: #8b5cf6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+          }
+
+          button:hover {
+            background: #7c3aed;
+          }
+        </style>
+        <div x-data="{ props: $el.$props }">
+          <button @click="props.$emit('custom-alert', { message: 'Hello from Shadow DOM!' })">
+            Emit Event
+          </button>
+        </div>
+      </template>
+
+      <div x-data="{ lastMessage: 'Waiting...' }" @custom-alert="lastMessage = $event.detail.message + ' at ' + new Date().toLocaleTimeString()" style="padding: 1rem; border: 1px dashed #ccc; border-radius: 8px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px;">
+        <emit-demo></emit-demo>
+
+        <div style="font-family: monospace; color: #555;">
+          Event Output: <span x-text="lastMessage" style="color: #8b5cf6; font-weight: bold;"></span>
+        </div>
+      </div>
+
+      <details>
+        <summary>View Source</summary>
+        <pre>&lt;!-- Component Definition --&gt;
+&lt;template acl-component="emit-demo"&gt;
+    &lt;div x-data="{ props: $el.$props }"&gt;
+        &lt;button @click="props.$emit('custom-alert', { msg: 'Hi!' })"&gt;
+            Emit
+        &lt;/button&gt;
+    &lt;/div&gt;
+&lt;/template&gt;
+
+&lt;!-- Usage --&gt;
+&lt;div @custom-alert="console.log($event.detail.msg)"&gt;
+    &lt;emit-demo&gt;&lt;/emit-demo&gt;
+&lt;/div&gt;</pre>
+      </details>
+    </section>
+
+    <section>
+      <h2>15. Shared Constructible Stylesheets</h2>
+      <p>Define global styles (like a Design System or Tailwind utility classes) once in JavaScript and share them across all Shadow DOM components automatically without duplication.</p>
+
+      <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+        <shared-demo></shared-demo>
+        <shared-demo></shared-demo>
+      </div>
+
+      <details>
+        <summary>View Source</summary>
+        <pre>
+const theme = new CSSStyleSheet();
+theme.replaceSync('.theme-box { background: purple; color: white; }');
+
+// Config applies to all future Shadow DOM components
+AlpineComponentLoader.config({
+    sharedStyleSheets: [theme]
+});
+
+AlpineComponentLoader.define('shared-demo', '#tpl-shared-demo', {
+    shadow: true
+});</pre>
+      </details>
+    </section>
+
+    <section>
+      <h2>16. State Persistence <span class="badge">localStorage / sessionStorage</span></h2>
+      <p>Components can automatically save their props to <code>localStorage</code> or <code>sessionStorage</code>. Try typing in the box or clicking the button, then <strong>reload the page</strong>.</p>
+
+      <template acl-component="persistent-note" acl-props='{ "note": "String", "count": "Number" }'>
+        <style>
+          .p-box {
+            padding: 1.5rem;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-sizing: border-box;
+          }
+
+          button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+          }
+
+          button:hover {
+            background: #2563eb;
+          }
+
+          input {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-top: 5px;
+            width: 100%;
+            box-sizing: border-box;
+          }
+        </style>
+        <div x-data="{ props: $el.$props }" class="p-box">
+          <label style="font-weight:bold; display:block; margin-bottom:5px;">Shared Notes:</label>
+          <input type="text" x-model="props.note" placeholder="I will survive a refresh...">
+
+          <div style="margin-top: 1rem; display: flex; align-items: center; justify-content: space-between;">
+            <button @click="props.count = (props.count || 0) + 1">
+              Increment Count
+            </button>
+            <strong style="font-size: 1.2em;">
+              Current: <span x-text="props.count || 0">0</span>
+            </strong>
+          </div>
+
+          <div style="margin-top: 10px; font-size: 0.8em; opacity: 0.8; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;">
+            <div>
+              Storage Key: <code>acl:demo-persist</code>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <button @click="location.reload()">
+                Reload
+              </button>
+              <button @click="props.$persistence.$clear(); location.reload()">
+                Reset & Reload
+              </button>
+            </div>
+          </div>
+        </div>
+      </template>
+      <persistent-note persist="session" persist-key="acl:demo-persist" note="" count="0"></persistent-note>
+
+      <details>
+        <summary>View Source</summary>
+        <pre>&lt;!-- Component Definition --&gt;
+&lt;template acl-component="persistent-note" acl-props='{ "note": "String", "count": "Number" }'&gt;
+    &lt;div x-data="{ props: $el.$props }"&gt;
+        &lt;input x-model="props.note"&gt;
+        &lt;button @click="props.count++"&gt;Inc&lt;/button&gt;
+    &lt;/div&gt;
+&lt;/template&gt;
+
+&lt;!-- Usage --&gt;
+&lt;persistent-note
+    persist="session"
+    persist-key="acl:demo-persist"
+&gt;&lt;/persistent-note&gt;
+
+&lt;!-- Clear Persistence --&gt;
+&lt;button @click=&quot;props.$persistence.$clear(); location.reload()&quot;&gt;
+    Reset &amp; Reload
+&lt;/button&gt;</pre>
+      </details>
+    </section>
+
+  </main>
+
+  <site-footer loading="lazy" @loaded="console.log('[site-footer] loaded')"></site-footer>
+
+  <template id="tpl-shadow-card">
+    <style>
+      :host {
+        display: block;
+        padding: 1rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+        transition: all 0.2s;
+        box-sizing: border-box;
+      }
+
+      :host([active="true"]) {
+        border-color: #3b82f6;
+        background: #eff6ff;
+        box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.1);
+      }
+    </style>
+    <div x-data="{ props: $el.$props }">
+      <strong x-text="props.title"></strong>
+      <small style="display:block; color:#6b7280" x-text="props.active ? 'Status: Active' : 'Status: Inactive'"></small>
+    </div>
+  </template>
+
+  <template id="tpl-declarative-card">
+    <style>
+      :host {
+        display: block;
+        padding: 1.5rem;
+        background: #2f3e46;
+        color: white;
+        border-radius: 12px;
+        margin-bottom: 1rem;
+        box-sizing: border-box;
+      }
+
+      .tags {
+        margin-top: 10px;
+        display: flex;
+        gap: 5px;
+      }
+
+      .tag {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+      }
+    </style>
+    <div x-data="{ props: $el.$props }">
+      <h3 style="margin:0 0 5px 0" x-text="props.title"></h3>
+      <div style="opacity: 0.8" x-text="props.description"></div>
+      <div class="tags">
+        <template x-for="tag in (props.tags || [])">
+          <span class="tag" x-text="tag"></span>
+        </template>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-lifecycle-logger">
+    <style>
+      :host {
+        display: block;
+        background: #27272a;
+        color: #10b981;
+        padding: 1rem;
+        border-radius: 8px;
+        font-family: monospace;
+        box-sizing: border-box;
+        overflow-x: auto;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 1rem;
+        list-style: square;
+      }
+    </style>
+    <div x-data="{ props: $el.$props }">
+      <div><strong>Console Log Output:</strong></div>
+      <ul x-effect="console.log('rendering logs')">
+        <template x-for="log in props.logs">
+          <li x-text="log"></li>
+        </template>
+      </ul>
+      <div style="margin-top:10px; color: #71717a; font-size: 0.8em">
+        Current Title: <span x-text="props.title || 'None'"></span>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-external-icon">
+    <style>
+      :host {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: white;
+        border: 1px solid #ddd;
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        font-size: 1.5rem;
+        color: #3b82f6;
+      }
+    </style>
+    <div x-data="{ props: $el.$props }">
+      <i :class="props.name"></i>
+    </div>
+  </template>
+
+  <template id="tpl-confetti">
+    <div x-data style="text-align: center;">
+      <button class="global-btn" @click="confetti({ origin: { y: 0.7 } })" style="padding:10px 20px; cursor:pointer;">
+        🎉 Party Time
+      </button>
+    </div>
+  </template>
+
+  <template id="tpl-strict-progress">
+    <style>
+      :host {
+        display: block;
+        margin-bottom: 10px;
+      }
+
+      .bar-bg {
+        background: #e5e7eb;
+        height: 20px;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+
+      .bar-fill {
+        background: #3b82f6;
+        height: 100%;
+        transition: width 0.3s;
+      }
+    </style>
+    <div x-data="{ props: $el.$props }">
+      <div class="bar-bg">
+        <div class="bar-fill" :style="`width: ${props.percent}%`"></div>
+      </div>
+      <div style="text-align:right; font-size:0.8em; margin-top:4px;">
+        <span x-text="props.percent + '%'"></span>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-light-alert">
+    <style>
+      :host {
+        display: flex;
+        gap: 1rem;
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #9ca3af;
+        background: #f3f4f6;
+        margin-bottom: 1rem;
+        box-sizing: border-box;
+      }
+
+      :host([type="success"]) {
+        border-color: #22c55e;
+        background: #f0fdf4;
+        color: #166534;
+      }
+
+      :host([type="error"]) {
+        border-color: #ef4444;
+        background: #fef2f2;
+        color: #991b1b;
+      }
+
+      .icon {
+        font-size: 1.5rem;
+      }
+    </style>
+    <div class="icon">
+      <template x-if="$el.closest('light-alert').getAttribute('type') === 'success'"><span>✅</span></template>
+      <template x-if="$el.closest('light-alert').getAttribute('type') === 'error'"><span>⚠️</span></template>
+    </div>
+    <div>
+      <div style="font-weight: bold; margin-bottom: 0.25rem">
+        <slot name="title">Alert</slot>
+      </div>
+      <div>
+        <slot></slot>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-event-button">
+    <style>
+      button {
+        background: #3b82f6;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: #2563eb;
+      }
+    </style>
+    <div x-data>
+      <button @click="$dispatch('action', { text: 'Last clicked at: ' + new Date().toLocaleTimeString() })">
+        Dispatch Event
+      </button>
+    </div>
+  </template>
+
+  <template id="tpl-user-card">
+    <style>
+      :host {
+        display: block;
+        border: 1px solid #ccc;
+        padding: 1rem;
+        border-radius: 8px;
+        background: #fff;
+        box-sizing: border-box;
+      }
+    </style>
+    <div x-data="{ props: $el.$props }">
+      <template x-if="props.loading">
+        <div>Loading API data...</div>
+      </template>
+      <template x-if="props.$error">
+        <div style="color:red" x-text="props.$error"></div>
+      </template>
+      <template x-if="props.$data">
+        <div>
+          <h3 style="margin-top:0" x-text="props.$data.name"></h3>
+          <p>Email: <span x-text="props.$data.email"></span></p>
+          <p>City: <span x-text="props.$data.address?.city"></span></p>
+        </div>
+      </template>
+    </div>
+  </template>
+
+  <template id="tpl-theme-display">
+    <style>
+      :host {
+        display: block;
+        padding: 1.5rem;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+        transition: all 0.3s;
+        box-sizing: border-box;
+      }
+
+      .box {
+        font-weight: bold;
+      }
+
+      button {
+        margin-top: 0.5rem;
+        padding: 4px 8px;
+        cursor: pointer;
+        font-size: 0.85em;
+      }
+    </style>
+    <div x-data="{ props: $el.$props }" class="box" :style="`color: ${props.color}`">
+      <div>Current Mode: <span x-text="props.mode"></span></div>
+
+      <button @click="props.mode = (props.mode === 'Dark Mode' ? 'Light Mode' : 'Dark Mode')">
+        Update from Component
+      </button>
+
+      <div style="margin-top: 8px">
+        <small style="color: #666; font-weight:normal;">Bound to global store.</small>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-fallback-error">
+    <style>
+      :host {
+        display: block;
+        padding: 1rem;
+        border: 1px solid #fca5a5;
+        background: #fee2e2;
+        color: #991b1b;
+        border-radius: 6px;
+        box-sizing: border-box;
+      }
+    </style>
+    <div x-data>
+      <strong>⚠️ Component Unavailable</strong>
+      <p style="margin:0; font-size: 0.9em">We successfully caught the error and rendered this fallback template instead.</p>
+    </div>
+  </template>
+
+  <template acl-component="site-header" acl-props='{ "title": "String", "github": "String" }'>
+    <style>
+      :host {
+        display: block;
+        background: #fff;
+        border-bottom: 1px solid #e5e7eb;
+        padding: clamp(1rem, 3vw, 2rem);
+        text-align: center;
+        position: relative;
+        z-index: 10;
+        box-sizing: border-box;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(1.8rem, 4vw, 2.5rem);
+        letter-spacing: -0.05em;
+        line-height: 1.2;
+        color: var(--text, #1f2937);
+      }
+
+      .subtitle {
+        color: #6b7280;
+        font-size: 1.1rem;
+        margin-top: 0.5rem;
+      }
+
+      .github-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 1rem;
+        text-decoration: none;
+        color: var(--primary, #3b82f6);
+        font-weight: 600;
+      }
+
+      .github-link:hover {
+        text-decoration: underline;
+      }
+    </style>
+
+    <div x-data="{ props: $el.$props }">
+      <button id="debug-toggle" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999; background: #1f2937; color: white; border: 1px solid #374151; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 12px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        🐞 Debug Mode
+      </button>
+
+      <h1 x-text="props.title || 'AlpineComponentLoader'"></h1>
+
+      <div class="subtitle">
+        <slot></slot>
+      </div>
+
+      <template x-if="props.github">
+        <a :href="props.github" class="github-link" target="_blank">
+          <svg style="width:20px; height:20px;" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+          </svg>
+          View on GitHub
+        </a>
+      </template>
+    </div>
+  </template>
+
+  <template acl-component="site-footer">
+    <style>
+      :host {
+        display: block;
+        margin-top: auto;
+        border-top: 1px solid #e5e7eb;
+        background: #fff;
+        color: #6b7280;
+        width: 100%;
+      }
+
+      .container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: clamp(1rem, 3vw, 2rem);
+        display: flex;
+        box-sizing: border-box;
+      }
+
+      .inner {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem 2rem;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .meta {
+        color: #6b7280;
+        font-size: 0.9rem;
+      }
+
+      .meta strong {
+        color: var(--text);
+      }
+
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem 1rem;
+        align-items: center;
+      }
+
+      a {
+        color: var(--primary);
+        text-decoration: none;
+        font-weight: 600;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+    </style>
+
+    <div class="container" x-data="{ year: new Date().getFullYear() }">
+      <div class="inner">
+        <div class="meta">
+          <div><strong>AlpineComponentLoader</strong> - A lightweight, build-free component loader for Alpine.js.</div>
+          <div>&copy; <span x-text="year"></span> LTDev LLC · MIT License</div>
+        </div>
+
+        <nav aria-label="Footer">
+          <a href="https://github.com/LTDev-LLC/alpine-component-loader" target="_blank" rel="noreferrer">GitHub</a>
+          <a href="https://github.com/LTDev-LLC/alpine-component-loader/issues" target="_blank" rel="noreferrer">Issues</a>
+          <a href="https://alpinejs.dev/" target="_blank" rel="noreferrer">Alpine.js</a>
+          <a href="#top">Back to top ↑</a>
+        </nav>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-shared-demo">
+    <div class="theme-box" x-data>
+      <div class="theme-title">Shared Theme Applied</div>
+      <div style="opacity: 0.9; font-size: 0.95em; line-height: 1.5;">
+        I have <strong>zero</strong> internal styles.
+        <br>
+        I inherited <span class="theme-badge">.theme-box</span> from the global config.
+      </div>
+    </div>
+  </template>
+</body>
+
+</html>
