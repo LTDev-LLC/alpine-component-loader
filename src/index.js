@@ -292,7 +292,12 @@ export default class AlpineComponentLoader {
                     }
 
                     // Only draw if we have a valid visible area
-                    if (rect.width > 0 && rect.height > 0) {
+                    if (rect.width > 0 && rect.height > 0 &&
+                        rect.top < window.innerHeight &&
+                        rect.left < window.innerWidth &&
+                        (rect.top + rect.height) > 0 &&
+                        (rect.left + rect.width) > 0
+                    ) {
                         // Reuse existing box or create new one
                         let box = children[usedBoxCount];
                         if (!box) {
