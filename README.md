@@ -24,7 +24,7 @@ Import the module directly. No installation required.
 
 ```html
 <script type="module">
-    import AlpineComponentLoader from '/dist/AlpineComponentLoader.js';
+    import AlpineComponentLoader from '/dist/AlpineComponentLoader.min.js';
 
     // Optional: Global Configuration
     AlpineComponentLoader.config({
@@ -102,7 +102,73 @@ Use the `<acl-component>` element to load components entirely from HTML without 
 
 ### 1. Typed Props (Attributes → `$el.$props`)
 
-The core feature of this library is transforming HTML attributes into typed JavaScript data. To use them efficiently, map them to your component scope using **`x-data`**.
+AlpineComponentLoader automatically converts HTML string attributes into real JavaScript types (Numbers, Booleans, Arrays, Objects) based on your configuration. These props are made available as a reactive `props` object in your Alpine component.
+
+#### Defining Props
+
+You can define props in two ways: using JavaScript (`define`) or directly in HTML (`acl-props`).
+
+**A. External Components (JavaScript)**
+Pass an `attributes` object when registering the component. You can use simple types or detailed objects for defaults and validation.
+
+```javascript
+AlpineComponentLoader.define('user-profile', 'user.html', {
+    attributes: {
+        'age': Number,                       // Basic type
+        'active': {                          // Default value
+            type: Boolean,
+            default: false
+        },
+        'status': {                          // Enum validation (Allowed values)
+            type: String,
+            options: ['online', 'offline', 'busy'],
+            default: 'online'
+        },
+        'config': {                          // Shape validation (Object structure)
+            type: Object,
+            schema: {
+                theme: String,
+                notifications: Boolean
+            }
+        }
+    }
+});
+```
+
+**B. Inline Templates (`acl-props`)**
+Use the `acl-props` attribute on the `<template>` tag. The value must be a **valid JSON string**. This is useful for single-file demos or rapid prototyping.
+
+```html
+<template acl-component="user-profile" acl-props='{
+    "age": "Number",
+    "active": { "type": "Boolean", "default": false },
+    "status": {
+        "type": "String",
+        "options": ["online", "offline", "busy"]
+    },
+    "config": {
+        "type": "Object",
+        "schema": { "theme": "String", "notifications": "Boolean" }
+    }
+}'>
+    <div x-data="{ props: $el.$props }">
+        <span x-text="props.status"></span>
+    </div>
+</template>
+```
+
+#### Usage in HTML
+
+Regardless of how they are defined, you pass props as standard HTML attributes. The loader handles the conversion before Alpine initializes.
+
+```html
+<user-profile
+    age="25"
+    active="true"
+    status="busy"
+    config="{ 'theme': 'dark', 'notifications': true }"
+></user-profile>
+```
 
 #### Configuration (External Files)
 
@@ -284,6 +350,19 @@ The loader injects a helper object into `props.$persistence` to allow manual con
 <heavy-footer loading="idle"></heavy-footer>
 ```
 
+### Template Prefetching
+
+To prevent "waterfall" loading (where a child component waits for its parent to mount before fetching), you can manually prefetch templates. This warms the cache so the component renders instantly when needed.
+
+```javascript
+// Register the component first (fetching is deferred)
+AlpineComponentLoader.define('heavy-widget', 'widget.html');
+
+// Prefetch when the browser is idle or on hover
+AlpineComponentLoader.prefetch('heavy-widget');
+
+```
+
 ### Error Boundaries (`fallback`)
 
 If a component fails to load (404, Network Error) or fails to fetch its `data-src`, the loader renders a fallback template instead of breaking the page.
@@ -346,13 +425,55 @@ AlpineComponentLoader.define('timer-comp', 'timer.html', {
 ```
 ---
 
+## Debugging
+
+AlpineComponentLoader includes an optional visual debugger to help you inspect component props, loading states, and layout boundaries. To keep the core library lightweight, the debugger is a separate module that must be injected.
+
+### Installation & Setup
+
+Import `ACLDebugger` and inject it into the main loader class **before** starting the application.
+
+```javascript
+import AlpineComponentLoader from '/dist/AlpineComponentLoader.min.js';
+import ACLDebugger from '/dist/ACLDebugger.min.js';
+
+// Inject the Debugger into the Loader
+ACLDebugger.inject(AlpineComponentLoader);
+
+// Expose AlpineComponentLoader to the global scope
+window.AlpineComponentLoader = AlpineComponentLoader;
+
+// ... Rest of your ACL code ...
+
+// Toggle the debugger on/off
+AlpineComponentLoader.toggleDebug();
+```
+
+### Usage
+
+Once injected, you can toggle the debug overlay programmatically or via a button:
+
+```html
+<button @click="AlpineComponentLoader.toggleDebug()">
+    🐞 Debug Mode
+</button>
+```
+
+### Features
+
+* **Component Inspector**: Hover over any component to see a tooltip with its **Tag Name**, **Loading Status**, and real-time **Props** (JSON).
+* **Visual Overlays**: Draws green borders around all detected components to visualize layout and nesting.
+* **Performance Optimized**: The debugger only renders overlays for components currently visible in the viewport, ensuring smooth performance even with hundreds of components on the page.
+
+---
+
 ## API Reference
 
 ### `define(tagName, source, options)`
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
-| `attributes` | `Object` | `{}` | Prop definitions (`type`, `default`, `required`). |
+| `attributes` | `Object` | `{}` | Prop definitions (`type`, `default`, `required`, `options`, `schema`). |
 | `shadow` | `Boolean` | `false` | Enable Shadow DOM encapsulation. |
 | `dataSrc` | `String` | `null` | Default API URL for fetching. |
 | `bindStore` | `String` | `null` | Name of Alpine Store to bind to props. |
@@ -363,6 +484,7 @@ AlpineComponentLoader.define('timer-comp', 'timer.html', {
 | `externalScripts` | `Array` | `[]` | List of JS URLs to inject. |
 | `forwardEvents` | `Array` | `[]` | Events to bubble out of Shadow DOM. |
 | `fetchTimeout` | `Number` | `10000` | Timeout for `data-src` requests (ms). |
+| `fetchOptions` | `Object` | `{}` | Custom options for `fetch()` (headers, method, etc). |
 | `cacheTemplates` | `Boolean` | `true` | Enable template cache for external (HTTP(s)) templates for 15 minutes. |
 
 ### `config(options)`
@@ -379,6 +501,18 @@ Manually clears all template caches (Current and Old versions) from the browser'
 
 ```javascript
 await AlpineComponentLoader.clearCache();
+```
+
+### `prefetch(tagName)`
+
+Manually fetches and caches the template for a registered component tag.
+
+* **tagName**: The hyphenated tag name of the component to prefetch.
+* **Returns**: A `Promise` that resolves with the template string.
+
+```javascript
+await AlpineComponentLoader.prefetch('my-component');
+
 ```
 
 ---

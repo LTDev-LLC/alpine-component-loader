@@ -381,41 +381,6 @@ var typeMap = {
     'Array': Array,
     'Object': Object
 };
-// CSS for debugger
-var debuggerCss = {
-    tooltip: {
-        position: 'fixed',
-        zIndex: 10000,
-        background: '#1f2937',
-        color: '#f3f4f6',
-        padding: '8px 12px',
-        borderRadius: '6px',
-        fontSize: '11px',
-        fontFamily: 'monospace',
-        pointerEvents: 'none',
-        border: '1px solid #374151',
-        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
-        maxWidth: '300px',
-        whiteSpace: 'pre-wrap',
-        display: 'none'
-    },
-    overlay: {
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        pointerEvents: 'none',
-        zIndex: 9998,
-        overflow: 'hidden'
-    },
-    overlayBoxes: {
-        position: 'absolute',
-        border: '3px solid #22c55e',
-        boxSizing: 'border-box',
-        transition: 'all 0.1s ease-out'
-    }
-};
 // Helper to convert JS style objects to CSS strings
 var toCssString = function(styleObj) {
     return Object.entries(styleObj).map(function(param) {
@@ -604,165 +569,179 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
             key: "toggleDebug",
             value: // Toggle the built-in debugger
             function toggleDebug() {
-                var active = this.globalConfig.debug = !this.globalConfig.debug;
-                document.body.classList.toggle('acl-debug-active', active);
-                // Create the tooltip element if it doesn't exist
-                var tooltip = document.getElementById('acl-debug-tooltip');
-                if (!tooltip) {
-                    tooltip = document.createElement('div');
-                    tooltip.id = 'acl-debug-tooltip';
-                    tooltip.style.cssText = toCssString(debuggerCss.tooltip);
-                    // Title
-                    var titleNode = document.createElement('strong');
-                    titleNode.style.color = '#4ade80';
-                    // Title separator
-                    var hr = document.createElement('div');
-                    hr.style.margin = '4px 0';
-                    hr.style.borderBottom = '1px solid #374151';
-                    // Status info
-                    var statusNode = document.createElement('div');
-                    // Prop info
-                    var propsNode = document.createElement('pre');
-                    propsNode.style.cssText = 'margin: 4px 0 0 0; opacity: 0.8;';
-                    // Append once
-                    tooltip.append(titleNode, hr, statusNode, propsNode);
-                    // Save references for fast updates
-                    tooltip._nodes = {
-                        title: titleNode,
-                        status: statusNode,
-                        props: propsNode
-                    };
-                    // Append to body
-                    document.body.appendChild(tooltip);
-                }
-                // Create the overlay container if it doesn't exist
-                var overlayContainer = document.getElementById('acl-debug-overlays');
-                if (!overlayContainer) {
-                    overlayContainer = document.createElement('div');
-                    overlayContainer.id = 'acl-debug-overlays';
-                    overlayContainer.style.cssText = toCssString(debuggerCss.overlay);
-                    document.body.appendChild(overlayContainer);
-                }
-                // State management, tracking hovered component + mouse position
-                var mouseX = 0, mouseY = 0, hoveredElement = null;
-                // Lightweight mouse listener for finding hovered component + mouse position
-                var onMouseMove = function(e) {
-                    mouseX = e.clientX;
-                    mouseY = e.clientY;
-                    // Find hovered component (handling Shadow DOM)
-                    hoveredElement = (e.composedPath() || []).find(function(node) {
-                        return node.nodeType === 1 && node.hasAttribute('data-acl-component');
-                    });
-                };
-                // If active, start debugging!
-                if (active) {
-                    document.addEventListener('mousemove', onMouseMove, {
-                        passive: true
-                    });
-                    // Render loop, with throttling, handles overlay + tooltip
-                    var renderLoop = function() {
-                        if (!AlpineComponentLoader.globalConfig.debug) {
-                            overlayContainer.replaceChildren(); // Cleanup
-                            tooltip.style.display = 'none';
-                            document.removeEventListener('mousemove', onMouseMove);
-                            return;
-                        }
-                        // Overlay logic (DOM Pooling) for component positions
-                        var components = document.querySelectorAll('[data-acl-component]'), children = overlayContainer.children;
-                        var usedBoxCount = 0;
-                        // Measure all components recursively to find visible areas
-                        components.forEach(function(el) {
-                            var rect = el.getBoundingClientRect();
-                            // Attempt to find visible area of children for collapsed elements
-                            if (rect.width === 0 && rect.height === 0) {
-                                var nodes = el.shadowRoot ? el.shadowRoot.children : el.children;
-                                if (nodes.length > 0) {
-                                    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, found = false;
-                                    var _iteratorNormalCompletion = true, _didIteratorError = false, _iteratorError = undefined;
-                                    try {
-                                        // Measure children recursively until we find a valid visible area
-                                        for(var _iterator = nodes[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true){
-                                            var child = _step.value;
-                                            var cRect = child.getBoundingClientRect();
-                                            if (cRect.width > 0 || cRect.height > 0) {
-                                                found = true;
-                                                minX = Math.min(minX, cRect.left);
-                                                minY = Math.min(minY, cRect.top);
-                                                maxX = Math.max(maxX, cRect.right);
-                                                maxY = Math.max(maxY, cRect.bottom);
-                                            }
-                                        }
-                                    } catch (err) {
-                                        _didIteratorError = true;
-                                        _iteratorError = err;
-                                    } finally{
-                                        try {
-                                            if (!_iteratorNormalCompletion && _iterator.return != null) {
-                                                _iterator.return();
-                                            }
-                                        } finally{
-                                            if (_didIteratorError) {
-                                                throw _iteratorError;
-                                            }
-                                        }
-                                    }
-                                    // Found a valid visible area, use it
-                                    if (found) rect = {
-                                        left: minX,
-                                        top: minY,
-                                        width: maxX - minX,
-                                        height: maxY - minY
-                                    };
+                console.warn('[AlpineComponentLoader] Debugger not loaded. Import \"acl-debugger.js\" to enable.');
+            }
+        },
+        {
+            key: "prefetch",
+            value: // Prefetch a component's template by tag name to warm the cache
+            function prefetch(tagName) {
+                return _async_to_generator(function() {
+                    var config;
+                    return _ts_generator(this, function(_state) {
+                        switch(_state.label){
+                            case 0:
+                                config = AlpineComponentLoader._registry.get(tagName);
+                                if (!config) {
+                                    console.warn("[AlpineComponentLoader] Cannot prefetch <".concat(tagName, ">: component not defined."));
+                                    return [
+                                        2
+                                    ];
                                 }
-                            }
-                            // Only draw if we have a valid visible area
-                            if (rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight && rect.left < window.innerWidth && rect.top + rect.height > 0 && rect.left + rect.width > 0) {
-                                // Reuse existing box or create new one
-                                var box = children[usedBoxCount];
-                                if (!box) {
-                                    box = document.createElement('div');
-                                    box.style.cssText = toCssString(debuggerCss.overlayBoxes);
-                                    overlayContainer.appendChild(box);
-                                }
-                                // Fast style update
-                                box.style.transform = "translate(".concat(rect.left, "px, ").concat(rect.top, "px)");
-                                box.style.width = "".concat(rect.width, "px");
-                                box.style.height = "".concat(rect.height, "px");
-                                box.style.display = 'block'; // Ensure it's visible
-                                // Count the used boxes
-                                usedBoxCount++;
-                            }
-                        });
-                        // Hide unused boxes in the pool
-                        for(var i = usedBoxCount; i < children.length; i++)children[i].style.display = 'none';
-                        // Tooltip logic, apply position + content
-                        if (hoveredElement) {
-                            tooltip.style.display = 'block';
-                            // Content Update
-                            tooltip._nodes.title.textContent = "<".concat(hoveredElement.getAttribute('data-acl-component'), ">");
-                            tooltip._nodes.status.textContent = hoveredElement._loading ? 'Loading...' : 'Ready';
-                            tooltip._nodes.status.style.color = hoveredElement._loading ? '#fbbf24' : '#4ade80';
-                            // Display all props
-                            tooltip._nodes.props.textContent = JSON.stringify(hoveredElement.$props, null, 2);
-                            // Base position information
-                            var offset = 15, tRect = tooltip.getBoundingClientRect(), winW = window.innerWidth, winH = window.innerHeight;
-                            // Initial positioning
-                            var left = mouseX + offset, top = mouseY + offset;
-                            // Keep tooltip on screen within offset
-                            if (left + tRect.width > winW) left = mouseX - tRect.width - offset;
-                            if (top + tRect.height > winH) top = mouseY - tRect.height - offset;
-                            if (left < 0) left = offset;
-                            if (top < 0) top = offset;
-                            // Update position
-                            tooltip.style.left = "".concat(left, "px");
-                            tooltip.style.top = "".concat(top, "px");
-                        } else {
-                            tooltip.style.display = 'none';
+                                return [
+                                    4,
+                                    AlpineComponentLoader.loadTemplate(config.source, config.settings)
+                                ];
+                            case 1:
+                                return [
+                                    2,
+                                    _state.sent()
+                                ];
                         }
-                        requestAnimationFrame(renderLoop);
-                    };
-                    requestAnimationFrame(renderLoop);
-                }
+                    });
+                })();
+            }
+        },
+        {
+            key: "loadTemplate",
+            value: // Centralized static template loader for components
+            function loadTemplate(source, settings) {
+                return _async_to_generator(function() {
+                    var el, useCache, faH, _cache, match, fetchedAt, unused, res, clone, headers, unused1;
+                    return _ts_generator(this, function(_state) {
+                        switch(_state.label){
+                            case 0:
+                                // Handle HTMLTemplateElement or ID selector
+                                if (_instanceof(source, HTMLTemplateElement)) {
+                                    return [
+                                        2,
+                                        source.content
+                                    ];
+                                } else if (typeof source === 'string' && source.startsWith('#')) {
+                                    el = document.querySelector(source);
+                                    if (!el) return [
+                                        2,
+                                        Promise.reject(new Error('Template ID "'.concat(source, '" not found')))
+                                    ];
+                                    if (!_instanceof(el, HTMLTemplateElement)) return [
+                                        2,
+                                        Promise.reject(new Error('ID "'.concat(source, '" is not a <template>')))
+                                    ];
+                                    return [
+                                        2,
+                                        el.content
+                                    ];
+                                }
+                                // Check Cache API
+                                useCache = settings.cacheTemplates && 'caches' in window, faH = 'acl__fetched-at__';
+                                if (!useCache) return [
+                                    3,
+                                    7
+                                ];
+                                _state.label = 1;
+                            case 1:
+                                _state.trys.push([
+                                    1,
+                                    6,
+                                    ,
+                                    7
+                                ]);
+                                return [
+                                    4,
+                                    caches.open(settings._templateCacheKey)
+                                ];
+                            case 2:
+                                // Open cache
+                                _cache = _state.sent();
+                                return [
+                                    4,
+                                    _cache.match(source)
+                                ];
+                            case 3:
+                                match = _state.sent();
+                                if (!(match === null || match === void 0 ? void 0 : match.ok)) return [
+                                    3,
+                                    5
+                                ];
+                                fetchedAt = Number(match.headers.get(faH));
+                                if (!Number.isNaN(fetchedAt) && Date.now() - fetchedAt < settings._templateCacheExpire) return [
+                                    2,
+                                    match.text()
+                                ];
+                                return [
+                                    4,
+                                    _cache.delete(settings._templateCacheKey)
+                                ];
+                            case 4:
+                                _state.sent();
+                                _state.label = 5;
+                            case 5:
+                                return [
+                                    3,
+                                    7
+                                ];
+                            case 6:
+                                unused = _state.sent();
+                                return [
+                                    3,
+                                    7
+                                ];
+                            case 7:
+                                return [
+                                    4,
+                                    fetch(source, {
+                                        cache: 'no-store'
+                                    })
+                                ];
+                            case 8:
+                                res = _state.sent();
+                                if (!res.ok) throw new Error("HTTP ".concat(res.status));
+                                if (!useCache) return [
+                                    3,
+                                    12
+                                ];
+                                _state.label = 9;
+                            case 9:
+                                _state.trys.push([
+                                    9,
+                                    11,
+                                    ,
+                                    12
+                                ]);
+                                // Clone response + headers
+                                clone = res.clone(), headers = new Headers(clone.headers);
+                                // Set cache expiration header
+                                headers.set(faH, Date.now().toString());
+                                // Write to cache
+                                return [
+                                    4,
+                                    _cache.put(source, new Response(clone.body, {
+                                        status: clone.status,
+                                        statusText: clone.statusText,
+                                        headers: headers
+                                    }))
+                                ];
+                            case 10:
+                                _state.sent();
+                                return [
+                                    3,
+                                    12
+                                ];
+                            case 11:
+                                unused1 = _state.sent();
+                                return [
+                                    3,
+                                    12
+                                ];
+                            case 12:
+                                // Return HTML string
+                                return [
+                                    2,
+                                    res.text()
+                                ];
+                        }
+                    });
+                })();
             }
         },
         {
@@ -816,6 +795,11 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                 // Prepend base path if source is a URL string
                 var contentSource = source;
                 if (typeof source === 'string' && !source.startsWith('#') && settings.basePath) contentSource = settings.basePath + source;
+                // Register in internal registry to enable prefetching
+                AlpineComponentLoader._registry.set(tagName, {
+                    source: contentSource,
+                    settings: settings
+                });
                 // Create component class
                 var AlpineExternalComponent = /*#__PURE__*/ function(HTMLElement1) {
                     _inherits(AlpineExternalComponent, HTMLElement1);
@@ -852,7 +836,8 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                         }) : _this;
                         _this._observer = null;
                         _this._scopeId = "scope-".concat(Math.random().toString(36).slice(2, 9));
-                        _this._slotObserver = null; // Initialize observer reference
+                        _this._slotObserver = null;
+                        _this._originalLightDom = document.createDocumentFragment();
                         return _this;
                     }
                     _create_class(AlpineExternalComponent, [
@@ -867,7 +852,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                 } else {
                                     this._updateProp(name, newVal);
                                 }
-                                // Lifecycle: Updated
+                                // Emit updated event
                                 if (this._initialized) this._triggerHook('updated', {
                                     name: name,
                                     oldVal: oldVal,
@@ -927,7 +912,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                         _this._disconnectTimeout = null;
                                         return;
                                     }
-                                    // Lifecycle: Unmounted
+                                    // Emit unmounted
                                     _this._triggerHook('unmounted');
                                     // Cancel any pending fetches
                                     if (_this._fetchAbortController) _this._fetchAbortController.abort();
@@ -1026,7 +1011,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                                 if (this._initialized) return [
                                                     2
                                                 ];
-                                                // Lifecycle: Before Mount
+                                                // Emit beforeMount
                                                 this._triggerHook('beforeMount');
                                                 // Load external dependencies, get content, and data if needed
                                                 promises = [
@@ -1075,7 +1060,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                                 // Mark success and unlock
                                                 this._initialized = true;
                                                 this._loading = false;
-                                                // Lifecycle: Mounted
+                                                // Dispatch 'mount' event
                                                 this._dispatch('mount');
                                                 this._triggerHook('mounted');
                                                 //Dispatch 'loaded' event
@@ -1179,14 +1164,14 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                                 if (!url) return [
                                                     2
                                                 ];
-                                                // Abort previous request (Fixes Race Conditions)
+                                                // Abort previous request (Fixes race conditions)
                                                 if (this._fetchAbortController) this._fetchAbortController.abort();
                                                 this._fetchAbortController = new AbortController();
                                                 signal = this._fetchAbortController.signal;
-                                                // Set Loading State
+                                                // Set loading state
                                                 this.$props.$loading = true;
                                                 this.$props.$error = null;
-                                                // Setup Timeout
+                                                // Setup timeout
                                                 timeoutId = setTimeout(function() {
                                                     return _this._fetchAbortController.abort('Timeout');
                                                 }, settings.fetchTimeout);
@@ -1198,7 +1183,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                                     12,
                                                     13
                                                 ]);
-                                                // Prepare Options
+                                                // Prepare options
                                                 options = _object_spread_props(_object_spread({
                                                     method: 'GET',
                                                     headers: {
@@ -1230,7 +1215,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                                 clearTimeout(timeoutId);
                                                 // Validate response
                                                 if (!res.ok) throw new Error("API Error: ".concat(res.status, " ").concat(res.statusText));
-                                                // Validate Content Type
+                                                // Validate content type as JSON
                                                 contentType = res.headers.get("content-type");
                                                 if (!contentType || !contentType.includes("application/json")) throw new Error('Invalid response. Expected JSON, got "'.concat(contentType, '"'));
                                                 _state.label = 5;
@@ -1276,7 +1261,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                                 ];
                                             case 11:
                                                 e1 = _state.sent();
-                                                // Handle Aborts vs Real Errors
+                                                // Ignore abort errors
                                                 if (e1.name === 'AbortError' || signal.aborted) {
                                                     if (signal.reason === 'Timeout') {
                                                         this.$props.$error = "Request timed out after ".concat(settings.fetchTimeout, "ms");
@@ -1392,19 +1377,23 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                             // Manual slot polyfill for Light DOM
                             key: "_captureLightSlots",
                             value: function _captureLightSlots() {
-                                var slots = {
-                                    default: []
-                                };
-                                Array.from(this.childNodes).forEach(function(node) {
-                                    if (node.nodeType === Node.ELEMENT_NODE && node.hasAttribute('slot')) {
-                                        var name = node.getAttribute('slot');
-                                        if (!slots[name]) slots[name] = [];
-                                        slots[name].push(node);
-                                    } else {
-                                        slots.default.push(node);
-                                    }
+                                var _this = this;
+                                // Recover slotted nodes if re-rendering (prevent loss)
+                                if (this._initialized) this._root.querySelectorAll('[data-acl-slot]').forEach(function(container) {
+                                    while(container.firstChild)_this._originalLightDom.appendChild(container.firstChild);
                                 });
-                                return slots;
+                                // Capture any new direct children (First load or dynamic additions)
+                                while(this.firstChild)this._originalLightDom.appendChild(this.firstChild);
+                                // We iterate the storage fragment to sort nodes into the slots map
+                                // Note: The nodes physically exist in the fragment until moved by _renderSafe
+                                return Array.from(this._originalLightDom.childNodes).reduce(function(slots, node) {
+                                    // Determine slot name
+                                    var name = node.nodeType === Node.ELEMENT_NODE && node.hasAttribute('slot') ? node.getAttribute('slot') : 'default';
+                                    // Add node to slot
+                                    return _object_spread_props(_object_spread({}, slots), _define_property({}, name, (slots[name] || []).concat(node)));
+                                }, {
+                                    default: []
+                                });
                             }
                         },
                         {
@@ -1418,10 +1407,10 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                         // Parse string to DOM if needed, otherwise clone fragment
                                         if (typeof content === 'string') rootNode = new DOMParser().parseFromString(content, 'text/html').body;
                                         else rootNode = content.cloneNode(true);
-                                        // Process styles (Constructible, Scoping, or Stripping)
+                                        // Process styles (constructible, scoping, or stripping)
                                         if (!settings.stripStyles) {
                                             styles = Array.from(rootNode.querySelectorAll('style'));
-                                            // Feature: Constructible Stylesheets (Shadow DOM only)
+                                            // Constructible stylesheets (Shadow DOM only)
                                             if (settings.shadow && settings.useConstructibleStyles && document.adoptedStyleSheets) {
                                                 combinedCss = styles.map(function(s) {
                                                     return s.textContent;
@@ -1445,7 +1434,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                                     return el.remove();
                                                 });
                                             } else {
-                                                // Fallback: Standard tag injection + Scoping
+                                                // Fallback: Standard tag injection + scoping
                                                 styles.forEach(function(style) {
                                                     if (!settings.shadow) {
                                                         // Native @scope support
@@ -1453,8 +1442,13 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                                             style.textContent = "@scope { ".concat(style.textContent.replace(/:host/g, ':scope'), " }");
                                                         } else {
                                                             _this.setAttribute('data-scope', _this._scopeId);
-                                                            // Rewrite :host to data-scope attribute
-                                                            if (style.textContent.includes(':host')) style.textContent = style.textContent.replace(/:host/g, "".concat(tagName, '[data-scope="').concat(_this._scopeId, '"]'));
+                                                            // Handles :host(.active) -> tagName[data-scope].active
+                                                            // Handles :host -> tagName[data-scope]
+                                                            var scopeSelector = "".concat(tagName, '[data-scope="').concat(_this._scopeId, '"]');
+                                                            if (style.textContent.includes(':host')) {
+                                                                style.textContent = style.textContent.replace(/:host\s*\(([^)]+)\)/g, "".concat(scopeSelector, "$1")) // Handle :host(...)
+                                                                .replace(/:host/g, scopeSelector); // Handle :host
+                                                            }
                                                         }
                                                     }
                                                 });
@@ -1540,7 +1534,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                             }
                         },
                         {
-                            // Advanced Prop Validation and Type Casting
+                            // Advanced prop validation and type casting
                             key: "_updateProp",
                             value: function _updateProp(name, value) {
                                 // Skip data-src, it's handled separately
@@ -1548,8 +1542,8 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                 // Get config
                                 var configDef = settings.attributes[name];
                                 // Normalization: handle { type: String } vs just String
-                                var type = configDef && configDef.type ? configDef.type : configDef, required = (configDef && configDef.required) === true, validator = configDef && configDef.validator ? configDef.validator : null, defaultValue = configDef && configDef.hasOwnProperty('default') ? configDef.default : undefined;
-                                // Handle Missing / Null Attributes
+                                var type = configDef && configDef.type ? configDef.type : configDef, required = (configDef && configDef.required) === true, validator = configDef && configDef.validator ? configDef.validator : null, defaultValue = configDef && configDef.hasOwnProperty('default') ? configDef.default : undefined, options = configDef && configDef.options ? configDef.options : null, schema = configDef && configDef.schema ? configDef.schema : null;
+                                // Handle null/undefined values
                                 if (value === null || value === undefined) {
                                     if (defaultValue !== undefined) {
                                         this.$props[name] = defaultValue;
@@ -1576,6 +1570,32 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                     }
                                 } else {
                                     parsedValue = value;
+                                }
+                                // Validate against 'enums' (allowed values)
+                                if (options && Array.isArray(options) && !options.includes(parsedValue)) {
+                                    console.warn('[AlpineComponentLoader] Value "'.concat(parsedValue, '" is not a valid option for prop "').concat(name, '" on <').concat(tagName, ">. Allowed:"), options);
+                                    if (defaultValue !== undefined) this.$props[name] = defaultValue;
+                                    else if (this.$props[name] === undefined) this._applyTypeDefault(name, type);
+                                    return;
+                                }
+                                // Validate with a JSON Schema
+                                if (schema && type === Object && (typeof parsedValue === "undefined" ? "undefined" : _type_of(parsedValue)) === 'object' && parsedValue !== null) {
+                                    if (Object.entries(schema).some(function(param) {
+                                        var _param = _sliced_to_array(param, 2), k = _param[0], t = _param[1];
+                                        var val = parsedValue[k];
+                                        if (val === undefined) return true;
+                                        if (t === String) return typeof val !== 'string';
+                                        if (t === Number) return typeof val !== 'number';
+                                        if (t === Boolean) return typeof val !== 'boolean';
+                                        if (t === Array) return !Array.isArray(val);
+                                        if (t === Object) return (typeof val === "undefined" ? "undefined" : _type_of(val)) !== 'object' || Array.isArray(val) || val === null;
+                                        return false;
+                                    })) {
+                                        console.warn('[AlpineComponentLoader] Schema validation failed for prop "'.concat(name, '" on <').concat(tagName, ">."));
+                                        if (defaultValue !== undefined) this.$props[name] = defaultValue;
+                                        else if (this.$props[name] === undefined) this._applyTypeDefault(name, type);
+                                        return;
+                                    }
                                 }
                                 // Validation: Custom Validator
                                 if (validator && typeof validator === 'function') {
@@ -1794,147 +1814,25 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                             }
                         },
                         {
-                            // Resolve URL string, ID selector, or Template object
                             key: "_resolveContent",
-                            value: function _resolveContent(source) {
-                                return function() {
-                                    return _async_to_generator(function() {
-                                        var el, useCache, faH, _cache, match, fetchedAt, unused, res, clone, headers, unused1;
-                                        return _ts_generator(this, function(_state) {
-                                            switch(_state.label){
-                                                case 0:
-                                                    // Handle HTMLTemplateElement or ID Selector (Sync/Fast)
-                                                    if (_instanceof(source, HTMLTemplateElement)) {
-                                                        return [
-                                                            2,
-                                                            source.content
-                                                        ];
-                                                    } else if (typeof source === 'string' && source.startsWith('#')) {
-                                                        el = document.querySelector(source);
-                                                        if (!el) return [
-                                                            2,
-                                                            Promise.reject(new Error('Template ID "'.concat(source, '" not found')))
-                                                        ];
-                                                        if (!_instanceof(el, HTMLTemplateElement)) return [
-                                                            2,
-                                                            Promise.reject(new Error('ID "'.concat(source, '" is not a <template>')))
-                                                        ];
-                                                        return [
-                                                            2,
-                                                            el.content
-                                                        ];
-                                                    }
-                                                    // Check Cache API
-                                                    useCache = settings.cacheTemplates && 'caches' in window, faH = 'acl__fetched-at__'; // XXX: Make this configurable?
-                                                    if (!useCache) return [
-                                                        3,
-                                                        7
-                                                    ];
-                                                    _state.label = 1;
-                                                case 1:
-                                                    _state.trys.push([
-                                                        1,
-                                                        6,
-                                                        ,
-                                                        7
-                                                    ]);
-                                                    return [
-                                                        4,
-                                                        caches.open(settings._templateCacheKey)
-                                                    ];
-                                                case 2:
-                                                    // Open cache
-                                                    _cache = _state.sent();
-                                                    return [
-                                                        4,
-                                                        _cache.match(source)
-                                                    ];
-                                                case 3:
-                                                    match = _state.sent();
-                                                    if (!(match === null || match === void 0 ? void 0 : match.ok)) return [
-                                                        3,
-                                                        5
-                                                    ];
-                                                    fetchedAt = Number(match.headers.get(faH));
-                                                    if (!Number.isNaN(fetchedAt) && Date.now() - fetchedAt < settings._templateCacheExpire) return [
-                                                        2,
-                                                        match.text()
-                                                    ];
-                                                    return [
-                                                        4,
-                                                        _cache.delete(settings._templateCacheKey)
-                                                    ];
-                                                case 4:
-                                                    _state.sent();
-                                                    _state.label = 5;
-                                                case 5:
-                                                    return [
-                                                        3,
-                                                        7
-                                                    ];
-                                                case 6:
-                                                    unused = _state.sent();
-                                                    return [
-                                                        3,
-                                                        7
-                                                    ];
-                                                case 7:
-                                                    return [
-                                                        4,
-                                                        fetch(source, {
-                                                            cache: 'no-store'
-                                                        })
-                                                    ];
-                                                case 8:
-                                                    res = _state.sent();
-                                                    if (!res.ok) throw new Error("HTTP ".concat(res.status));
-                                                    if (!useCache) return [
-                                                        3,
-                                                        12
-                                                    ];
-                                                    _state.label = 9;
-                                                case 9:
-                                                    _state.trys.push([
-                                                        9,
-                                                        11,
-                                                        ,
-                                                        12
-                                                    ]);
-                                                    // Clone response + headers
-                                                    clone = res.clone(), headers = new Headers(clone.headers);
-                                                    // Set cache expiration header
-                                                    headers.set(faH, Date.now().toString());
-                                                    // Write to cache
-                                                    return [
-                                                        4,
-                                                        _cache.put(source, new Response(clone.body, {
-                                                            status: clone.status,
-                                                            statusText: clone.statusText,
-                                                            headers: headers
-                                                        }))
-                                                    ];
-                                                case 10:
-                                                    _state.sent();
-                                                    return [
-                                                        3,
-                                                        12
-                                                    ];
-                                                case 11:
-                                                    unused1 = _state.sent();
-                                                    return [
-                                                        3,
-                                                        12
-                                                    ];
-                                                case 12:
-                                                    // Return HTML string
-                                                    return [
-                                                        2,
-                                                        res.text()
-                                                    ];
-                                            }
-                                        });
-                                    })();
-                                }();
+                            value: // Resolve URL string, ID selector, or Template object
+                            function _resolveContent(source) {
+                                return _async_to_generator(function() {
+                                    return _ts_generator(this, function(_state) {
+                                        switch(_state.label){
+                                            case 0:
+                                                return [
+                                                    4,
+                                                    AlpineComponentLoader.loadTemplate(source, settings)
+                                                ];
+                                            case 1:
+                                                return [
+                                                    2,
+                                                    _state.sent()
+                                                ];
+                                        }
+                                    });
+                                })();
                             }
                         },
                         {
@@ -2000,6 +1898,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
     return AlpineComponentLoader;
 }();
 _define_property(AlpineComponentLoader, "_started", false);
+_define_property(AlpineComponentLoader, "_registry", new Map());
 // Global default configuration
 _define_property(AlpineComponentLoader, "globalConfig", {
     debug: false,
@@ -2191,48 +2090,94 @@ var AlpineDynamicLoader = /*#__PURE__*/ function(HTMLElement1) {
         },
         {
             key: "_switch",
-            value: function _switch(tag) {
-                if (!tag) return;
-                tag = tag.toLowerCase();
-                var keepAlive = this.hasAttribute('keep-alive'), current = this.firstElementChild;
-                // Cache the current component if keep-alive is active
-                if (current && keepAlive) {
-                    // Save scroll position before detaching
-                    current._savedScroll = current.scrollTop;
-                    // Mark as kept alive so disconnectedCallback doesn't destroy it
-                    current._isKeptAlive = true;
-                    this._cache.set(current.tagName.toLowerCase(), current);
-                    // Detach
-                    current.remove();
-                    // Reset flag for future legitimate removals
-                    current._isKeptAlive = false;
-                } else {
-                    // Standard tear down
-                    this.replaceChildren();
-                    // If we turned off keep-alive, ensure we don't hold onto old refs
-                    if (current && !keepAlive) this._cache.delete(current.tagName.toLowerCase());
-                }
-                // Restore or Create new component
-                if (keepAlive && this._cache.has(tag)) {
-                    var el = this._cache.get(tag);
-                    this.appendChild(el);
-                    // Restore scroll position
-                    if (el._savedScroll) el.scrollTop = el._savedScroll;
-                } else {
-                    try {
-                        var el1 = document.createElement(tag);
-                        // Forward attributes (excluding loader-specific ones)
-                        Array.from(this.attributes).forEach(function(attr) {
-                            if (![
-                                'is',
-                                'keep-alive'
-                            ].includes(attr.name)) el1.setAttribute(attr.name, attr.value);
-                        });
-                        this.appendChild(el1);
-                    } catch (e) {
-                        console.error("[AlpineComponentLoader] Failed to create: <".concat(tag, ">"), e);
-                    }
-                }
+            value: // Switch to a new component
+            function _switch(tag) {
+                return _async_to_generator(function() {
+                    var keepAlive, current, el;
+                    return _ts_generator(this, function(_state) {
+                        switch(_state.label){
+                            case 0:
+                                if (!tag) return [
+                                    2
+                                ];
+                                tag = tag.toLowerCase();
+                                keepAlive = this.hasAttribute('keep-alive'), current = this.firstElementChild;
+                                if (!current) return [
+                                    3,
+                                    2
+                                ];
+                                current.style.transition = 'opacity 0.1s ease-out';
+                                current.style.opacity = '0';
+                                return [
+                                    4,
+                                    new Promise(function(r) {
+                                        return setTimeout(r, 100);
+                                    })
+                                ];
+                            case 1:
+                                _state.sent();
+                                _state.label = 2;
+                            case 2:
+                                // Cache the current component if keep-alive is active
+                                if (current && keepAlive) {
+                                    // Save scroll position before detaching
+                                    current._savedScroll = current.scrollTop;
+                                    // Mark as kept alive so disconnectedCallback doesn't destroy it
+                                    current._isKeptAlive = true;
+                                    this._cache.set(current.tagName.toLowerCase(), current);
+                                    // Detach
+                                    current.remove();
+                                    // Clean styles before caching
+                                    current.style.opacity = '';
+                                    current.style.transition = '';
+                                    // Reset flag for future legitimate removals
+                                    current._isKeptAlive = false;
+                                } else {
+                                    // Standard tear down
+                                    this.replaceChildren();
+                                    // If we turned off keep-alive, ensure we don't hold onto old refs
+                                    if (current && !keepAlive) this._cache.delete(current.tagName.toLowerCase());
+                                }
+                                if (keepAlive && this._cache.has(tag)) {
+                                    el = this._cache.get(tag);
+                                    // Restore scroll position
+                                    if (el._savedScroll) setTimeout(function() {
+                                        return el.scrollTop = el._savedScroll;
+                                    }, 0);
+                                } else {
+                                    try {
+                                        el = document.createElement(tag);
+                                        // Forward attributes (excluding loader-specific ones)
+                                        Array.from(this.attributes).forEach(function(attr) {
+                                            if (![
+                                                'is',
+                                                'keep-alive'
+                                            ].includes(attr.name)) el.setAttribute(attr.name, attr.value);
+                                        });
+                                    } catch (e) {
+                                        console.error("[AlpineComponentLoader] Failed to create: <".concat(tag, ">"), e);
+                                    }
+                                }
+                                // Fade in new component
+                                if (el) {
+                                    el.style.opacity = '0';
+                                    el.style.transition = 'opacity 0.1s ease-in';
+                                    this.appendChild(el);
+                                    // Trigger transitions
+                                    requestAnimationFrame(function() {
+                                        el.style.opacity = '1';
+                                        setTimeout(function() {
+                                            el.style.transition = '';
+                                            el.style.opacity = '';
+                                        }, 100);
+                                    });
+                                }
+                                return [
+                                    2
+                                ];
+                        }
+                    });
+                }).call(this);
             }
         }
     ], [

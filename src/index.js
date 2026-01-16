@@ -22,42 +22,6 @@ const typeMap = {
     'Object': Object
 };
 
-// CSS for debugger
-const debuggerCss = {
-    tooltip: {
-        position: 'fixed',
-        zIndex: 10000,
-        background: '#1f2937',
-        color: '#f3f4f6',
-        padding: '8px 12px',
-        borderRadius: '6px',
-        fontSize: '11px',
-        fontFamily: 'monospace',
-        pointerEvents: 'none',
-        border: '1px solid #374151',
-        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
-        maxWidth: '300px',
-        whiteSpace: 'pre-wrap',
-        display: 'none',
-    },
-    overlay: {
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        pointerEvents: 'none',
-        zIndex: 9998,
-        overflow: 'hidden'
-    },
-    overlayBoxes: {
-        position: 'absolute',
-        border: '3px solid #22c55e',
-        boxSizing: 'border-box',
-        transition: 'all 0.1s ease-out'
-    }
-};
-
 // Helper to convert JS style objects to CSS strings
 const toCssString = (styleObj) => {
     return Object.entries(styleObj)
@@ -67,6 +31,7 @@ const toCssString = (styleObj) => {
 
 export default class AlpineComponentLoader {
     static _started = false;
+    static _registry = new Map();
 
     // Global default configuration
     static globalConfig = {
@@ -89,7 +54,7 @@ export default class AlpineComponentLoader {
         _templateCacheVersion: '0.0.1',
         _templateCachePrefix: 'alpine-component-loader-',
         _templateCacheKey: `alpine-component-loader-0.0.1`,
-        _templateCacheExpire: 15 * 60 * 1000, // 15 minutes
+        _templateCacheExpire: 15 * 60 * 1000,
     };
 
     // Start loading components + setup component proxy
@@ -177,192 +142,84 @@ export default class AlpineComponentLoader {
 
     // Toggle the built-in debugger
     static toggleDebug() {
-        const active = (this.globalConfig.debug = !this.globalConfig.debug);
-        document.body.classList.toggle('acl-debug-active', active);
+        console.warn('[AlpineComponentLoader] Debugger not loaded. Import \"acl-debugger.js\" to enable.');
+    }
 
-        // Create the tooltip element if it doesn't exist
-        let tooltip = document.getElementById('acl-debug-tooltip');
-        if (!tooltip) {
-            tooltip = document.createElement('div');
-            tooltip.id = 'acl-debug-tooltip';
-            tooltip.style.cssText = toCssString(debuggerCss.tooltip);
+    // Prefetch a component's template by tag name to warm the cache
+    static async prefetch(tagName) {
+        const config = AlpineComponentLoader._registry.get(tagName);
+        if (!config) {
+            console.warn(`[AlpineComponentLoader] Cannot prefetch <${tagName}>: component not defined.`);
+            return;
+        }
+        return await AlpineComponentLoader.loadTemplate(config.source, config.settings);
+    }
 
-            // Title
-            const titleNode = document.createElement('strong');
-            titleNode.style.color = '#4ade80';
-
-            // Title separator
-            const hr = document.createElement('div');
-            hr.style.margin = '4px 0';
-            hr.style.borderBottom = '1px solid #374151';
-
-            // Status info
-            const statusNode = document.createElement('div');
-
-            // Prop info
-            const propsNode = document.createElement('pre');
-            propsNode.style.cssText = 'margin: 4px 0 0 0; opacity: 0.8;';
-
-            // Append once
-            tooltip.append(titleNode, hr, statusNode, propsNode);
-
-            // Save references for fast updates
-            tooltip._nodes = { title: titleNode, status: statusNode, props: propsNode };
-
-            // Append to body
-            document.body.appendChild(tooltip);
+    // Centralized static template loader for components
+    static async loadTemplate(source, settings) {
+        // Handle HTMLTemplateElement or ID selector
+        if (source instanceof HTMLTemplateElement) {
+            return source.content;
+        } else if (typeof source === 'string' && source.startsWith('#')) {
+            const el = document.querySelector(source);
+            if (!el)
+                return Promise.reject(new Error(`Template ID "${source}" not found`));
+            if (!(el instanceof HTMLTemplateElement))
+                return Promise.reject(new Error(`ID "${source}" is not a <template>`));
+            return el.content;
         }
 
-        // Create the overlay container if it doesn't exist
-        let overlayContainer = document.getElementById('acl-debug-overlays');
-        if (!overlayContainer) {
-            overlayContainer = document.createElement('div');
-            overlayContainer.id = 'acl-debug-overlays';
-            overlayContainer.style.cssText = toCssString(debuggerCss.overlay);
-            document.body.appendChild(overlayContainer);
-        }
+        // Check Cache API
+        const useCache = settings.cacheTemplates && 'caches' in window,
+            faH = 'acl__fetched-at__';
 
-        // State management, tracking hovered component + mouse position
-        let mouseX = 0,
-            mouseY = 0,
-            hoveredElement = null;
+        // Cache API
+        let _cache;
+        if (useCache) {
+            try {
+                // Open cache
+                _cache = await caches.open(settings._templateCacheKey);
 
-        // Lightweight mouse listener for finding hovered component + mouse position
-        const onMouseMove = (e) => {
-            mouseX = e.clientX;
-            mouseY = e.clientY;
-
-            // Find hovered component (handling Shadow DOM)
-            hoveredElement = (e.composedPath() || []).find(node => node.nodeType === 1 && node.hasAttribute('data-acl-component'));
-        };
-
-        // If active, start debugging!
-        if (active) {
-            document.addEventListener('mousemove', onMouseMove, { passive: true });
-
-            // Render loop, with throttling, handles overlay + tooltip
-            const renderLoop = () => {
-                if (!AlpineComponentLoader.globalConfig.debug) {
-                    overlayContainer.replaceChildren(); // Cleanup
-                    tooltip.style.display = 'none';
-                    document.removeEventListener('mousemove', onMouseMove);
-                    return;
+                // Read from cache + check expiration
+                const match = await _cache.match(source);
+                if (match?.ok) {
+                    const fetchedAt = Number(match.headers.get(faH));
+                    if (!Number.isNaN(fetchedAt) && (Date.now() - fetchedAt) < settings._templateCacheExpire)
+                        return match.text();
+                    await _cache.delete(settings._templateCacheKey);
                 }
-
-                // Overlay logic (DOM Pooling) for component positions
-                const components = document.querySelectorAll('[data-acl-component]'),
-                    children = overlayContainer.children;
-                let usedBoxCount = 0;
-
-                // Measure all components recursively to find visible areas
-                components.forEach((el) => {
-                    let rect = el.getBoundingClientRect();
-
-                    // Attempt to find visible area of children for collapsed elements
-                    if (rect.width === 0 && rect.height === 0) {
-                        const nodes = el.shadowRoot ? el.shadowRoot.children : el.children;
-                        if (nodes.length > 0) {
-                            let minX = Infinity,
-                                minY = Infinity,
-                                maxX = -Infinity,
-                                maxY = -Infinity,
-                                found = false;
-
-                            // Measure children recursively until we find a valid visible area
-                            for (const child of nodes) {
-                                const cRect = child.getBoundingClientRect();
-                                if (cRect.width > 0 || cRect.height > 0) {
-                                    found = true;
-                                    minX = Math.min(minX, cRect.left);
-                                    minY = Math.min(minY, cRect.top);
-                                    maxX = Math.max(maxX, cRect.right);
-                                    maxY = Math.max(maxY, cRect.bottom);
-                                }
-                            }
-
-                            // Found a valid visible area, use it
-                            if (found)
-                                rect = {
-                                    left: minX,
-                                    top: minY,
-                                    width: maxX - minX,
-                                    height: maxY - minY
-                                };
-                        }
-                    }
-
-                    // Only draw if we have a valid visible area
-                    if (rect.width > 0 && rect.height > 0 &&
-                        rect.top < window.innerHeight &&
-                        rect.left < window.innerWidth &&
-                        (rect.top + rect.height) > 0 &&
-                        (rect.left + rect.width) > 0
-                    ) {
-                        // Reuse existing box or create new one
-                        let box = children[usedBoxCount];
-                        if (!box) {
-                            box = document.createElement('div');
-                            box.style.cssText = toCssString(debuggerCss.overlayBoxes);
-                            overlayContainer.appendChild(box);
-                        }
-
-                        // Fast style update
-                        box.style.transform = `translate(${rect.left}px, ${rect.top}px)`;
-                        box.style.width = `${rect.width}px`;
-                        box.style.height = `${rect.height}px`;
-                        box.style.display = 'block'; // Ensure it's visible
-
-                        // Count the used boxes
-                        usedBoxCount++;
-                    }
-                });
-
-                // Hide unused boxes in the pool
-                for (let i = usedBoxCount; i < children.length; i++)
-                    children[i].style.display = 'none';
-
-                // Tooltip logic, apply position + content
-                if (hoveredElement) {
-                    tooltip.style.display = 'block';
-
-                    // Content Update
-                    tooltip._nodes.title.textContent = `<${hoveredElement.getAttribute('data-acl-component')}>`;
-                    tooltip._nodes.status.textContent = hoveredElement._loading ? 'Loading...' : 'Ready';
-                    tooltip._nodes.status.style.color = hoveredElement._loading ? '#fbbf24' : '#4ade80';
-
-                    // Display all props
-                    tooltip._nodes.props.textContent = JSON.stringify(hoveredElement.$props, null, 2);
-
-                    // Base position information
-                    const offset = 15,
-                        tRect = tooltip.getBoundingClientRect(),
-                        winW = window.innerWidth,
-                        winH = window.innerHeight;
-
-                    // Initial positioning
-                    let left = mouseX + offset,
-                        top = mouseY + offset;
-
-                    // Keep tooltip on screen within offset
-                    if (left + tRect.width > winW)
-                        left = mouseX - tRect.width - offset;
-                    if (top + tRect.height > winH)
-                        top = mouseY - tRect.height - offset;
-                    if (left < 0)
-                        left = offset;
-                    if (top < 0)
-                        top = offset;
-
-                    // Update position
-                    tooltip.style.left = `${left}px`;
-                    tooltip.style.top = `${top}px`;
-                } else {
-                    tooltip.style.display = 'none';
-                }
-                requestAnimationFrame(renderLoop);
-            };
-            requestAnimationFrame(renderLoop);
+            } catch { /* Ignore cache read errors */ }
         }
+
+        // Network fetch
+        const res = await fetch(source, { cache: 'no-store' });
+        if (!res.ok)
+            throw new Error(`HTTP ${res.status}`);
+
+        // Write to Cache API
+        if (useCache) {
+            try {
+                // Clone response + headers
+                const clone = res.clone(),
+                    headers = new Headers(clone.headers);
+
+                // Set cache expiration header
+                headers.set(faH, Date.now().toString());
+
+                // Write to cache
+                await _cache.put(
+                    source,
+                    new Response(clone.body, {
+                        status: clone.status,
+                        statusText: clone.statusText,
+                        headers
+                    })
+                );
+            } catch { /* Ignore cache write errors */ }
+        }
+
+        // Return HTML string
+        return res.text();
     }
 
     // Define a new component from a URL, ID, or Template element
@@ -433,6 +290,9 @@ export default class AlpineComponentLoader {
         if (typeof source === 'string' && !source.startsWith('#') && settings.basePath)
             contentSource = settings.basePath + source;
 
+        // Register in internal registry to enable prefetching
+        AlpineComponentLoader._registry.set(tagName, { source: contentSource, settings });
+
         // Create component class
         class AlpineExternalComponent extends HTMLElement {
             constructor() {
@@ -467,7 +327,8 @@ export default class AlpineComponentLoader {
                 this._root = settings.shadow ? this.attachShadow({ mode: 'open' }) : this;
                 this._observer = null;
                 this._scopeId = `scope-${Math.random().toString(36).slice(2, 9)}`;
-                this._slotObserver = null; // Initialize observer reference
+                this._slotObserver = null;
+                this._originalLightDom = document.createDocumentFragment();
             }
 
             // Define observed attributes
@@ -488,7 +349,7 @@ export default class AlpineComponentLoader {
                     this._updateProp(name, newVal);
                 }
 
-                // Lifecycle: Updated
+                // Emit updated event
                 if (this._initialized)
                     this._triggerHook('updated', { name, oldVal, newVal });
             }
@@ -553,7 +414,7 @@ export default class AlpineComponentLoader {
                         return;
                     }
 
-                    // Lifecycle: Unmounted
+                    // Emit unmounted
                     this._triggerHook('unmounted');
 
                     // Cancel any pending fetches
@@ -631,7 +492,7 @@ export default class AlpineComponentLoader {
                     if (this._initialized)
                         return;
 
-                    // Lifecycle: Before Mount
+                    // Emit beforeMount
                     this._triggerHook('beforeMount');
 
                     // Load external dependencies, get content, and data if needed
@@ -680,7 +541,7 @@ export default class AlpineComponentLoader {
                     this._initialized = true;
                     this._loading = false;
 
-                    // Lifecycle: Mounted
+                    // Dispatch 'mount' event
                     this._dispatch('mount');
                     this._triggerHook('mounted');
 
@@ -726,21 +587,21 @@ export default class AlpineComponentLoader {
                 if (!url)
                     return;
 
-                // Abort previous request (Fixes Race Conditions)
+                // Abort previous request (Fixes race conditions)
                 if (this._fetchAbortController)
                     this._fetchAbortController.abort();
                 this._fetchAbortController = new AbortController();
                 const signal = this._fetchAbortController.signal;
 
-                // Set Loading State
+                // Set loading state
                 this.$props.$loading = true;
                 this.$props.$error = null;
 
-                // Setup Timeout
+                // Setup timeout
                 const timeoutId = setTimeout(() => this._fetchAbortController.abort('Timeout'), settings.fetchTimeout);
 
                 try {
-                    // Prepare Options
+                    // Prepare options
                     let options = {
                         method: 'GET',
                         headers: { 'Accept': 'application/json' },
@@ -766,7 +627,7 @@ export default class AlpineComponentLoader {
                     if (!res.ok)
                         throw new Error(`API Error: ${res.status} ${res.statusText}`);
 
-                    // Validate Content Type
+                    // Validate content type as JSON
                     const contentType = res.headers.get("content-type");
                     if (!contentType || !contentType.includes("application/json"))
                         throw new Error(`Invalid response. Expected JSON, got "${contentType}"`);
@@ -790,7 +651,7 @@ export default class AlpineComponentLoader {
                     if (!signal.aborted)
                         this.$props.$data = json;
                 } catch (e) {
-                    // Handle Aborts vs Real Errors
+                    // Ignore abort errors
                     if (e.name === 'AbortError' || signal.aborted) {
                         if (signal.reason === 'Timeout') {
                             this.$props.$error = `Request timed out after ${settings.fetchTimeout}ms`;
@@ -869,18 +730,31 @@ export default class AlpineComponentLoader {
 
             // Manual slot polyfill for Light DOM
             _captureLightSlots() {
-                const slots = { default: [] };
-                Array.from(this.childNodes).forEach(node => {
-                    if (node.nodeType === Node.ELEMENT_NODE && node.hasAttribute('slot')) {
-                        const name = node.getAttribute('slot');
-                        if (!slots[name])
-                            slots[name] = [];
-                        slots[name].push(node);
-                    } else {
-                        slots.default.push(node);
-                    }
-                });
-                return slots;
+                // Recover slotted nodes if re-rendering (prevent loss)
+                if (this._initialized)
+                    this._root.querySelectorAll('[data-acl-slot]').forEach(container => {
+                        while (container.firstChild)
+                            this._originalLightDom.appendChild(container.firstChild);
+                    });
+
+                // Capture any new direct children (First load or dynamic additions)
+                while (this.firstChild)
+                    this._originalLightDom.appendChild(this.firstChild);
+
+                // We iterate the storage fragment to sort nodes into the slots map
+                // Note: The nodes physically exist in the fragment until moved by _renderSafe
+                return Array.from(this._originalLightDom.childNodes).reduce((slots, node) => {
+                    // Determine slot name
+                    const name = (
+                        node.nodeType === Node.ELEMENT_NODE && node.hasAttribute('slot')
+                    ) ? node.getAttribute('slot') : 'default';
+
+                    // Add node to slot
+                    return {
+                        ...slots,
+                        [name]: (slots[name] || []).concat(node)
+                    };
+                }, { default: [] });
             }
 
             // Render logic using DOM manipulation
@@ -893,11 +767,11 @@ export default class AlpineComponentLoader {
                 else
                     rootNode = content.cloneNode(true);
 
-                // Process styles (Constructible, Scoping, or Stripping)
+                // Process styles (constructible, scoping, or stripping)
                 if (!settings.stripStyles) {
                     const styles = Array.from(rootNode.querySelectorAll('style'));
 
-                    // Feature: Constructible Stylesheets (Shadow DOM only)
+                    // Constructible stylesheets (Shadow DOM only)
                     if (settings.shadow && settings.useConstructibleStyles && document.adoptedStyleSheets) {
                         const combinedCss = styles.map(s => s.textContent).join('\n');
                         let sheet = null;
@@ -921,7 +795,7 @@ export default class AlpineComponentLoader {
                         // Remove style tags since we moved them to adoptedStyleSheets
                         styles.forEach(el => el.remove());
                     } else {
-                        // Fallback: Standard tag injection + Scoping
+                        // Fallback: Standard tag injection + scoping
                         styles.forEach(style => {
                             if (!settings.shadow) {
                                 // Native @scope support
@@ -930,9 +804,14 @@ export default class AlpineComponentLoader {
                                 } else {
                                     this.setAttribute('data-scope', this._scopeId);
 
-                                    // Rewrite :host to data-scope attribute
-                                    if (style.textContent.includes(':host'))
-                                        style.textContent = style.textContent.replace(/:host/g, `${tagName}[data-scope="${this._scopeId}"]`);
+                                    // Handles :host(.active) -> tagName[data-scope].active
+                                    // Handles :host -> tagName[data-scope]
+                                    const scopeSelector = `${tagName}[data-scope="${this._scopeId}"]`;
+                                    if (style.textContent.includes(':host')) {
+                                        style.textContent = style.textContent
+                                            .replace(/:host\s*\(([^)]+)\)/g, `${scopeSelector}$1`) // Handle :host(...)
+                                            .replace(/:host/g, scopeSelector);                     // Handle :host
+                                    }
                                 }
                             }
                         });
@@ -1014,7 +893,7 @@ export default class AlpineComponentLoader {
                 });
             }
 
-            // Advanced Prop Validation and Type Casting
+            // Advanced prop validation and type casting
             _updateProp(name, value) {
                 // Skip data-src, it's handled separately
                 if (name === 'data-src')
@@ -1027,9 +906,11 @@ export default class AlpineComponentLoader {
                 const type = (configDef && configDef.type) ? configDef.type : configDef,
                     required = (configDef && configDef.required) === true,
                     validator = (configDef && configDef.validator) ? configDef.validator : null,
-                    defaultValue = (configDef && configDef.hasOwnProperty('default')) ? configDef.default : undefined;
+                    defaultValue = (configDef && configDef.hasOwnProperty('default')) ? configDef.default : undefined,
+                    options = (configDef && configDef.options) ? configDef.options : null,
+                    schema = (configDef && configDef.schema) ? configDef.schema : null;
 
-                // Handle Missing / Null Attributes
+                // Handle null/undefined values
                 if (value === null || value === undefined) {
                     if (defaultValue !== undefined) {
                         this.$props[name] = defaultValue;
@@ -1059,6 +940,43 @@ export default class AlpineComponentLoader {
                     }
                 } else {
                     parsedValue = value;
+                }
+
+                // Validate against 'enums' (allowed values)
+                if (options && Array.isArray(options) && !options.includes(parsedValue)) {
+                    console.warn(`[AlpineComponentLoader] Value "${parsedValue}" is not a valid option for prop "${name}" on <${tagName}>. Allowed:`, options);
+                    if (defaultValue !== undefined)
+                        this.$props[name] = defaultValue;
+                    else if (this.$props[name] === undefined)
+                        this._applyTypeDefault(name, type);
+                    return;
+                }
+
+                // Validate with a JSON Schema
+                if (schema && type === Object && typeof parsedValue === 'object' && parsedValue !== null) {
+                    if (Object.entries(schema).some(([k, t]) => {
+                        const val = parsedValue[k];
+                        if (val === undefined)
+                            return true;
+                        if (t === String)
+                            return typeof val !== 'string';
+                        if (t === Number)
+                            return typeof val !== 'number';
+                        if (t === Boolean)
+                            return typeof val !== 'boolean';
+                        if (t === Array)
+                            return !Array.isArray(val);
+                        if (t === Object)
+                            return typeof val !== 'object' || Array.isArray(val) || val === null;
+                        return false;
+                    })) {
+                        console.warn(`[AlpineComponentLoader] Schema validation failed for prop "${name}" on <${tagName}>.`);
+                        if (defaultValue !== undefined)
+                            this.$props[name] = defaultValue;
+                        else if (this.$props[name] === undefined)
+                            this._applyTypeDefault(name, type);
+                        return;
+                    }
                 }
 
                 // Validation: Custom Validator
@@ -1277,72 +1195,8 @@ export default class AlpineComponentLoader {
             }
 
             // Resolve URL string, ID selector, or Template object
-            _resolveContent(source) {
-                return (async () => {
-                    // Handle HTMLTemplateElement or ID Selector (Sync/Fast)
-                    if (source instanceof HTMLTemplateElement) {
-                        return source.content;
-                    } else if (typeof source === 'string' && source.startsWith('#')) {
-                        const el = document.querySelector(source);
-                        if (!el)
-                            return Promise.reject(new Error(`Template ID "${source}" not found`));
-                        if (!(el instanceof HTMLTemplateElement))
-                            return Promise.reject(new Error(`ID "${source}" is not a <template>`));
-                        return el.content;
-                    }
-
-                    // Check Cache API
-                    const useCache = settings.cacheTemplates && 'caches' in window,
-                        faH = 'acl__fetched-at__'; // XXX: Make this configurable?
-
-                    // Cache API
-                    let _cache;
-                    if (useCache) {
-                        try {
-                            // Open cache
-                            _cache = await caches.open(settings._templateCacheKey);
-
-                            // Read from cache + check expiration
-                            const match = await _cache.match(source);
-                            if (match?.ok) {
-                                const fetchedAt = Number(match.headers.get(faH));
-                                if (!Number.isNaN(fetchedAt) && (Date.now() - fetchedAt) < settings._templateCacheExpire)
-                                    return match.text();
-                                await _cache.delete(settings._templateCacheKey);
-                            }
-                        } catch { /* Ignore cache read errors */ }
-                    }
-
-                    // Network Fetch
-                    const res = await fetch(source, { cache: 'no-store' });
-                    if (!res.ok)
-                        throw new Error(`HTTP ${res.status}`);
-
-                    // Write to Cache API
-                    if (useCache) {
-                        try {
-                            // Clone response + headers
-                            const clone = res.clone(),
-                                headers = new Headers(clone.headers);
-
-                            // Set cache expiration header
-                            headers.set(faH, Date.now().toString());
-
-                            // Write to cache
-                            await _cache.put(
-                                source,
-                                new Response(clone.body, {
-                                    status: clone.status,
-                                    statusText: clone.statusText,
-                                    headers
-                                })
-                            );
-                        } catch { /* Ignore cache write errors */ }
-                    }
-
-                    // Return HTML string
-                    return res.text();
-                })();
+            async _resolveContent(source) {
+                return await AlpineComponentLoader.loadTemplate(source, settings);
             }
 
             // Helpers to deal with template caches within the component
@@ -1463,13 +1317,21 @@ class AlpineDynamicLoader extends HTMLElement {
         this._cache.clear();
     }
 
-    _switch(tag) {
+    // Switch to a new component
+    async _switch(tag) {
         if (!tag)
             return;
         tag = tag.toLowerCase();
 
         const keepAlive = this.hasAttribute('keep-alive'),
             current = this.firstElementChild;
+
+        // Fade out current component
+        if (current) {
+            current.style.transition = 'opacity 0.1s ease-out';
+            current.style.opacity = '0';
+            await new Promise(r => setTimeout(r, 100));
+        }
 
         // Cache the current component if keep-alive is active
         if (current && keepAlive) {
@@ -1483,6 +1345,10 @@ class AlpineDynamicLoader extends HTMLElement {
             // Detach
             current.remove();
 
+            // Clean styles before caching
+            current.style.opacity = '';
+            current.style.transition = '';
+
             // Reset flag for future legitimate removals
             current._isKeptAlive = false;
         } else {
@@ -1494,25 +1360,39 @@ class AlpineDynamicLoader extends HTMLElement {
         }
 
         // Restore or Create new component
+        let el;
         if (keepAlive && this._cache.has(tag)) {
-            const el = this._cache.get(tag);
-            this.appendChild(el);
-
+            el = this._cache.get(tag);
             // Restore scroll position
             if (el._savedScroll)
-                el.scrollTop = el._savedScroll;
+                setTimeout(() => el.scrollTop = el._savedScroll, 0);
         } else {
             try {
-                const el = document.createElement(tag);
+                el = document.createElement(tag);
                 // Forward attributes (excluding loader-specific ones)
                 Array.from(this.attributes).forEach(attr => {
                     if (!['is', 'keep-alive'].includes(attr.name))
                         el.setAttribute(attr.name, attr.value);
                 });
-                this.appendChild(el);
             } catch (e) {
                 console.error(`[AlpineComponentLoader] Failed to create: <${tag}>`, e);
             }
+        }
+
+        // Fade in new component
+        if (el) {
+            el.style.opacity = '0';
+            el.style.transition = 'opacity 0.1s ease-in';
+            this.appendChild(el);
+
+            // Trigger transitions
+            requestAnimationFrame(() => {
+                el.style.opacity = '1';
+                setTimeout(() => {
+                    el.style.transition = '';
+                    el.style.opacity = '';
+                }, 100);
+            });
         }
     }
 }

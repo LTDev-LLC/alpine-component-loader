@@ -169,6 +169,12 @@
 
   <script type="module">
     import AlpineComponentLoader from './dist/AlpineComponentLoader.js';
+    import ACLDebugger from './dist/ACLDebugger.js';
+
+    // Inject the debugger functionality into the main class
+    ACLDebugger.inject(AlpineComponentLoader);
+
+    // Expose the loader to the global scope
     window.AlpineComponentLoader = AlpineComponentLoader;
 
     AlpineComponentLoader.config({
