@@ -32,6 +32,7 @@ const toCssString = (styleObj) => {
 export default class AlpineComponentLoader {
     static _started = false;
     static _registry = new Map();
+    static _debugger = false;
 
     // Global default configuration
     static globalConfig = {
@@ -85,7 +86,7 @@ export default class AlpineComponentLoader {
     // Manually clear all template caches
     static async clearCache(current = AlpineComponentLoader.globalConfig._templateCacheKey) {
         if (!('caches' in window)) {
-            console.warn('[AlpineComponentLoader] Cache API not supported.');
+            console.warn('[ACL] Cache API not supported.');
             return;
         }
 
@@ -132,7 +133,7 @@ export default class AlpineComponentLoader {
                     ]))
                 }
             } catch (e) {
-                console.warn(`[AlpineComponentLoader] Invalid JSON in acl-props for <${tagName}>`, e);
+                console.warn(`[ACL] Invalid JSON in acl-props for <${tagName}>`, e);
             }
 
             // Define the component
@@ -142,14 +143,14 @@ export default class AlpineComponentLoader {
 
     // Toggle the built-in debugger
     static toggleDebug() {
-        console.warn('[AlpineComponentLoader] Debugger not loaded. Import \"acl-debugger.js\" to enable.');
+        console.warn('[ACL] Debugger not loaded. Import \"acl-debugger.js\" to enable.');
     }
 
     // Prefetch a component's template by tag name to warm the cache
     static async prefetch(tagName) {
         const config = AlpineComponentLoader._registry.get(tagName);
         if (!config) {
-            console.warn(`[AlpineComponentLoader] Cannot prefetch <${tagName}>: component not defined.`);
+            console.warn(`[ACL] Cannot prefetch <${tagName}>: component not defined.`);
             return;
         }
         return await AlpineComponentLoader.loadTemplate(config.source, config.settings);
@@ -293,18 +294,29 @@ export default class AlpineComponentLoader {
         // Register in internal registry to enable prefetching
         AlpineComponentLoader._registry.set(tagName, { source: contentSource, settings });
 
+        // Return helpers to be assigned to $el.$props
+        const helpers = (_this) => ({
+            $emit: (name, detail) => _this.dispatchEvent(new CustomEvent(name, {
+                bubbles: true,
+                composed: true,
+                detail
+            })),
+            $reload: () => _this.reload(),
+        });
+
         // Create component class
         class AlpineExternalComponent extends HTMLElement {
             constructor() {
                 super();
 
-                // Helper to emit events via $el.$props.$emit
-                const $emit = (name, detail) => {
-                    this.dispatchEvent(new CustomEvent(name, {
-                        bubbles: true,
-                        composed: true,
-                        detail
-                    }));
+                // Initialize props
+                let _$props = {
+                    $data: null,
+                    $loading: false,
+                    $error: null,
+                    $lastUpdated: Date.now(),
+                    ...helpers(this),
+                    ...settings.attributes || {}
                 };
 
                 // Initialize state and attributes
@@ -312,18 +324,7 @@ export default class AlpineComponentLoader {
                 this._loading = false;
                 this._disconnectTimeout = null;
                 this._fetchAbortController = null;
-                this.$props = window.Alpine ? window.Alpine.reactive({
-                    $data: null,
-                    $loading: false,
-                    $error: null,
-                    $emit,
-                    ...settings.attributes || {}
-                }) : {
-                    data: null,
-                    loading: false,
-                    error: null,
-                    $emit,
-                };
+                this.$props = window.Alpine ? window.Alpine.reactive(_$props) : _$props;
                 this._root = settings.shadow ? this.attachShadow({ mode: 'open' }) : this;
                 this._observer = null;
                 this._scopeId = `scope-${Math.random().toString(36).slice(2, 9)}`;
@@ -345,13 +346,13 @@ export default class AlpineComponentLoader {
                 if (name === 'data-src') {
                     if (this._initialized)
                         this._fetchData(newVal);
-                } else {
+                } else
                     this._updateProp(name, newVal);
-                }
 
                 // Emit updated event
-                if (this._initialized)
+                if (this._initialized) {
                     this._triggerHook('updated', { name, oldVal, newVal });
+                }
             }
 
             // Initialize on insertion
@@ -485,8 +486,31 @@ export default class AlpineComponentLoader {
                 this._slotObserver.observe(this, { childList: true });
             }
 
+            // Allow the component to be reloaded
+            async reload() {
+                if (this._loading)
+                    return;
+                console.log(`[ACL] Reloading <${tagName}>...`);
+
+                // Clear caches specific to this component's source
+                if (settings.cacheTemplates) {
+                    const cache = await caches.open(settings._templateCacheKey);
+                    await cache.delete(contentSource);
+                }
+
+                // Reset state
+                this._initialized = false;
+                this.$props.$loading = true;
+                this.$props.$error = null;
+                this.$props.$data = null;
+
+                // Re-trigger load
+                await this._load();
+            }
+
             // Main load sequence
             async _load() {
+                const startMark = performance.now();
                 try {
                     // Lock loading state
                     if (this._initialized)
@@ -537,6 +561,9 @@ export default class AlpineComponentLoader {
                     // Initialize Alpine
                     await this._initAlpine();
 
+                    // Stop timer and store metrics
+                    this._perf = { duration: performance.now() - startMark };
+
                     // Mark success and unlock
                     this._initialized = true;
                     this._loading = false;
@@ -548,7 +575,7 @@ export default class AlpineComponentLoader {
                     //Dispatch 'loaded' event
                     this._dispatch('loaded');
                 } catch (err) {
-                    console.error(`[AlpineComponentLoader] <${tagName}>`, err);
+                    console.error(`[ACL] <${tagName}>`, err);
                     this._loading = false; // Unlock on error so we can retry
                     const fallbackSource = this.getAttribute('fallback') || settings.fallback;
                     if (fallbackSource) {
@@ -562,6 +589,9 @@ export default class AlpineComponentLoader {
                             // Init Alpine (so fallback can be interactive)
                             await this._initAlpine();
 
+                            // Stop timer and store metrics
+                            this._perf = { duration: performance.now() - startMark };
+
                             // Mark success and unlock
                             this._initialized = true;
 
@@ -571,7 +601,7 @@ export default class AlpineComponentLoader {
                             // Stop here, do not render default error
                             return;
                         } catch (fallbackErr) {
-                            console.error(`[AlpineComponentLoader] <${tagName}> Fallback Failed:`, fallbackErr);
+                            console.error(`[ACL] <${tagName}> Fallback Failed:`, fallbackErr);
                             // If fallback fails, show original error (or combined)
                             this._renderError(`Load Failed: ${err.message}. (Fallback also failed)`);
                         }
@@ -659,7 +689,7 @@ export default class AlpineComponentLoader {
                         }
                         return;
                     }
-                    console.error(`[AlpineComponentLoader] Fetch failed for ${url}`, e);
+                    console.error(`[ACL] Fetch failed for ${url}`, e);
                     this.$props.$error = e.message;
                     this.$props.$data = null;
                 } finally {
@@ -762,9 +792,19 @@ export default class AlpineComponentLoader {
                 let rootNode;
 
                 // Parse string to DOM if needed, otherwise clone fragment
-                if (typeof content === 'string')
-                    rootNode = ((new DOMParser()).parseFromString(content, 'text/html')).body;
-                else
+                if (typeof content === 'string') {
+                    // Parse HTML to DOM
+                    const doc = (new DOMParser()).parseFromString(content, 'text/html');
+
+                    // Create document fragment to hold elements
+                    rootNode = document.createDocumentFragment();
+
+                    // Move elements from head/body (styles, title, meta and actual markup)
+                    [
+                        ...Array.from(doc.head.childNodes),
+                        ...Array.from(doc.body.childNodes),
+                    ].forEach(node => rootNode.appendChild(node));
+                } else
                     rootNode = content.cloneNode(true);
 
                 // Process styles (constructible, scoping, or stripping)
@@ -777,9 +817,9 @@ export default class AlpineComponentLoader {
                         let sheet = null;
 
                         if (combinedCss.trim().length > 0) {
-                            if (styleSheetCache.has(combinedCss)) {
+                            if (styleSheetCache.has(combinedCss))
                                 sheet = styleSheetCache.get(combinedCss);
-                            } else {
+                            else {
                                 sheet = new CSSStyleSheet();
                                 sheet.replaceSync(combinedCss);
                                 styleSheetCache.set(combinedCss, sheet);
@@ -917,7 +957,7 @@ export default class AlpineComponentLoader {
                         return;
                     }
                     if (required)
-                        console.warn(`[AlpineComponentLoader] Missing required prop "${name}" on <${tagName}>`);
+                        console.warn(`[ACL] Missing required prop "${name}" on <${tagName}>`);
 
                     this._applyTypeDefault(name, type);
                     return;
@@ -935,7 +975,7 @@ export default class AlpineComponentLoader {
                         if (!value) parsedValue = (type === Array) ? [] : {};
                         else parsedValue = JSON.parse(value.replace(/'/g, '"'));
                     } catch (e) {
-                        console.warn(`[AlpineComponentLoader] Attribute "${name}" is invalid JSON:`, value);
+                        console.warn(`[ACL] Attribute "${name}" is invalid JSON:`, value);
                         parsedValue = (type === Array) ? [] : {};
                     }
                 } else {
@@ -944,7 +984,7 @@ export default class AlpineComponentLoader {
 
                 // Validate against 'enums' (allowed values)
                 if (options && Array.isArray(options) && !options.includes(parsedValue)) {
-                    console.warn(`[AlpineComponentLoader] Value "${parsedValue}" is not a valid option for prop "${name}" on <${tagName}>. Allowed:`, options);
+                    console.warn(`[ACL] Value "${parsedValue}" is not a valid option for prop "${name}" on <${tagName}>. Allowed:`, options);
                     if (defaultValue !== undefined)
                         this.$props[name] = defaultValue;
                     else if (this.$props[name] === undefined)
@@ -970,7 +1010,7 @@ export default class AlpineComponentLoader {
                             return typeof val !== 'object' || Array.isArray(val) || val === null;
                         return false;
                     })) {
-                        console.warn(`[AlpineComponentLoader] Schema validation failed for prop "${name}" on <${tagName}>.`);
+                        console.warn(`[ACL] Schema validation failed for prop "${name}" on <${tagName}>.`);
                         if (defaultValue !== undefined)
                             this.$props[name] = defaultValue;
                         else if (this.$props[name] === undefined)
@@ -982,7 +1022,7 @@ export default class AlpineComponentLoader {
                 // Validation: Custom Validator
                 if (validator && typeof validator === 'function') {
                     if (!validator(parsedValue)) {
-                        console.warn(`[AlpineComponentLoader] Validation failed for prop "${name}" on <${tagName}>. Value:`, parsedValue);
+                        console.warn(`[ACL] Validation failed for prop "${name}" on <${tagName}>. Value:`, parsedValue);
                         // If we have a default, use it
                         if (defaultValue !== undefined)
                             this.$props[name] = defaultValue;
@@ -1084,7 +1124,7 @@ export default class AlpineComponentLoader {
                             if (Object.prototype.hasOwnProperty.call(stored, k))
                                 this.$props[k] = stored[k];
                 } catch (e) {
-                    console.warn(`[AlpineComponentLoader] Restore failed for ${key}`, e);
+                    console.warn(`[ACL] Restore failed for ${key}`, e);
                 }
 
                 // Start saving on Alpine updates
@@ -1135,7 +1175,7 @@ export default class AlpineComponentLoader {
                         // Set $props to Alpine store
                         this.$props = store;
                     } else {
-                        console.error(`[AlpineComponentLoader] Store "${storeName}" not found. Falling back to local state.`);
+                        console.error(`[ACL] Store "${storeName}" not found. Falling back to local state.`);
                         this.$props = window.Alpine.reactive(this.$props || {});
                     }
                 } else {
@@ -1145,6 +1185,18 @@ export default class AlpineComponentLoader {
 
                 // Initialize persistence
                 this._initPersistence();
+
+                // Track reactive updates for the debugger
+                // We manually touch all props *except* $lastUpdated to avoid an infinite loop
+                Alpine.effect(() => {
+                    if (this.$props) {
+                        Object.keys(this.$props).forEach(k => {
+                            if (k !== '$lastUpdated')
+                                void this.$props[k];
+                        });
+                        this.$props.$lastUpdated = Date.now();
+                    }
+                });
 
                 // Set an anonymous Alpine store for debugging
                 Alpine.store(`props_${tagName}_${Math.random().toString(36).slice(2)}`, this.$props);
@@ -1375,7 +1427,7 @@ class AlpineDynamicLoader extends HTMLElement {
                         el.setAttribute(attr.name, attr.value);
                 });
             } catch (e) {
-                console.error(`[AlpineComponentLoader] Failed to create: <${tag}>`, e);
+                console.error(`[ACL] Failed to create: <${tag}>`, e);
             }
         }
 
@@ -1405,5 +1457,5 @@ try {
         AlpineComponentLoader.start();
     }
 } catch (e) {
-    console.warn(`[AlpineComponentLoader] Failed to register components:`, e);
+    console.warn(`[ACL] Failed to register components:`, e);
 }

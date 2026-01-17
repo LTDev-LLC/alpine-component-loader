@@ -481,7 +481,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                             case 0:
                                 current = _arguments.length > 0 && _arguments[0] !== void 0 ? _arguments[0] : AlpineComponentLoader.globalConfig._templateCacheKey;
                                 if (!('caches' in window)) {
-                                    console.warn('[AlpineComponentLoader] Cache API not supported.');
+                                    console.warn('[ACL] Cache API not supported.');
                                     return [
                                         2
                                     ];
@@ -558,7 +558,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                             }))
                         };
                     } catch (e) {
-                        console.warn("[AlpineComponentLoader] Invalid JSON in acl-props for <".concat(tagName, ">"), e);
+                        console.warn("[ACL] Invalid JSON in acl-props for <".concat(tagName, ">"), e);
                     }
                     // Define the component
                     AlpineComponentLoader.define(tagName, tpl, config || {});
@@ -569,7 +569,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
             key: "toggleDebug",
             value: // Toggle the built-in debugger
             function toggleDebug() {
-                console.warn('[AlpineComponentLoader] Debugger not loaded. Import \"acl-debugger.js\" to enable.');
+                console.warn('[ACL] Debugger not loaded. Import \"acl-debugger.js\" to enable.');
             }
         },
         {
@@ -583,7 +583,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                             case 0:
                                 config = AlpineComponentLoader._registry.get(tagName);
                                 if (!config) {
-                                    console.warn("[AlpineComponentLoader] Cannot prefetch <".concat(tagName, ">: component not defined."));
+                                    console.warn("[ACL] Cannot prefetch <".concat(tagName, ">: component not defined."));
                                     return [
                                         2
                                     ];
@@ -800,6 +800,21 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                     source: contentSource,
                     settings: settings
                 });
+                // Return helpers to be assigned to $el.$props
+                var helpers = function(_this) {
+                    return {
+                        $emit: function(name, detail) {
+                            return _this.dispatchEvent(new CustomEvent(name, {
+                                bubbles: true,
+                                composed: true,
+                                detail: detail
+                            }));
+                        },
+                        $reload: function() {
+                            return _this.reload();
+                        }
+                    };
+                };
                 // Create component class
                 var AlpineExternalComponent = /*#__PURE__*/ function(HTMLElement1) {
                     _inherits(AlpineExternalComponent, HTMLElement1);
@@ -807,30 +822,19 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                         _class_call_check(this, AlpineExternalComponent);
                         var _this;
                         _this = _call_super(this, AlpineExternalComponent);
-                        // Helper to emit events via $el.$props.$emit
-                        var $emit = function(name, detail) {
-                            _this.dispatchEvent(new CustomEvent(name, {
-                                bubbles: true,
-                                composed: true,
-                                detail: detail
-                            }));
-                        };
+                        // Initialize props
+                        var _$props = _object_spread({
+                            $data: null,
+                            $loading: false,
+                            $error: null,
+                            $lastUpdated: Date.now()
+                        }, helpers(_this), settings.attributes || {});
                         // Initialize state and attributes
                         _this._initialized = false;
                         _this._loading = false;
                         _this._disconnectTimeout = null;
                         _this._fetchAbortController = null;
-                        _this.$props = window.Alpine ? window.Alpine.reactive(_object_spread({
-                            $data: null,
-                            $loading: false,
-                            $error: null,
-                            $emit: $emit
-                        }, settings.attributes || {})) : {
-                            data: null,
-                            loading: false,
-                            error: null,
-                            $emit: $emit
-                        };
+                        _this.$props = window.Alpine ? window.Alpine.reactive(_$props) : _$props;
                         _this._root = settings.shadow ? _this.attachShadow({
                             mode: 'open'
                         }) : _this;
@@ -849,15 +853,15 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                 // Update prop and validate
                                 if (name === 'data-src') {
                                     if (this._initialized) this._fetchData(newVal);
-                                } else {
-                                    this._updateProp(name, newVal);
-                                }
+                                } else this._updateProp(name, newVal);
                                 // Emit updated event
-                                if (this._initialized) this._triggerHook('updated', {
-                                    name: name,
-                                    oldVal: oldVal,
-                                    newVal: newVal
-                                });
+                                if (this._initialized) {
+                                    this._triggerHook('updated', {
+                                        name: name,
+                                        oldVal: oldVal,
+                                        newVal: newVal
+                                    });
+                                }
                             }
                         },
                         {
@@ -990,15 +994,67 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                             }
                         },
                         {
+                            key: "reload",
+                            value: // Allow the component to be reloaded
+                            function reload() {
+                                return _async_to_generator(function() {
+                                    var cache;
+                                    return _ts_generator(this, function(_state) {
+                                        switch(_state.label){
+                                            case 0:
+                                                if (this._loading) return [
+                                                    2
+                                                ];
+                                                console.log("[ACL] Reloading <".concat(tagName, ">..."));
+                                                if (!settings.cacheTemplates) return [
+                                                    3,
+                                                    3
+                                                ];
+                                                return [
+                                                    4,
+                                                    caches.open(settings._templateCacheKey)
+                                                ];
+                                            case 1:
+                                                cache = _state.sent();
+                                                return [
+                                                    4,
+                                                    cache.delete(contentSource)
+                                                ];
+                                            case 2:
+                                                _state.sent();
+                                                _state.label = 3;
+                                            case 3:
+                                                // Reset state
+                                                this._initialized = false;
+                                                this.$props.$loading = true;
+                                                this.$props.$error = null;
+                                                this.$props.$data = null;
+                                                // Re-trigger load
+                                                return [
+                                                    4,
+                                                    this._load()
+                                                ];
+                                            case 4:
+                                                _state.sent();
+                                                return [
+                                                    2
+                                                ];
+                                        }
+                                    });
+                                }).call(this);
+                            }
+                        },
+                        {
                             key: "_load",
                             value: // Main load sequence
                             function _load() {
                                 return _async_to_generator(function() {
-                                    var _this, promises, content, lightSlots, err, fallbackSource, _, _1, fallbackErr;
+                                    var _this, startMark, promises, content, lightSlots, err, fallbackSource, _, _1, fallbackErr;
                                     return _ts_generator(this, function(_state) {
                                         switch(_state.label){
                                             case 0:
                                                 _this = this;
+                                                startMark = performance.now();
                                                 _state.label = 1;
                                             case 1:
                                                 _state.trys.push([
@@ -1057,6 +1113,10 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                                 ];
                                             case 4:
                                                 _state.sent();
+                                                // Stop timer and store metrics
+                                                this._perf = {
+                                                    duration: performance.now() - startMark
+                                                };
                                                 // Mark success and unlock
                                                 this._initialized = true;
                                                 this._loading = false;
@@ -1071,7 +1131,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                                 ];
                                             case 5:
                                                 err = _state.sent();
-                                                console.error("[AlpineComponentLoader] <".concat(tagName, ">"), err);
+                                                console.error("[ACL] <".concat(tagName, ">"), err);
                                                 this._loading = false; // Unlock on error so we can retry
                                                 fallbackSource = this.getAttribute('fallback') || settings.fallback;
                                                 if (!fallbackSource) return [
@@ -1111,6 +1171,10 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                                 ];
                                             case 9:
                                                 _state.sent();
+                                                // Stop timer and store metrics
+                                                this._perf = {
+                                                    duration: performance.now() - startMark
+                                                };
                                                 // Mark success and unlock
                                                 this._initialized = true;
                                                 // Dispatch 'loaded' event
@@ -1121,7 +1185,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                                 ];
                                             case 10:
                                                 fallbackErr = _state.sent();
-                                                console.error("[AlpineComponentLoader] <".concat(tagName, "> Fallback Failed:"), fallbackErr);
+                                                console.error("[ACL] <".concat(tagName, "> Fallback Failed:"), fallbackErr);
                                                 // If fallback fails, show original error (or combined)
                                                 this._renderError("Load Failed: ".concat(err.message, ". (Fallback also failed)"));
                                                 return [
@@ -1271,7 +1335,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                                         2
                                                     ];
                                                 }
-                                                console.error("[AlpineComponentLoader] Fetch failed for ".concat(url), e1);
+                                                console.error("[ACL] Fetch failed for ".concat(url), e1);
                                                 this.$props.$error = e1.message;
                                                 this.$props.$data = null;
                                                 return [
@@ -1401,12 +1465,20 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                             value: // Render logic using DOM manipulation
                             function _renderSafe(content, lightSlots) {
                                 return _async_to_generator(function() {
-                                    var _this, rootNode, styles, combinedCss, sheet, scripts, node;
+                                    var _this, rootNode, doc, styles, combinedCss, sheet, scripts, node;
                                     return _ts_generator(this, function(_state) {
                                         _this = this;
                                         // Parse string to DOM if needed, otherwise clone fragment
-                                        if (typeof content === 'string') rootNode = new DOMParser().parseFromString(content, 'text/html').body;
-                                        else rootNode = content.cloneNode(true);
+                                        if (typeof content === 'string') {
+                                            // Parse HTML to DOM
+                                            doc = new DOMParser().parseFromString(content, 'text/html');
+                                            // Create document fragment to hold elements
+                                            rootNode = document.createDocumentFragment();
+                                            // Move elements from head/body (styles, title, meta and actual markup)
+                                            _to_consumable_array(Array.from(doc.head.childNodes)).concat(_to_consumable_array(Array.from(doc.body.childNodes))).forEach(function(node) {
+                                                return rootNode.appendChild(node);
+                                            });
+                                        } else rootNode = content.cloneNode(true);
                                         // Process styles (constructible, scoping, or stripping)
                                         if (!settings.stripStyles) {
                                             styles = Array.from(rootNode.querySelectorAll('style'));
@@ -1417,9 +1489,8 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                                 }).join('\n');
                                                 sheet = null;
                                                 if (combinedCss.trim().length > 0) {
-                                                    if (styleSheetCache.has(combinedCss)) {
-                                                        sheet = styleSheetCache.get(combinedCss);
-                                                    } else {
+                                                    if (styleSheetCache.has(combinedCss)) sheet = styleSheetCache.get(combinedCss);
+                                                    else {
                                                         sheet = new CSSStyleSheet();
                                                         sheet.replaceSync(combinedCss);
                                                         styleSheetCache.set(combinedCss, sheet);
@@ -1549,7 +1620,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                         this.$props[name] = defaultValue;
                                         return;
                                     }
-                                    if (required) console.warn('[AlpineComponentLoader] Missing required prop "'.concat(name, '" on <').concat(tagName, ">"));
+                                    if (required) console.warn('[ACL] Missing required prop "'.concat(name, '" on <').concat(tagName, ">"));
                                     this._applyTypeDefault(name, type);
                                     return;
                                 }
@@ -1565,7 +1636,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                         if (!value) parsedValue = type === Array ? [] : {};
                                         else parsedValue = JSON.parse(value.replace(/'/g, '"'));
                                     } catch (e) {
-                                        console.warn('[AlpineComponentLoader] Attribute "'.concat(name, '" is invalid JSON:'), value);
+                                        console.warn('[ACL] Attribute "'.concat(name, '" is invalid JSON:'), value);
                                         parsedValue = type === Array ? [] : {};
                                     }
                                 } else {
@@ -1573,7 +1644,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                 }
                                 // Validate against 'enums' (allowed values)
                                 if (options && Array.isArray(options) && !options.includes(parsedValue)) {
-                                    console.warn('[AlpineComponentLoader] Value "'.concat(parsedValue, '" is not a valid option for prop "').concat(name, '" on <').concat(tagName, ">. Allowed:"), options);
+                                    console.warn('[ACL] Value "'.concat(parsedValue, '" is not a valid option for prop "').concat(name, '" on <').concat(tagName, ">. Allowed:"), options);
                                     if (defaultValue !== undefined) this.$props[name] = defaultValue;
                                     else if (this.$props[name] === undefined) this._applyTypeDefault(name, type);
                                     return;
@@ -1591,7 +1662,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                         if (t === Object) return (typeof val === "undefined" ? "undefined" : _type_of(val)) !== 'object' || Array.isArray(val) || val === null;
                                         return false;
                                     })) {
-                                        console.warn('[AlpineComponentLoader] Schema validation failed for prop "'.concat(name, '" on <').concat(tagName, ">."));
+                                        console.warn('[ACL] Schema validation failed for prop "'.concat(name, '" on <').concat(tagName, ">."));
                                         if (defaultValue !== undefined) this.$props[name] = defaultValue;
                                         else if (this.$props[name] === undefined) this._applyTypeDefault(name, type);
                                         return;
@@ -1600,7 +1671,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                 // Validation: Custom Validator
                                 if (validator && typeof validator === 'function') {
                                     if (!validator(parsedValue)) {
-                                        console.warn('[AlpineComponentLoader] Validation failed for prop "'.concat(name, '" on <').concat(tagName, ">. Value:"), parsedValue);
+                                        console.warn('[ACL] Validation failed for prop "'.concat(name, '" on <').concat(tagName, ">. Value:"), parsedValue);
                                         // If we have a default, use it
                                         if (defaultValue !== undefined) this.$props[name] = defaultValue;
                                         else if (this.$props[name] === undefined) this._applyTypeDefault(name, type);
@@ -1694,7 +1765,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                         for(var k in this.$props)if (Object.prototype.hasOwnProperty.call(stored, k)) this.$props[k] = stored[k];
                                     }
                                 } catch (e) {
-                                    console.warn("[AlpineComponentLoader] Restore failed for ".concat(key), e);
+                                    console.warn("[ACL] Restore failed for ".concat(key), e);
                                 }
                                 // Start saving on Alpine updates
                                 Alpine.effect(function() {
@@ -1760,7 +1831,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                         // Set $props to Alpine store
                                         this.$props = store;
                                     } else {
-                                        console.error('[AlpineComponentLoader] Store "'.concat(storeName, '" not found. Falling back to local state.'));
+                                        console.error('[ACL] Store "'.concat(storeName, '" not found. Falling back to local state.'));
                                         this.$props = window.Alpine.reactive(this.$props || {});
                                     }
                                 } else {
@@ -1769,6 +1840,16 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                 }
                                 // Initialize persistence
                                 this._initPersistence();
+                                // Track reactive updates for the debugger
+                                // We manually touch all props *except* $lastUpdated to avoid an infinite loop
+                                Alpine.effect(function() {
+                                    if (_this.$props) {
+                                        Object.keys(_this.$props).forEach(function(k) {
+                                            if (k !== '$lastUpdated') void _this.$props[k];
+                                        });
+                                        _this.$props.$lastUpdated = Date.now();
+                                    }
+                                });
                                 // Set an anonymous Alpine store for debugging
                                 Alpine.store("props_".concat(tagName, "_").concat(Math.random().toString(36).slice(2)), this.$props);
                                 // Pass the reactive reference to all children
@@ -1899,6 +1980,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
 }();
 _define_property(AlpineComponentLoader, "_started", false);
 _define_property(AlpineComponentLoader, "_registry", new Map());
+_define_property(AlpineComponentLoader, "_debugger", false);
 // Global default configuration
 _define_property(AlpineComponentLoader, "globalConfig", {
     debug: false,
@@ -2155,7 +2237,7 @@ var AlpineDynamicLoader = /*#__PURE__*/ function(HTMLElement1) {
                                             ].includes(attr.name)) el.setAttribute(attr.name, attr.value);
                                         });
                                     } catch (e) {
-                                        console.error("[AlpineComponentLoader] Failed to create: <".concat(tag, ">"), e);
+                                        console.error("[ACL] Failed to create: <".concat(tag, ">"), e);
                                     }
                                 }
                                 // Fade in new component
@@ -2202,7 +2284,7 @@ try {
         AlpineComponentLoader.start();
     }
 } catch (e) {
-    console.warn("[AlpineComponentLoader] Failed to register components:", e);
+    console.warn("[ACL] Failed to register components:", e);
 }
 
 

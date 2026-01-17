@@ -10,7 +10,7 @@
         "compile-min": "npx swc src/index.js -o dist/AlpineComponentLoader.min.js -C minify=true -C jsc.minify.mangle=true -C jsc.minify.compress=true -C jsc.minify.format.comments=some -s",
         "compile-debug": "npx swc src/debugger.js -o dist/ACLDebugger.js -s",
         "compile-min-debug": "npx swc src/debugger.js -o dist/ACLDebugger.min.js -C minify=true -C jsc.minify.mangle=true -C jsc.minify.compress=true -C jsc.minify.format.comments=some -s",
-        "compile-watch": " npm run clean ; npm run compile-debug & npm run compile -- -w",
+        "compile-watch": " npm run clean ; npm run compile-debug -- -w & npm run compile -- -w",
         "serve": "npm run clean ; npm run compile-watch & sleep 2 && npx reload -b",
         "build": "npm run clean ; npm run compile && npm run compile-min && npm run compile-debug && npm run compile-min-debug",
         "prepare": "husky"

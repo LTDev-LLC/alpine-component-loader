@@ -37,9 +37,13 @@ const debuggerCss = {
     },
     overlayBoxes: {
         position: 'absolute',
-        border: '4px solid #22c55e',
+        border: '4px solid',
         boxSizing: 'border-box',
-    }
+    },
+    overlayBoxesColors: {
+        default: '#22c55e',
+        update: '#fbbf24',
+    },
 };
 
 // Helper to convert JS style objects to CSS strings
@@ -81,15 +85,20 @@ export default class ACLDebugger {
                 // Status info
                 const statusNode = document.createElement('div');
 
+                // Performance info
+                const perfNode = document.createElement('div');
+                perfNode.style.marginTop = '2px';
+                perfNode.style.fontSize = '0.9em';
+
                 // Prop info
                 const propsNode = document.createElement('pre');
                 propsNode.style.cssText = 'margin: 4px 0 0 0; opacity: 0.8;';
 
                 // Append once
-                tooltip.append(titleNode, hr, statusNode, propsNode);
+                tooltip.append(titleNode, hr, statusNode, perfNode, propsNode);
 
                 // Save references for fast updates
-                tooltip._nodes = { title: titleNode, status: statusNode, props: propsNode };
+                tooltip._nodes = { title: titleNode, status: statusNode, perf: perfNode, props: propsNode };
 
                 // Append to body
                 document.body.appendChild(tooltip);
@@ -194,6 +203,13 @@ export default class ACLDebugger {
                             box.style.height = `${rect.height}px`;
                             box.style.display = 'block'; // Ensure it's visible
 
+                            // Flash border color when updated
+                            box.style.borderColor = debuggerCss.overlayBoxesColors[
+                                (el.$props?.$lastUpdated && ((Date.now() - el.$props.$lastUpdated) < 1000))
+                                    ? 'update'
+                                    : 'default'
+                            ];
+
                             // Count the used boxes
                             usedBoxCount++;
                         }
@@ -211,6 +227,16 @@ export default class ACLDebugger {
                         tooltip._nodes.title.textContent = `<${hoveredElement.getAttribute('data-acl-component')}>`;
                         tooltip._nodes.status.textContent = hoveredElement._loading ? 'Loading...' : 'Ready';
                         tooltip._nodes.status.style.color = hoveredElement._loading ? '#fbbf24' : '#4ade80';
+
+                        // Display perf metrics
+                        if (hoveredElement._perf && hoveredElement._perf.duration) {
+                            const time = hoveredElement._perf.duration.toFixed(1);
+                            tooltip._nodes.perf.textContent = `Load: ${time}ms`;
+                            tooltip._nodes.perf.style.color = time > 100 ? '#f87171' : '#94a3b8';
+                            tooltip._nodes.perf.style.display = 'block';
+                        } else {
+                            tooltip._nodes.perf.style.display = 'none';
+                        }
 
                         // Display all props
                         tooltip._nodes.props.textContent = JSON.stringify(hoveredElement.$props, null, 2);

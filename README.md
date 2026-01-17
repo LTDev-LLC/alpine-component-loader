@@ -208,7 +208,21 @@ Regardless of how it is defined, usage is the same:
 ></user-card>
 ```
 
-### 2. Declarative Fetching (`data-src`)
+### 2. Built-in Props & Helpers
+
+The `$props` object automatically includes several read-only state properties and helper methods useful for controlling the component.
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| **`$data`** | `any` | Data fetched via `data-src`. `null` until loaded. |
+| **`$loading`** | `Boolean` | `true` while data is fetching or template is resolving. |
+| **`$error`** | `String` | Error message if something goes wrong. `null` otherwise. |
+| **`$lastUpdated`** | `Number` | Timestamp of the last reactive update. |
+| **`$emit(name, detail)`** | `Function` | Dispatches a custom event from the component root. |
+| **`$reload()`** | `Function` | Forces the component to reload (re-fetch data/template). |
+| **`$persistence`** | `Object` | If `persist` is used this contains further helpers. See `8. State Persistence` below. |
+
+### 3. Declarative Fetching (`data-src`)
 
 Automatically fetch JSON data and inject it into `$el.$props.$data`.
 
@@ -235,7 +249,7 @@ Automatically fetch JSON data and inject it into `$el.$props.$data`.
 </div>
 ```
 
-### 3. Global Store Binding (`bind-store`)
+### 4. Global Store Binding (`bind-store`)
 
 Sync an Alpine Global Store to the component's props. Updates to the store automatically update the component.
 
@@ -248,7 +262,7 @@ Alpine.store('theme', { mode: 'dark', color: 'blue' });
 <theme-widget bind-store="theme"></theme-widget>
 ```
 
-### 4. Emitting Events (`$emit`)
+### 5. Emitting Events (`$emit`)
 
 Dispatch custom events from your component using the **`$emit`** helper available on `props`. It automatically configures the event with `bubbles: true` and `composed: true` so it can be caught by parent components, even outside the Shadow DOM.
 
@@ -262,7 +276,7 @@ Dispatch custom events from your component using the **`$emit`** helper availabl
 <my-component @save="console.log('Saved:', $event.detail.status)"></my-component>
 ```
 
-### 5. Dynamic Components (`<acl-dynamic>`)
+### 6. Dynamic Components (`<acl-dynamic>`)
 
 Dynamically switch between components using the `<acl-dynamic>` element. This is similar to Vue's `<component :is="...">`. Attributes placed on the loader are automatically forwarded to the rendered component.
 
@@ -281,7 +295,7 @@ By default, switching components destroys the old instance (losing state). Add t
 <acl-dynamic :is="currentView" keep-alive></acl-dynamic>
 ```
 
-### 6. Component keep-alive
+### 7. Component keep-alive
 
 You can also use **`keep-alive`** on standard components to prevent them from being destroyed when removed from the DOM manually. This allows you to detach a component (e.g., `el.remove()`) and re-attach it later without losing its state or triggering a re-fetch.
 
@@ -303,7 +317,7 @@ You can also use **`keep-alive`** on standard components to prevent them from be
 </script>
 ```
 
-### 7. State Persistence (`persist`)
+### 8. State Persistence (`persist`)
 
 Automatically save and restore component props to `localStorage` or `sessionStorage`. This is useful for preserving form inputs, user preferences, or active tabs across page reloads.
 

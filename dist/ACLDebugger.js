@@ -100,8 +100,12 @@ var debuggerCss = {
     },
     overlayBoxes: {
         position: 'absolute',
-        border: '4px solid #22c55e',
+        border: '4px solid',
         boxSizing: 'border-box'
+    },
+    overlayBoxesColors: {
+        default: '#22c55e',
+        update: '#fbbf24'
     }
 };
 // Helper to convert JS style objects to CSS strings
@@ -145,15 +149,20 @@ var ACLDebugger = /*#__PURE__*/ function() {
                         hr.style.borderBottom = '1px solid #374151';
                         // Status info
                         var statusNode = document.createElement('div');
+                        // Performance info
+                        var perfNode = document.createElement('div');
+                        perfNode.style.marginTop = '2px';
+                        perfNode.style.fontSize = '0.9em';
                         // Prop info
                         var propsNode = document.createElement('pre');
                         propsNode.style.cssText = 'margin: 4px 0 0 0; opacity: 0.8;';
                         // Append once
-                        tooltip.append(titleNode, hr, statusNode, propsNode);
+                        tooltip.append(titleNode, hr, statusNode, perfNode, propsNode);
                         // Save references for fast updates
                         tooltip._nodes = {
                             title: titleNode,
                             status: statusNode,
+                            perf: perfNode,
                             props: propsNode
                         };
                         // Append to body
@@ -241,6 +250,7 @@ var ACLDebugger = /*#__PURE__*/ function() {
                                 }
                                 // Only draw if we have a valid visible area
                                 if (rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight && rect.left < window.innerWidth && rect.top + rect.height > 0 && rect.left + rect.width > 0) {
+                                    var _el_$props;
                                     // Reuse existing box or create new one
                                     var box = children[usedBoxCount];
                                     if (!box) {
@@ -253,6 +263,8 @@ var ACLDebugger = /*#__PURE__*/ function() {
                                     box.style.width = "".concat(rect.width, "px");
                                     box.style.height = "".concat(rect.height, "px");
                                     box.style.display = 'block'; // Ensure it's visible
+                                    // Flash border color when updated
+                                    box.style.borderColor = debuggerCss.overlayBoxesColors[((_el_$props = el.$props) === null || _el_$props === void 0 ? void 0 : _el_$props.$lastUpdated) && Date.now() - el.$props.$lastUpdated < 1000 ? 'update' : 'default'];
                                     // Count the used boxes
                                     usedBoxCount++;
                                 }
@@ -266,6 +278,15 @@ var ACLDebugger = /*#__PURE__*/ function() {
                                 tooltip._nodes.title.textContent = "<".concat(hoveredElement.getAttribute('data-acl-component'), ">");
                                 tooltip._nodes.status.textContent = hoveredElement._loading ? 'Loading...' : 'Ready';
                                 tooltip._nodes.status.style.color = hoveredElement._loading ? '#fbbf24' : '#4ade80';
+                                // Display perf metrics
+                                if (hoveredElement._perf && hoveredElement._perf.duration) {
+                                    var time = hoveredElement._perf.duration.toFixed(1);
+                                    tooltip._nodes.perf.textContent = "Load: ".concat(time, "ms");
+                                    tooltip._nodes.perf.style.color = time > 100 ? '#f87171' : '#94a3b8';
+                                    tooltip._nodes.perf.style.display = 'block';
+                                } else {
+                                    tooltip._nodes.perf.style.display = 'none';
+                                }
                                 // Display all props
                                 tooltip._nodes.props.textContent = JSON.stringify(hoveredElement.$props, null, 2);
                                 // Base position information

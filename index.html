@@ -565,14 +565,20 @@ AlpineComponentLoader.define('light-alert', '#tpl-light-alert', {
       <h2>9. Declarative Fetching <span class="badge">data-src</span></h2>
       <p>Provide a `data-src` attribute to automatically fetch JSON and inject it into `props.$data`.</p>
 
-      <acl-component src="#tpl-user-card" tag="api-user" shadow="true" data-src="https://jsonplaceholder.typicode.com/users/1"></acl-component>
+      <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+        <acl-component src="user-card.html" tag="api-user" shadow="true" data-src="https://dummyjson.com/users/1">
+        </acl-component>
+
+        <acl-component src="user-card.html" tag="api-user" shadow="true" data-src="https://dummyjson.com/users/2">
+        </acl-component>
+      </div>
 
       <details>
         <summary>View Source</summary>
         <pre>&lt;acl-component
-  src="#tpl-user-card"
+  src="/components/user-card.html"
   tag="api-user"
-  data-src="https://jsonplaceholder.typicode.com/users/1"
+  data-src="https://dummyjson.com/users/1"
 &gt;&lt;/acl-component&gt;</pre>
       </details>
     </section>
