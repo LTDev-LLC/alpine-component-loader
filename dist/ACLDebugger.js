@@ -109,7 +109,7 @@ var debuggerCss = {
     }
 };
 // Helper to convert JS style objects to CSS strings
-var toCssString = function(styleObj) {
+var toCssString = function toCssString(styleObj) {
     return Object.entries(styleObj).map(function(param) {
         var _param = _sliced_to_array(param, 2), k = _param[0], v = _param[1];
         return "".concat(k.replace(/[A-Z]/g, function(m) {
@@ -179,7 +179,7 @@ var ACLDebugger = /*#__PURE__*/ function() {
                     // State management, tracking hovered component + mouse position
                     var mouseX = 0, mouseY = 0, hoveredElement = null;
                     // Lightweight mouse listener for finding hovered component + mouse position
-                    var onMouseMove = function(e) {
+                    var onMouseMove = function onMouseMove(e) {
                         mouseX = e.clientX;
                         mouseY = e.clientY;
                         // Find hovered component (handling Shadow DOM)
@@ -193,7 +193,7 @@ var ACLDebugger = /*#__PURE__*/ function() {
                             passive: true
                         });
                         // Render loop, with throttling, handles overlay + tooltip
-                        var renderLoop = function() {
+                        var renderLoop = function renderLoop1() {
                             if (!AlpineComponentLoader.globalConfig.debug) {
                                 overlayContainer.replaceChildren(); // Cleanup
                                 tooltip.style.display = 'none';

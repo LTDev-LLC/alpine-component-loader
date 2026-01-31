@@ -381,8 +381,10 @@ var typeMap = {
     'Array': Array,
     'Object': Object
 };
+// Cache for xxternal data requests (Prevent duplicate API calls)
+var dataFetchCache = new Map();
 // Helper to convert JS style objects to CSS strings
-var toCssString = function(styleObj) {
+var toCssString = function toCssString(styleObj) {
     return Object.entries(styleObj).map(function(param) {
         var _param = _sliced_to_array(param, 2), k = _param[0], v = _param[1];
         return "".concat(k.replace(/[A-Z]/g, function(m) {
@@ -390,6 +392,69 @@ var toCssString = function(styleObj) {
         }), ":").concat(v);
     }).join(';');
 };
+// Helper to ensure values are string-safe for URLs (stringifies objects/arrays)
+var toUrlValue = function toUrlValue(v) {
+    return encodeURIComponent((typeof v === "undefined" ? "undefined" : _type_of(v)) === 'object' && v !== null ? JSON.stringify(v) : v);
+};
+// Helper to convert JS objects to URLSearchParams (supports nested objects and arrays)
+function toSearchParamsDeep(obj) {
+    var _params = new URLSearchParams(), // Support nested objects and arrays in query parameters
+    add = function add1(key, value) {
+        if (value == null) return;
+        // Support arrays
+        if (Array.isArray(value)) return value.forEach(function(v) {
+            return add(key, v);
+        });
+        // Support nested objects
+        if ((typeof value === "undefined" ? "undefined" : _type_of(value)) === "object") {
+            var _iteratorNormalCompletion = true, _didIteratorError = false, _iteratorError = undefined;
+            try {
+                for(var _iterator = Object.entries(value)[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true){
+                    var _step_value = _sliced_to_array(_step.value, 2), k = _step_value[0], v = _step_value[1];
+                    add("".concat(key, "[").concat(k, "]"), v);
+                }
+            } catch (err) {
+                _didIteratorError = true;
+                _iteratorError = err;
+            } finally{
+                try {
+                    if (!_iteratorNormalCompletion && _iterator.return != null) {
+                        _iterator.return();
+                    }
+                } finally{
+                    if (_didIteratorError) {
+                        throw _iteratorError;
+                    }
+                }
+            }
+            return;
+        }
+        // Add parameter
+        _params.append(key, toUrlValue(value));
+    };
+    var _iteratorNormalCompletion = true, _didIteratorError = false, _iteratorError = undefined;
+    try {
+        // Add parameters
+        for(var _iterator = Object.entries(obj !== null && obj !== void 0 ? obj : {})[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true){
+            var _step_value = _sliced_to_array(_step.value, 2), k = _step_value[0], v = _step_value[1];
+            add(k, v);
+        }
+    } catch (err) {
+        _didIteratorError = true;
+        _iteratorError = err;
+    } finally{
+        try {
+            if (!_iteratorNormalCompletion && _iterator.return != null) {
+                _iterator.return();
+            }
+        } finally{
+            if (_didIteratorError) {
+                throw _iteratorError;
+            }
+        }
+    }
+    return _params;
+}
 var AlpineComponentLoader = /*#__PURE__*/ function() {
     "use strict";
     function AlpineComponentLoader() {
@@ -698,7 +763,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                 if (!res.ok) throw new Error("HTTP ".concat(res.status));
                                 if (!useCache) return [
                                     3,
-                                    12
+                                    13
                                 ];
                                 _state.label = 9;
                             case 9:
@@ -734,6 +799,13 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                     12
                                 ];
                             case 12:
+                                // If the browser supports ReadableStream and it's a large file, return the stream
+                                if (res.body && typeof ReadableStream !== 'undefined') return [
+                                    2,
+                                    res.body.pipeThrough(new TextDecoderStream())
+                                ];
+                                _state.label = 13;
+                            case 13:
                                 // Return HTML string
                                 return [
                                     2,
@@ -754,10 +826,10 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                     attributes: {},
                     loading: 'eager',
                     hooks: {
-                        beforeFetch: function(opts) {
+                        beforeFetch: function beforeFetch(opts) {
                             return opts;
                         },
-                        afterFetch: function(data) {
+                        afterFetch: function afterFetch(data) {
                             return data;
                         }
                     }
@@ -784,13 +856,20 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                     persistDebounce: config.persistDebounce || 250,
                     bindStore: config.bindStore || null,
                     dataSrc: config.dataSrc || null,
-                    fetchTimeout: config.fetchTimeout || 30000,
-                    fetchOptions: config.fetchOptions || {}
+                    dataFetchParams: config.dataFetchParams || AlpineComponentLoader.globalConfig.dataFetchParams || null,
+                    dataFetchKeys: config.dataFetchKeys || AlpineComponentLoader.globalConfig.dataFetchKeys || null,
+                    dataFetchPoll: config.dataFetchPoll || AlpineComponentLoader.globalConfig.dataFetchPoll || null,
+                    dataFetchTimeout: config.dataFetchTimeout || AlpineComponentLoader.globalConfig.dataFetchTimeout || 30000,
+                    dataFetchOptions: config.dataFetchOptions || {}
                 });
                 // Track observed attributes internally
                 var observedAttrs = _to_consumable_array(new Set(_to_consumable_array(Object.keys(settings.attributes)).concat([
                     'bind-store',
-                    'data-src'
+                    'data-src',
+                    'data-fetch-params',
+                    'data-fetch-keys',
+                    'data-fetch-poll',
+                    'data-fetch-timeout'
                 ])));
                 // Prepend base path if source is a URL string
                 var contentSource = source;
@@ -801,16 +880,16 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                     settings: settings
                 });
                 // Return helpers to be assigned to $el.$props
-                var helpers = function(_this) {
+                var helpers = function helpers(_this) {
                     return {
-                        $emit: function(name, detail) {
+                        $emit: function $emit(name, detail) {
                             return _this.dispatchEvent(new CustomEvent(name, {
                                 bubbles: true,
                                 composed: true,
                                 detail: detail
                             }));
                         },
-                        $reload: function() {
+                        $reload: function $reload() {
                             return _this.reload();
                         }
                     };
@@ -842,6 +921,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                         _this._scopeId = "scope-".concat(Math.random().toString(36).slice(2, 9));
                         _this._slotObserver = null;
                         _this._originalLightDom = document.createDocumentFragment();
+                        _this._pollTimer = null;
                         return _this;
                     }
                     _create_class(AlpineExternalComponent, [
@@ -850,10 +930,16 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                             key: "attributeChangedCallback",
                             value: function attributeChangedCallback(name, oldVal, newVal) {
                                 if (oldVal === newVal) return;
-                                // Update prop and validate
-                                if (name === 'data-src') {
-                                    if (this._initialized) this._fetchData(newVal);
-                                } else this._updateProp(name, newVal);
+                                // Watch data-src and renamed fetch attributes
+                                if ([
+                                    'data-src',
+                                    'data-fetch-params',
+                                    'data-fetch-keys',
+                                    'data-fetch-timeout'
+                                ].includes(name)) {
+                                    if (this._initialized) this._fetchData(this.getAttribute('data-src') || settings.dataSrc);
+                                } else if (name === 'data-poll') this._startPolling(); // Restart polling with new interval
+                                else this._updateProp(name, newVal);
                                 // Emit updated event
                                 if (this._initialized) {
                                     this._triggerHook('updated', {
@@ -892,6 +978,8 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                 if (loadMode === 'lazy') this._initLazyObserver();
                                 else if (loadMode === 'idle') this._initIdleLoader();
                                 else this._load();
+                                // Initialize data polling if configured
+                                this._startPolling();
                             }
                         },
                         {
@@ -899,6 +987,8 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                             key: "disconnectedCallback",
                             value: function disconnectedCallback() {
                                 var _this = this;
+                                // Stop polling
+                                this._stopPolling();
                                 // Stop observing slots
                                 if (this._slotObserver) {
                                     this._slotObserver.disconnect();
@@ -927,6 +1017,59 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                     _this._loading = false;
                                     _this._disconnectTimeout = null;
                                 }, 250);
+                            }
+                        },
+                        {
+                            // Initiate the recursive polling timeout
+                            key: "_startPolling",
+                            value: function _startPolling() {
+                                var _this = this;
+                                this._stopPolling();
+                                var interval = parseInt(this.getAttribute('data-fetch-poll') || settings.dataFetchPoll);
+                                if (isNaN(interval) || interval <= 0) return;
+                                // Start the timer
+                                this._pollTimer = setTimeout(function() {
+                                    return _async_to_generator(function() {
+                                        var src;
+                                        return _ts_generator(this, function(_state) {
+                                            switch(_state.label){
+                                                case 0:
+                                                    if (!this.isConnected) return [
+                                                        2
+                                                    ];
+                                                    // Fetch data again
+                                                    src = this.getAttribute('data-src') || settings.dataSrc;
+                                                    if (!(src && this._initialized && !this.$props.$loading)) return [
+                                                        3,
+                                                        2
+                                                    ];
+                                                    return [
+                                                        4,
+                                                        this._fetchData(src, true)
+                                                    ];
+                                                case 1:
+                                                    _state.sent();
+                                                    _state.label = 2;
+                                                case 2:
+                                                    // Schedule next tick
+                                                    this._startPolling();
+                                                    return [
+                                                        2
+                                                    ];
+                                            }
+                                        });
+                                    }).call(_this);
+                                }, interval);
+                            }
+                        },
+                        {
+                            // Clear the active polling timeout
+                            key: "_stopPolling",
+                            value: function _stopPolling() {
+                                if (this._pollTimer) {
+                                    clearTimeout(this._pollTimer);
+                                    this._pollTimer = null;
+                                }
                             }
                         },
                         {
@@ -998,7 +1141,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                             value: // Allow the component to be reloaded
                             function reload() {
                                 return _async_to_generator(function() {
-                                    var cache;
+                                    var currentDataSrc, cache;
                                     return _ts_generator(this, function(_state) {
                                         switch(_state.label){
                                             case 0:
@@ -1006,6 +1149,9 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                                     2
                                                 ];
                                                 console.log("[ACL] Reloading <".concat(tagName, ">..."));
+                                                // Clear data cache for this specific endpoint
+                                                currentDataSrc = this.getAttribute('data-src') || settings.dataSrc;
+                                                if (currentDataSrc) dataFetchCache.delete(currentDataSrc);
                                                 if (!settings.cacheTemplates) return [
                                                     3,
                                                     3
@@ -1217,10 +1363,11 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                         },
                         {
                             key: "_fetchData",
-                            value: // Handle data fetching for APIs
+                            value: // Handle data fetching for APIs with caching, placeholders, and parameters
                             function _fetchData(url) {
+                                var skipCache = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : false;
                                 return _async_to_generator(function() {
-                                    var _this, signal, timeoutId, _AlpineComponentLoader_globalConfig, _settings_hooks, _settings_hooks1, options, modifiedOptions, res, contentType, json, e, modified, e1, _this__fetchAbortController;
+                                    var _this, signal, timeoutId, _settings_hooks, resolveValue, keys, params, resolvedUrl, finalUrl, fetchTask, json, processedData, modified, e, e1, _this__fetchAbortController;
                                     return _ts_generator(this, function(_state) {
                                         switch(_state.label){
                                             case 0:
@@ -1228,60 +1375,271 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                                 if (!url) return [
                                                     2
                                                 ];
-                                                // Abort previous request (Fixes race conditions)
+                                                // Abort any pending component request and init new controller
                                                 if (this._fetchAbortController) this._fetchAbortController.abort();
                                                 this._fetchAbortController = new AbortController();
                                                 signal = this._fetchAbortController.signal;
-                                                // Set loading state
+                                                // Initialize reactive states for loading and error resets
                                                 this.$props.$loading = true;
                                                 this.$props.$error = null;
-                                                // Setup timeout
+                                                this.$props.$data = null;
+                                                // Enforce request timeout via AbortController cancellation
                                                 timeoutId = setTimeout(function() {
                                                     return _this._fetchAbortController.abort('Timeout');
-                                                }, settings.fetchTimeout);
+                                                }, settings.dataFetchTimeout);
                                                 _state.label = 1;
                                             case 1:
                                                 _state.trys.push([
                                                     1,
-                                                    11,
-                                                    12,
-                                                    13
+                                                    9,
+                                                    10,
+                                                    11
                                                 ]);
-                                                // Prepare options
-                                                options = _object_spread_props(_object_spread({
-                                                    method: 'GET',
-                                                    headers: {
-                                                        'Accept': 'application/json'
-                                                    }
-                                                }, ((_AlpineComponentLoader_globalConfig = AlpineComponentLoader.globalConfig) === null || _AlpineComponentLoader_globalConfig === void 0 ? void 0 : _AlpineComponentLoader_globalConfig.fetchOptions) || {}, (settings === null || settings === void 0 ? void 0 : settings.fetchOptions) || {}), {
-                                                    signal: signal
-                                                });
-                                                if (!(typeof (settings === null || settings === void 0 ? void 0 : (_settings_hooks = settings.hooks) === null || _settings_hooks === void 0 ? void 0 : _settings_hooks.beforeFetch) === 'function')) return [
-                                                    3,
-                                                    3
-                                                ];
+                                                // Helper to resolve attributes as JSON, Expressions, or Functions (Sync/Async)
+                                                resolveValue = function resolveValue(attrName, configVal) {
+                                                    return _async_to_generator(function() {
+                                                        var result, attrVal, context, trimmed, unused, evaled, _tmp, e, _tmp1, _tmp2;
+                                                        return _ts_generator(this, function(_state) {
+                                                            switch(_state.label){
+                                                                case 0:
+                                                                    result = {};
+                                                                    attrVal = this.getAttribute(attrName), context = {
+                                                                        el: this,
+                                                                        $el: this,
+                                                                        props: this.$props,
+                                                                        $props: this.$props,
+                                                                        root: this._root,
+                                                                        $root: this._root
+                                                                    };
+                                                                    if (!attrVal) return [
+                                                                        3,
+                                                                        9
+                                                                    ];
+                                                                    trimmed = attrVal.trim();
+                                                                    _state.label = 1;
+                                                                case 1:
+                                                                    _state.trys.push([
+                                                                        1,
+                                                                        2,
+                                                                        ,
+                                                                        9
+                                                                    ]);
+                                                                    // Attempt standard JSON parsing first
+                                                                    if (trimmed.startsWith('{') || trimmed.startsWith('[')) result = JSON.parse(trimmed.replace(/'/g, '"'));
+                                                                    else throw new Error();
+                                                                    return [
+                                                                        3,
+                                                                        9
+                                                                    ];
+                                                                case 2:
+                                                                    unused = _state.sent();
+                                                                    _state.label = 3;
+                                                                case 3:
+                                                                    _state.trys.push([
+                                                                        3,
+                                                                        7,
+                                                                        ,
+                                                                        8
+                                                                    ]);
+                                                                    // Evaluate as JS: supports arrow functions and dynamic expressions
+                                                                    // We inject $props and $el into the function scope for convenience
+                                                                    evaled = new Function('$props', '$el', "return (".concat(trimmed, ")"))(this.$props, this);
+                                                                    if (!(typeof evaled === 'function')) return [
+                                                                        3,
+                                                                        5
+                                                                    ];
+                                                                    return [
+                                                                        4,
+                                                                        evaled.call(this, context)
+                                                                    ];
+                                                                case 4:
+                                                                    _tmp = _state.sent();
+                                                                    return [
+                                                                        3,
+                                                                        6
+                                                                    ];
+                                                                case 5:
+                                                                    _tmp = evaled;
+                                                                    _state.label = 6;
+                                                                case 6:
+                                                                    result = _tmp;
+                                                                    return [
+                                                                        3,
+                                                                        8
+                                                                    ];
+                                                                case 7:
+                                                                    e = _state.sent();
+                                                                    console.warn("[ACL] Invalid value in ".concat(attrName, " for <").concat(tagName, ">"), e);
+                                                                    return [
+                                                                        3,
+                                                                        8
+                                                                    ];
+                                                                case 8:
+                                                                    return [
+                                                                        3,
+                                                                        9
+                                                                    ];
+                                                                case 9:
+                                                                    if (!configVal) return [
+                                                                        3,
+                                                                        13
+                                                                    ];
+                                                                    _tmp1 = [
+                                                                        {},
+                                                                        result
+                                                                    ];
+                                                                    if (!(typeof configVal === 'function')) return [
+                                                                        3,
+                                                                        11
+                                                                    ];
+                                                                    return [
+                                                                        4,
+                                                                        configVal.call(this, context)
+                                                                    ];
+                                                                case 10:
+                                                                    _tmp2 = _state.sent();
+                                                                    return [
+                                                                        3,
+                                                                        12
+                                                                    ];
+                                                                case 11:
+                                                                    _tmp2 = configVal;
+                                                                    _state.label = 12;
+                                                                case 12:
+                                                                    result = _object_spread.apply(void 0, _tmp1.concat([
+                                                                        _tmp2 || {}
+                                                                    ]));
+                                                                    _state.label = 13;
+                                                                case 13:
+                                                                    return [
+                                                                        2,
+                                                                        result
+                                                                    ];
+                                                            }
+                                                        });
+                                                    }).call(_this);
+                                                };
                                                 return [
                                                     4,
-                                                    settings.hooks.beforeFetch(options)
+                                                    resolveValue('data-fetch-keys', settings.dataFetchKeys)
                                                 ];
                                             case 2:
-                                                modifiedOptions = _state.sent();
-                                                if (modifiedOptions && (typeof modifiedOptions === "undefined" ? "undefined" : _type_of(modifiedOptions)) === 'object') options = modifiedOptions;
-                                                _state.label = 3;
-                                            case 3:
+                                                keys = _state.sent();
                                                 return [
                                                     4,
-                                                    fetch(url, options)
+                                                    resolveValue('data-fetch-params', settings.dataFetchParams)
+                                                ];
+                                            case 3:
+                                                params = _state.sent();
+                                                // Perform URL placeholder replacement (e.g., :userId -> 123)
+                                                resolvedUrl = url;
+                                                Object.entries(keys).forEach(function(param) {
+                                                    var _param = _sliced_to_array(param, 2), k = _param[0], v = _param[1];
+                                                    return resolvedUrl = resolvedUrl.replace(":".concat(k), toUrlValue(v));
+                                                });
+                                                // Build final URL string with appended query parameters
+                                                finalUrl = new URL(resolvedUrl, window.location.origin);
+                                                if (Object.keys(params).length > 0) finalUrl.search = toSearchParamsDeep(params).toString();
+                                                // Convert to string for caching
+                                                finalUrl = finalUrl.toString();
+                                                // Bypass shared cache if requested
+                                                if (skipCache) dataFetchCache.delete(finalUrl);
+                                                // Shared cache management (Deduplicate identical requests)
+                                                if (!dataFetchCache.has(finalUrl)) {
+                                                    fetchTask = function() {
+                                                        return _async_to_generator(function() {
+                                                            var _AlpineComponentLoader_globalConfig, _settings_hooks, options, modified, e, res, contentType;
+                                                            return _ts_generator(this, function(_state) {
+                                                                switch(_state.label){
+                                                                    case 0:
+                                                                        options = _object_spread({
+                                                                            method: 'GET',
+                                                                            headers: {
+                                                                                'Accept': 'application/json'
+                                                                            }
+                                                                        }, ((_AlpineComponentLoader_globalConfig = AlpineComponentLoader.globalConfig) === null || _AlpineComponentLoader_globalConfig === void 0 ? void 0 : _AlpineComponentLoader_globalConfig.dataFetchOptions) || {}, (settings === null || settings === void 0 ? void 0 : settings.dataFetchOptions) || {});
+                                                                        if (!(typeof (settings === null || settings === void 0 ? void 0 : (_settings_hooks = settings.hooks) === null || _settings_hooks === void 0 ? void 0 : _settings_hooks.beforeFetch) === 'function')) return [
+                                                                            3,
+                                                                            4
+                                                                        ];
+                                                                        _state.label = 1;
+                                                                    case 1:
+                                                                        _state.trys.push([
+                                                                            1,
+                                                                            3,
+                                                                            ,
+                                                                            4
+                                                                        ]);
+                                                                        return [
+                                                                            4,
+                                                                            settings.hooks.beforeFetch(options)
+                                                                        ];
+                                                                    case 2:
+                                                                        modified = _state.sent();
+                                                                        if (modified && (typeof modified === "undefined" ? "undefined" : _type_of(modified)) === 'object') options = modified;
+                                                                        return [
+                                                                            3,
+                                                                            4
+                                                                        ];
+                                                                    case 3:
+                                                                        e = _state.sent();
+                                                                        console.warn("[ACL] beforeFetch hook error for <".concat(tagName, ">"), e);
+                                                                        return [
+                                                                            3,
+                                                                            4
+                                                                        ];
+                                                                    case 4:
+                                                                        return [
+                                                                            4,
+                                                                            fetch(finalUrl, options)
+                                                                        ];
+                                                                    case 5:
+                                                                        res = _state.sent();
+                                                                        if (!res.ok) throw new Error("API Error: ".concat(res.status));
+                                                                        // Validate content type header as JSON
+                                                                        contentType = res.headers.get("content-type");
+                                                                        if (!(contentType === null || contentType === void 0 ? void 0 : contentType.includes("application/json"))) throw new Error("Invalid JSON response");
+                                                                        return [
+                                                                            4,
+                                                                            res.json()
+                                                                        ];
+                                                                    case 6:
+                                                                        // Parse JSON response
+                                                                        return [
+                                                                            2,
+                                                                            _state.sent()
+                                                                        ];
+                                                                }
+                                                            });
+                                                        })();
+                                                    }();
+                                                    // Store pending promise in cache and prune on failure
+                                                    dataFetchCache.set(finalUrl, fetchTask);
+                                                    fetchTask.catch(function() {
+                                                        return dataFetchCache.delete(finalUrl);
+                                                    });
+                                                }
+                                                return [
+                                                    4,
+                                                    Promise.race([
+                                                        dataFetchCache.get(finalUrl),
+                                                        new Promise(function(_, reject) {
+                                                            return signal.addEventListener('abort', function() {
+                                                                return reject(new Error('Aborted'));
+                                                            }, {
+                                                                once: true
+                                                            });
+                                                        })
+                                                    ])
                                                 ];
                                             case 4:
-                                                res = _state.sent();
-                                                // Clear the fetch timeout
-                                                clearTimeout(timeoutId);
-                                                // Validate response
-                                                if (!res.ok) throw new Error("API Error: ".concat(res.status, " ").concat(res.statusText));
-                                                // Validate content type as JSON
-                                                contentType = res.headers.get("content-type");
-                                                if (!contentType || !contentType.includes("application/json")) throw new Error('Invalid response. Expected JSON, got "'.concat(contentType, '"'));
+                                                json = _state.sent();
+                                                // Transform received data via afterFetch hook
+                                                processedData = json;
+                                                if (!(typeof (settings === null || settings === void 0 ? void 0 : (_settings_hooks = settings.hooks) === null || _settings_hooks === void 0 ? void 0 : _settings_hooks.afterFetch) === 'function')) return [
+                                                    3,
+                                                    8
+                                                ];
                                                 _state.label = 5;
                                             case 5:
                                                 _state.trys.push([
@@ -1292,41 +1650,33 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                                 ]);
                                                 return [
                                                     4,
-                                                    res.json()
+                                                    settings.hooks.afterFetch(json)
                                                 ];
                                             case 6:
-                                                json = _state.sent();
+                                                modified = _state.sent();
+                                                if (modified && (typeof modified === "undefined" ? "undefined" : _type_of(modified)) === 'object') processedData = modified;
                                                 return [
                                                     3,
                                                     8
                                                 ];
                                             case 7:
                                                 e = _state.sent();
-                                                throw new Error("Invalid JSON: ".concat(e.message));
-                                            case 8:
-                                                if (!(typeof (settings === null || settings === void 0 ? void 0 : (_settings_hooks1 = settings.hooks) === null || _settings_hooks1 === void 0 ? void 0 : _settings_hooks1.afterFetch) === 'function')) return [
-                                                    3,
-                                                    10
-                                                ];
+                                                console.warn("[ACL] afterFetch hook error for <".concat(tagName, ">"), e);
                                                 return [
-                                                    4,
-                                                    settings.hooks.afterFetch(json)
+                                                    3,
+                                                    8
+                                                ];
+                                            case 8:
+                                                // Finalize component data update if not locally aborted
+                                                if (!signal.aborted) this.$props.$data = processedData;
+                                                return [
+                                                    3,
+                                                    11
                                                 ];
                                             case 9:
-                                                modified = _state.sent();
-                                                if (modified && (typeof modified === "undefined" ? "undefined" : _type_of(modified)) === 'object') json = modified;
-                                                _state.label = 10;
-                                            case 10:
-                                                // Only update if not aborted
-                                                if (!signal.aborted) this.$props.$data = json;
-                                                return [
-                                                    3,
-                                                    13
-                                                ];
-                                            case 11:
                                                 e1 = _state.sent();
-                                                // Ignore abort errors
-                                                if (e1.name === 'AbortError' || signal.aborted) {
+                                                // Handle errors or timeout cancellations for the specific instance
+                                                if (signal.aborted) {
                                                     if (signal.reason === 'Timeout') {
                                                         this.$props.$error = "Request timed out after ".concat(settings.fetchTimeout, "ms");
                                                         this.$props.$data = null;
@@ -1340,12 +1690,11 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                                 this.$props.$data = null;
                                                 return [
                                                     3,
-                                                    13
+                                                    11
                                                 ];
-                                            case 12:
-                                                // Cleanup
+                                            case 10:
+                                                // Cleanup timers and unlock component loading states
                                                 clearTimeout(timeoutId);
-                                                // Only turn off loading if this request wasn't superseded by a new one
                                                 if (!signal.aborted || signal.reason === 'Timeout') {
                                                     ;
                                                     this.$props.$loading = false;
@@ -1354,7 +1703,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                                 return [
                                                     7
                                                 ];
-                                            case 13:
+                                            case 11:
                                                 return [
                                                     2
                                                 ];
@@ -1465,125 +1814,161 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                             value: // Render logic using DOM manipulation
                             function _renderSafe(content, lightSlots) {
                                 return _async_to_generator(function() {
-                                    var _this, rootNode, doc, styles, combinedCss, sheet, scripts, node;
+                                    var _this, rootNode, reader, decoder, accumulator, _ref, done, value, doc, styles, combinedCss, sheet, scripts, node;
                                     return _ts_generator(this, function(_state) {
-                                        _this = this;
-                                        // Parse string to DOM if needed, otherwise clone fragment
-                                        if (typeof content === 'string') {
-                                            // Parse HTML to DOM
-                                            doc = new DOMParser().parseFromString(content, 'text/html');
-                                            // Create document fragment to hold elements
-                                            rootNode = document.createDocumentFragment();
-                                            // Move elements from head/body (styles, title, meta and actual markup)
-                                            _to_consumable_array(Array.from(doc.head.childNodes)).concat(_to_consumable_array(Array.from(doc.body.childNodes))).forEach(function(node) {
-                                                return rootNode.appendChild(node);
-                                            });
-                                        } else rootNode = content.cloneNode(true);
-                                        // Process styles (constructible, scoping, or stripping)
-                                        if (!settings.stripStyles) {
-                                            styles = Array.from(rootNode.querySelectorAll('style'));
-                                            // Constructible stylesheets (Shadow DOM only)
-                                            if (settings.shadow && settings.useConstructibleStyles && document.adoptedStyleSheets) {
-                                                combinedCss = styles.map(function(s) {
-                                                    return s.textContent;
-                                                }).join('\n');
-                                                sheet = null;
-                                                if (combinedCss.trim().length > 0) {
-                                                    if (styleSheetCache.has(combinedCss)) sheet = styleSheetCache.get(combinedCss);
-                                                    else {
-                                                        sheet = new CSSStyleSheet();
-                                                        sheet.replaceSync(combinedCss);
-                                                        styleSheetCache.set(combinedCss, sheet);
-                                                    }
-                                                }
-                                                // Apply shared + internal styles
-                                                this._root.adoptedStyleSheets = _to_consumable_array(settings.sharedStyleSheets || []).concat(_to_consumable_array(sheet ? [
-                                                    sheet
-                                                ] : []));
-                                                // Remove style tags since we moved them to adoptedStyleSheets
-                                                styles.forEach(function(el) {
-                                                    return el.remove();
-                                                });
-                                            } else {
-                                                // Fallback: Standard tag injection + scoping
-                                                styles.forEach(function(style) {
-                                                    if (!settings.shadow) {
-                                                        // Native @scope support
-                                                        if ('CSSScopeRule' in window) {
-                                                            style.textContent = "@scope { ".concat(style.textContent.replace(/:host/g, ':scope'), " }");
-                                                        } else {
-                                                            _this.setAttribute('data-scope', _this._scopeId);
-                                                            // Handles :host(.active) -> tagName[data-scope].active
-                                                            // Handles :host -> tagName[data-scope]
-                                                            var scopeSelector = "".concat(tagName, '[data-scope="').concat(_this._scopeId, '"]');
-                                                            if (style.textContent.includes(':host')) {
-                                                                style.textContent = style.textContent.replace(/:host\s*\(([^)]+)\)/g, "".concat(scopeSelector, "$1")) // Handle :host(...)
-                                                                .replace(/:host/g, scopeSelector); // Handle :host
+                                        switch(_state.label){
+                                            case 0:
+                                                _this = this;
+                                                if (!_instanceof(content, ReadableStream)) return [
+                                                    3,
+                                                    4
+                                                ];
+                                                reader = content.getReader(), decoder = new TextDecoder(), accumulator = [];
+                                                _state.label = 1;
+                                            case 1:
+                                                if (!true) return [
+                                                    3,
+                                                    3
+                                                ];
+                                                return [
+                                                    4,
+                                                    reader.read()
+                                                ];
+                                            case 2:
+                                                _ref = _state.sent(), done = _ref.done, value = _ref.value;
+                                                if (done) return [
+                                                    3,
+                                                    3
+                                                ];
+                                                accumulator.push(typeof value === 'string' ? value : decoder.decode(value, {
+                                                    stream: true
+                                                }));
+                                                return [
+                                                    3,
+                                                    1
+                                                ];
+                                            case 3:
+                                                content = accumulator.join('') + decoder.decode();
+                                                console.log('[ACL] Stream content loaded as string.');
+                                                _state.label = 4;
+                                            case 4:
+                                                // Parse string to DOM if needed, otherwise clone fragment
+                                                if (typeof content === 'string') {
+                                                    // Parse HTML to DOM
+                                                    doc = new DOMParser().parseFromString(content, 'text/html');
+                                                    // Create document fragment to hold elements
+                                                    rootNode = document.createDocumentFragment();
+                                                    // Move elements from head/body (styles, title, meta and actual markup)
+                                                    _to_consumable_array(Array.from(doc.head.childNodes)).concat(_to_consumable_array(Array.from(doc.body.childNodes))).forEach(function(node) {
+                                                        return rootNode.appendChild(node);
+                                                    });
+                                                } else rootNode = content.cloneNode(true);
+                                                // Process styles (constructible, scoping, or stripping)
+                                                if (!settings.stripStyles) {
+                                                    styles = Array.from(rootNode.querySelectorAll('style'));
+                                                    // Constructible stylesheets (Shadow DOM only)
+                                                    if (settings.shadow && settings.useConstructibleStyles && document.adoptedStyleSheets) {
+                                                        combinedCss = styles.map(function(s) {
+                                                            return s.textContent;
+                                                        }).join('\n');
+                                                        sheet = null;
+                                                        if (combinedCss.trim().length > 0) {
+                                                            if (styleSheetCache.has(combinedCss)) sheet = styleSheetCache.get(combinedCss);
+                                                            else {
+                                                                sheet = new CSSStyleSheet();
+                                                                sheet.replaceSync(combinedCss);
+                                                                styleSheetCache.set(combinedCss, sheet);
                                                             }
                                                         }
+                                                        // Apply shared + internal styles
+                                                        this._root.adoptedStyleSheets = _to_consumable_array(settings.sharedStyleSheets || []).concat(_to_consumable_array(sheet ? [
+                                                            sheet
+                                                        ] : []));
+                                                        // Remove style tags since we moved them to adoptedStyleSheets
+                                                        styles.forEach(function(el) {
+                                                            return el.remove();
+                                                        });
+                                                    } else {
+                                                        // Fallback: Standard tag injection + scoping
+                                                        styles.forEach(function(style) {
+                                                            if (!settings.shadow) {
+                                                                // Native @scope support
+                                                                if ('CSSScopeRule' in window) {
+                                                                    style.textContent = "@scope { ".concat(style.textContent.replace(/:host/g, ':scope'), " }");
+                                                                } else {
+                                                                    _this.setAttribute('data-scope', _this._scopeId);
+                                                                    // Handles :host(.active) -> tagName[data-scope].active
+                                                                    // Handles :host -> tagName[data-scope]
+                                                                    var scopeSelector = "".concat(tagName, '[data-scope="').concat(_this._scopeId, '"]');
+                                                                    if (style.textContent.includes(':host')) {
+                                                                        style.textContent = style.textContent.replace(/:host\s*\(([^)]+)\)/g, "".concat(scopeSelector, "$1")) // Handle :host(...)
+                                                                        .replace(/:host/g, scopeSelector); // Handle :host
+                                                                    }
+                                                                }
+                                                            }
+                                                        });
                                                     }
-                                                });
-                                            }
-                                        } else {
-                                            rootNode.querySelectorAll('style').forEach(function(el) {
-                                                return el.remove();
-                                            });
-                                        }
-                                        // Process scripts (security check and re-creation)
-                                        scripts = [];
-                                        if (settings.executeScripts) {
-                                            rootNode.querySelectorAll('script').forEach(function(oldScript) {
-                                                var newScript = document.createElement('script');
-                                                Array.from(oldScript.attributes).forEach(function(attr) {
-                                                    return newScript.setAttribute(attr.name, attr.value);
-                                                });
-                                                newScript.textContent = oldScript.textContent;
-                                                scripts.push(newScript);
-                                                oldScript.remove();
-                                            });
-                                        } else {
-                                            rootNode.querySelectorAll('script').forEach(function(el) {
-                                                return el.remove();
-                                            });
-                                        }
-                                        // Inject Light DOM slots if needed
-                                        if (!settings.shadow) {
-                                            // Instead of replacing the slot entirely, we replace it with a persistent container
-                                            // This allows us to append new nodes to it later via the MutationObserver
-                                            rootNode.querySelectorAll('slot').forEach(function(slotEl) {
-                                                var name = slotEl.getAttribute('name') || 'default';
-                                                // Create a transparent wrapper acting as the slot
-                                                var anchor = document.createElement('div');
-                                                anchor.style.display = 'contents';
-                                                anchor.setAttribute('data-acl-slot', name);
-                                                // Insert pre-captured nodes (initial render)
-                                                var nodesToInsert = lightSlots ? lightSlots[name] : null;
-                                                if (nodesToInsert && nodesToInsert.length > 0) {
-                                                    nodesToInsert.forEach(function(node) {
-                                                        return anchor.appendChild(node);
+                                                } else {
+                                                    rootNode.querySelectorAll('style').forEach(function(el) {
+                                                        return el.remove();
                                                     });
-                                                } else if (slotEl.childNodes.length > 0) {
-                                                    while(slotEl.firstChild)anchor.appendChild(slotEl.firstChild);
                                                 }
-                                                // Replace the <slot> tag with our anchor
-                                                slotEl.replaceWith(anchor);
-                                            });
+                                                // Process scripts (security check and re-creation)
+                                                scripts = [];
+                                                if (settings.executeScripts) {
+                                                    rootNode.querySelectorAll('script').forEach(function(oldScript) {
+                                                        var newScript = document.createElement('script');
+                                                        Array.from(oldScript.attributes).forEach(function(attr) {
+                                                            return newScript.setAttribute(attr.name, attr.value);
+                                                        });
+                                                        newScript.textContent = oldScript.textContent;
+                                                        scripts.push(newScript);
+                                                        oldScript.remove();
+                                                    });
+                                                } else {
+                                                    rootNode.querySelectorAll('script').forEach(function(el) {
+                                                        return el.remove();
+                                                    });
+                                                }
+                                                // Inject Light DOM slots if needed
+                                                if (!settings.shadow) {
+                                                    // Instead of replacing the slot entirely, we replace it with a persistent container
+                                                    // This allows us to append new nodes to it later via the MutationObserver
+                                                    rootNode.querySelectorAll('slot').forEach(function(slotEl) {
+                                                        var name = slotEl.getAttribute('name') || 'default';
+                                                        // Create a transparent wrapper acting as the slot
+                                                        var anchor = document.createElement('div');
+                                                        anchor.style.display = 'contents';
+                                                        anchor.setAttribute('data-acl-slot', name);
+                                                        // Insert pre-captured nodes (initial render)
+                                                        var nodesToInsert = lightSlots ? lightSlots[name] : null;
+                                                        if (nodesToInsert && nodesToInsert.length > 0) {
+                                                            nodesToInsert.forEach(function(node) {
+                                                                return anchor.appendChild(node);
+                                                            });
+                                                        } else if (slotEl.childNodes.length > 0) {
+                                                            while(slotEl.firstChild)anchor.appendChild(slotEl.firstChild);
+                                                        }
+                                                        // Replace the <slot> tag with our anchor
+                                                        slotEl.replaceWith(anchor);
+                                                    });
+                                                }
+                                                // Move nodes to component root
+                                                while(rootNode.firstChild){
+                                                    node = rootNode.firstChild;
+                                                    // Attach props directly to element
+                                                    if (node.nodeType === 1) node.$props = this.$props;
+                                                    // Append to root
+                                                    this._root.appendChild(node);
+                                                }
+                                                // Append scripts to trigger execution
+                                                scripts.forEach(function(s) {
+                                                    return _this._root.appendChild(s);
+                                                });
+                                                return [
+                                                    2
+                                                ];
                                         }
-                                        // Move nodes to component root
-                                        while(rootNode.firstChild){
-                                            node = rootNode.firstChild;
-                                            // Attach props directly to element
-                                            if (node.nodeType === 1) node.$props = this.$props;
-                                            // Append to root
-                                            this._root.appendChild(node);
-                                        }
-                                        // Append scripts to trigger execution
-                                        scripts.forEach(function(s) {
-                                            return _this._root.appendChild(s);
-                                        });
-                                        return [
-                                            2
-                                        ];
                                     });
                                 }).call(this);
                             }
@@ -1715,14 +2100,14 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                 // Debounce timer for persistence
                                 var _timer = null;
                                 // Create a clean snapshot
-                                var getSnapshot = function() {
+                                var getSnapshot = function getSnapshot() {
                                     return Object.fromEntries(Object.entries(_this.$props).filter(function(param) {
                                         var _param = _sliced_to_array(param, 2), k = _param[0], v = _param[1];
                                         return !k.startsWith('$') && typeof v !== 'function';
                                     }));
                                 };
                                 // Perform immediate save
-                                var saveNow = function(value) {
+                                var saveNow = function saveNow(value) {
                                     if (_timer) clearTimeout(_timer);
                                     _timer = null;
                                     storage.setItem(key, JSON.stringify(value || getSnapshot()));
@@ -1730,7 +2115,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                 // Attach persistence helpers
                                 this.$props.$persistence = {
                                     $key: key,
-                                    $save: function(value) {
+                                    $save: function $save(value) {
                                         if (debounceMs > 0) {
                                             if (_timer) clearTimeout(_timer);
                                             _timer = setTimeout(function() {
@@ -1740,12 +2125,12 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                             saveNow(value);
                                         }
                                     },
-                                    $clear: function() {
+                                    $clear: function $clear() {
                                         if (_timer) clearTimeout(_timer);
                                         _timer = null;
                                         storage.removeItem(key);
                                     },
-                                    $get: function() {
+                                    $get: function $get() {
                                         var k = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : null, fallback = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : null;
                                         try {
                                             var stored = JSON.parse(storage.getItem(key));
@@ -1754,7 +2139,7 @@ var AlpineComponentLoader = /*#__PURE__*/ function() {
                                             return fallback;
                                         }
                                     },
-                                    $flush: function() {
+                                    $flush: function $flush() {
                                         if (_timer) saveNow();
                                     }
                                 };
@@ -1996,6 +2381,11 @@ _define_property(AlpineComponentLoader, "globalConfig", {
     externalScripts: [],
     defaultComponentName: 'acl-component',
     defaultDynamicName: 'acl-dynamic',
+    // Data fetching
+    dataFetchParams: null,
+    dataFetchKeys: null,
+    dataFetchPoll: null,
+    dataFetchTimeout: 30000,
     // Template caching
     cacheTemplates: true,
     _templateCacheVersion: '0.0.1',
@@ -2061,9 +2451,13 @@ var AlpineDeclarativeLoader = /*#__PURE__*/ function(HTMLElement1) {
                                         'class',
                                         'style',
                                         'id',
-                                        'data-src',
                                         'bind-store',
-                                        'fallback'
+                                        'fallback',
+                                        'data-src',
+                                        'data-fetch-keys',
+                                        'data-fetch-params',
+                                        'data-fetch-timeout',
+                                        'data-fetch-poll'
                                     ].includes(attr.name)) continue;
                                     // If value looks like JSON Array/Object, treat as such
                                     val = attr.value.trim();
@@ -2172,21 +2566,81 @@ var AlpineDynamicLoader = /*#__PURE__*/ function(HTMLElement1) {
         },
         {
             key: "_switch",
-            value: // Switch to a new component
+            value: // Switch to a new component with View Transitions support
             function _switch(tag) {
                 return _async_to_generator(function() {
-                    var keepAlive, current, el;
+                    var _this, updateDOM, current, el;
                     return _ts_generator(this, function(_state) {
                         switch(_state.label){
                             case 0:
+                                _this = this;
                                 if (!tag) return [
                                     2
                                 ];
                                 tag = tag.toLowerCase();
-                                keepAlive = this.hasAttribute('keep-alive'), current = this.firstElementChild;
+                                updateDOM = function updateDOM() {
+                                    var keepAlive = _this.hasAttribute('keep-alive'), current = _this.firstElementChild;
+                                    // Cache the current component if keep-alive is active
+                                    if (current && keepAlive) {
+                                        // Save scroll position before detaching
+                                        current._savedScroll = current.scrollTop;
+                                        // Mark as kept alive so disconnectedCallback doesn't destroy it
+                                        current._isKeptAlive = true;
+                                        _this._cache.set(current.tagName.toLowerCase(), current);
+                                        // Detach
+                                        current.remove();
+                                        // Reset flag for future legitimate removals
+                                        current._isKeptAlive = false;
+                                    } else {
+                                        // Standard tear down
+                                        _this.replaceChildren();
+                                        // If we turned off keep-alive, ensure we don't hold onto old refs
+                                        if (current && !keepAlive) _this._cache.delete(current.tagName.toLowerCase());
+                                    }
+                                    // Restore or Create new component
+                                    var el;
+                                    if (keepAlive && _this._cache.has(tag)) {
+                                        el = _this._cache.get(tag);
+                                        // Restore scroll position
+                                        if (el._savedScroll) setTimeout(function() {
+                                            return el.scrollTop = el._savedScroll;
+                                        }, 0);
+                                    } else {
+                                        try {
+                                            el = document.createElement(tag);
+                                            // Forward attributes (excluding loader-specific ones)
+                                            Array.from(_this.attributes).forEach(function(attr) {
+                                                if (![
+                                                    'is',
+                                                    'keep-alive'
+                                                ].includes(attr.name)) el.setAttribute(attr.name, attr.value);
+                                            });
+                                        } catch (e) {
+                                            console.error("[ACL] Failed to create: <".concat(tag, ">"), e);
+                                        }
+                                    }
+                                    // Add to DOM
+                                    if (el) _this.appendChild(el);
+                                    // Return the new element
+                                    return el;
+                                };
+                                if (!document.startViewTransition) return [
+                                    3,
+                                    1
+                                ];
+                                document.startViewTransition(function() {
+                                    return updateDOM();
+                                });
+                                return [
+                                    3,
+                                    4
+                                ];
+                            case 1:
+                                // Manual fallback transition logic (Fade out/in)
+                                current = this.firstElementChild;
                                 if (!current) return [
                                     3,
-                                    2
+                                    3
                                 ];
                                 current.style.transition = 'opacity 0.1s ease-out';
                                 current.style.opacity = '0';
@@ -2196,56 +2650,15 @@ var AlpineDynamicLoader = /*#__PURE__*/ function(HTMLElement1) {
                                         return setTimeout(r, 100);
                                     })
                                 ];
-                            case 1:
-                                _state.sent();
-                                _state.label = 2;
                             case 2:
-                                // Cache the current component if keep-alive is active
-                                if (current && keepAlive) {
-                                    // Save scroll position before detaching
-                                    current._savedScroll = current.scrollTop;
-                                    // Mark as kept alive so disconnectedCallback doesn't destroy it
-                                    current._isKeptAlive = true;
-                                    this._cache.set(current.tagName.toLowerCase(), current);
-                                    // Detach
-                                    current.remove();
-                                    // Clean styles before caching
-                                    current.style.opacity = '';
-                                    current.style.transition = '';
-                                    // Reset flag for future legitimate removals
-                                    current._isKeptAlive = false;
-                                } else {
-                                    // Standard tear down
-                                    this.replaceChildren();
-                                    // If we turned off keep-alive, ensure we don't hold onto old refs
-                                    if (current && !keepAlive) this._cache.delete(current.tagName.toLowerCase());
-                                }
-                                if (keepAlive && this._cache.has(tag)) {
-                                    el = this._cache.get(tag);
-                                    // Restore scroll position
-                                    if (el._savedScroll) setTimeout(function() {
-                                        return el.scrollTop = el._savedScroll;
-                                    }, 0);
-                                } else {
-                                    try {
-                                        el = document.createElement(tag);
-                                        // Forward attributes (excluding loader-specific ones)
-                                        Array.from(this.attributes).forEach(function(attr) {
-                                            if (![
-                                                'is',
-                                                'keep-alive'
-                                            ].includes(attr.name)) el.setAttribute(attr.name, attr.value);
-                                        });
-                                    } catch (e) {
-                                        console.error("[ACL] Failed to create: <".concat(tag, ">"), e);
-                                    }
-                                }
-                                // Fade in new component
+                                _state.sent();
+                                _state.label = 3;
+                            case 3:
+                                // Update DOM
+                                el = updateDOM();
                                 if (el) {
                                     el.style.opacity = '0';
                                     el.style.transition = 'opacity 0.1s ease-in';
-                                    this.appendChild(el);
-                                    // Trigger transitions
                                     requestAnimationFrame(function() {
                                         el.style.opacity = '1';
                                         setTimeout(function() {
@@ -2254,6 +2667,8 @@ var AlpineDynamicLoader = /*#__PURE__*/ function(HTMLElement1) {
                                         }, 100);
                                     });
                                 }
+                                _state.label = 4;
+                            case 4:
                                 return [
                                     2
                                 ];

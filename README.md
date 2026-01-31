@@ -224,17 +224,60 @@ The `$props` object automatically includes several read-only state properties an
 
 ### 3. Declarative Fetching (`data-src`)
 
-Automatically fetch JSON data and inject it into `$el.$props.$data`.
+Automatically fetch JSON data and inject it into `$el.$props.$data`. Requests are globally deduplicated via a shared data cache; if multiple components request the same final URL simultaneously, only one network request is made.
+
+#### URL Placeholders and Parameters
+
+You can dynamically build the fetch URL using path placeholders and query parameters through dedicated data attributes.
+
+* **`data-fetch-keys`**: Replaces segments in the `data-src` starting with a colon (e.g., `:userId`).
+* **`data-fetch-params`**: Appends a query string to the URL (e.g., `?limit=5`).
+
+These attributes support three types of values:
+
+1. **JSON Objects**: `data-fetch-params='{ "limit": 5 }'`.
+2. **Dynamic Expressions**: `data-fetch-keys='{ "userId": $el.id }'` (accesses component props directly).
+3. **Functions**: `data-fetch-keys='() => ({ "userId": ~~(Math.random() * 9) + 1 })'` (supports sync or async arrow functions).
+
+#### Polling Support
+
+Use the **`data-fetch-poll`** attribute to automatically re-fetch data at set intervals (in milliseconds). Polling bypasses the shared cache to ensure the component always receives fresh data.
 
 ```html
-<user-profile data-src="/api/users/1"></user-profile>
+<user-stats
+    data-src="/api/stats"
+    data-fetch-poll="5000"
+></user-stats>
 ```
 
-**Template:**
+#### Configuration Options
+
+Fetch logic and polling intervals can also be defined globally or per-component using objects or functions in your JavaScript configuration.
+
+```javascript
+AlpineComponentLoader.define('user-profile', 'user.html', {
+    // Maps :userId in data-src to props.id
+    dataFetchKeys: ({ props }) => ({
+        userId: props.id
+    }),
+    // Adds dynamic query parameters asynchronously
+    dataFetchParams: async () => ({
+        _t: Date.now()
+    }),
+    // Set a default polling interval for this component
+    dataFetchPoll: 10000
+});
+```
+
+#### Usage in Template
+
+The component provides reactive state properties to handle the lifecycle of the request.
 
 ```html
 <div x-data="{ props: $el.$props }">
-    <template x-if="props.$loading">Loading...</template>
+    <template x-if="props.$loading">
+        <div>Loading...</div>
+    </template>
 
     <template x-if="props.$error">
         <div style="color: red" x-text="props.$error"></div>
@@ -244,6 +287,7 @@ Automatically fetch JSON data and inject it into `$el.$props.$data`.
         <div>
             <h1 x-text="props.$data.name"></h1>
             <p x-text="props.$data.bio"></p>
+            <button @click="props.$reload()">Refresh Data</button>
         </div>
     </template>
 </div>
@@ -490,6 +534,11 @@ Once injected, you can toggle the debug overlay programmatically or via a button
 | `attributes` | `Object` | `{}` | Prop definitions (`type`, `default`, `required`, `options`, `schema`). |
 | `shadow` | `Boolean` | `false` | Enable Shadow DOM encapsulation. |
 | `dataSrc` | `String` | `null` | Default API URL for fetching. |
+| `dataFetchKeys` | `Object|Function` | `null` | URL path placeholder values. |
+| `dataFetchOptions` | `Object` | `{}` | Custom options for `fetch()` (headers, method, etc). |
+| `dataFetchParams` | `Object|Function` | `null` | GET parameters for the fetch URL. |
+| `dataFetchPoll` | `Number` | `null` | Polling interval in milliseconds. |
+| `dataFetchTimeout` | `Number` | `10000` | Timeout for `data-src` requests (ms). |
 | `bindStore` | `String` | `null` | Name of Alpine Store to bind to props. |
 | `loading` | `String` | `'eager'` | `'eager'`, `'lazy'`, or `'idle'`. |
 | `fallback` | `String` | `null` | URL/ID of template to show on error. |
@@ -497,8 +546,6 @@ Once injected, you can toggle the debug overlay programmatically or via a button
 | `externalCss` | `Array` | `[]` | List of CSS URLs to inject. |
 | `externalScripts` | `Array` | `[]` | List of JS URLs to inject. |
 | `forwardEvents` | `Array` | `[]` | Events to bubble out of Shadow DOM. |
-| `fetchTimeout` | `Number` | `10000` | Timeout for `data-src` requests (ms). |
-| `fetchOptions` | `Object` | `{}` | Custom options for `fetch()` (headers, method, etc). |
 | `cacheTemplates` | `Boolean` | `true` | Enable template cache for external (HTTP(s)) templates for 15 minutes. |
 
 ### `config(options)`

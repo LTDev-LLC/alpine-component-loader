@@ -22,12 +22,48 @@ const typeMap = {
     'Object': Object
 };
 
+// Cache for xxternal data requests (Prevent duplicate API calls)
+const dataFetchCache = new Map();
+
 // Helper to convert JS style objects to CSS strings
 const toCssString = (styleObj) => {
     return Object.entries(styleObj)
         .map(([k, v]) => `${k.replace(/[A-Z]/g, m => `-${m.toLowerCase()}`)}:${v}`)
         .join(';');
 };
+
+// Helper to ensure values are string-safe for URLs (stringifies objects/arrays)
+const toUrlValue = (v) => encodeURIComponent((typeof v === 'object' && v !== null) ? JSON.stringify(v) : v);
+
+// Helper to convert JS objects to URLSearchParams (supports nested objects and arrays)
+function toSearchParamsDeep(obj) {
+    const _params = new URLSearchParams(),
+        // Support nested objects and arrays in query parameters
+        add = (key, value) => {
+            if (value == null)
+                return;
+
+            // Support arrays
+            if (Array.isArray(value))
+                return value.forEach((v) => add(key, v));
+
+            // Support nested objects
+            if (typeof value === "object") {
+                for (const [k, v] of Object.entries(value))
+                    add(`${key}[${k}]`, v);
+                return;
+            }
+
+            // Add parameter
+            _params.append(key, toUrlValue(value));
+        };
+
+    // Add parameters
+    for (const [k, v] of Object.entries(obj ?? {}))
+        add(k, v);
+
+    return _params;
+}
 
 export default class AlpineComponentLoader {
     static _started = false;
@@ -49,6 +85,12 @@ export default class AlpineComponentLoader {
         externalScripts: [],
         defaultComponentName: 'acl-component',
         defaultDynamicName: 'acl-dynamic',
+
+        // Data fetching
+        dataFetchParams: null,
+        dataFetchKeys: null,
+        dataFetchPoll: null,
+        dataFetchTimeout: 30000,
 
         // Template caching
         cacheTemplates: true,
@@ -217,6 +259,10 @@ export default class AlpineComponentLoader {
                     })
                 );
             } catch { /* Ignore cache write errors */ }
+
+            // If the browser supports ReadableStream and it's a large file, return the stream
+            if (res.body && typeof ReadableStream !== 'undefined')
+                return res.body.pipeThrough(new TextDecoderStream());
         }
 
         // Return HTML string
@@ -273,8 +319,11 @@ export default class AlpineComponentLoader {
             persistDebounce: config.persistDebounce || 250,
             bindStore: config.bindStore || null,
             dataSrc: config.dataSrc || null,
-            fetchTimeout: config.fetchTimeout || 30000,
-            fetchOptions: config.fetchOptions || {},
+            dataFetchParams: config.dataFetchParams || AlpineComponentLoader.globalConfig.dataFetchParams || null,
+            dataFetchKeys: config.dataFetchKeys || AlpineComponentLoader.globalConfig.dataFetchKeys || null,
+            dataFetchPoll: config.dataFetchPoll || AlpineComponentLoader.globalConfig.dataFetchPoll || null,
+            dataFetchTimeout: config.dataFetchTimeout || AlpineComponentLoader.globalConfig.dataFetchTimeout || 30000,
+            dataFetchOptions: config.dataFetchOptions || {},
         };
 
         // Track observed attributes internally
@@ -283,6 +332,10 @@ export default class AlpineComponentLoader {
                 ...Object.keys(settings.attributes),
                 'bind-store',
                 'data-src',
+                'data-fetch-params',
+                'data-fetch-keys',
+                'data-fetch-poll',
+                'data-fetch-timeout',
             ]),
         ];
 
@@ -330,6 +383,7 @@ export default class AlpineComponentLoader {
                 this._scopeId = `scope-${Math.random().toString(36).slice(2, 9)}`;
                 this._slotObserver = null;
                 this._originalLightDom = document.createDocumentFragment();
+                this._pollTimer = null;
             }
 
             // Define observed attributes
@@ -342,11 +396,13 @@ export default class AlpineComponentLoader {
                 if (oldVal === newVal)
                     return;
 
-                // Update prop and validate
-                if (name === 'data-src') {
+                // Watch data-src and renamed fetch attributes
+                if (['data-src', 'data-fetch-params', 'data-fetch-keys', 'data-fetch-timeout'].includes(name)) {
                     if (this._initialized)
-                        this._fetchData(newVal);
-                } else
+                        this._fetchData(this.getAttribute('data-src') || settings.dataSrc);
+                } else if (name === 'data-poll')
+                    this._startPolling(); // Restart polling with new interval
+                else
                     this._updateProp(name, newVal);
 
                 // Emit updated event
@@ -391,10 +447,16 @@ export default class AlpineComponentLoader {
                     this._initIdleLoader();
                 else
                     this._load();
+
+                // Initialize data polling if configured
+                this._startPolling();
             }
 
             // Cleanup memory on removal
             disconnectedCallback() {
+                // Stop polling
+                this._stopPolling();
+
                 // Stop observing slots
                 if (this._slotObserver) {
                     this._slotObserver.disconnect();
@@ -431,6 +493,36 @@ export default class AlpineComponentLoader {
                     this._loading = false;
                     this._disconnectTimeout = null;
                 }, 250);
+            }
+
+            // Initiate the recursive polling timeout
+            _startPolling() {
+                this._stopPolling();
+                const interval = parseInt(this.getAttribute('data-fetch-poll') || settings.dataFetchPoll);
+                if (isNaN(interval) || interval <= 0)
+                    return;
+
+                // Start the timer
+                this._pollTimer = setTimeout(async () => {
+                    if (!this.isConnected)
+                        return;
+
+                    // Fetch data again
+                    const src = this.getAttribute('data-src') || settings.dataSrc;
+                    if (src && this._initialized && !this.$props.$loading)
+                        await this._fetchData(src, true);
+
+                    // Schedule next tick
+                    this._startPolling();
+                }, interval);
+            }
+
+            // Clear the active polling timeout
+            _stopPolling() {
+                if (this._pollTimer) {
+                    clearTimeout(this._pollTimer);
+                    this._pollTimer = null;
+                }
             }
 
             // intersectionObserver for lazy loading
@@ -491,6 +583,11 @@ export default class AlpineComponentLoader {
                 if (this._loading)
                     return;
                 console.log(`[ACL] Reloading <${tagName}>...`);
+
+                // Clear data cache for this specific endpoint
+                const currentDataSrc = this.getAttribute('data-src') || settings.dataSrc;
+                if (currentDataSrc)
+                    dataFetchCache.delete(currentDataSrc);
 
                 // Clear caches specific to this component's source
                 if (settings.cacheTemplates) {
@@ -612,77 +709,158 @@ export default class AlpineComponentLoader {
                 }
             }
 
-            // Handle data fetching for APIs
-            async _fetchData(url) {
+            // Handle data fetching for APIs with caching, placeholders, and parameters
+            async _fetchData(url, skipCache = false) {
                 if (!url)
                     return;
 
-                // Abort previous request (Fixes race conditions)
+                // Abort any pending component request and init new controller
                 if (this._fetchAbortController)
                     this._fetchAbortController.abort();
                 this._fetchAbortController = new AbortController();
                 const signal = this._fetchAbortController.signal;
 
-                // Set loading state
+                // Initialize reactive states for loading and error resets
                 this.$props.$loading = true;
                 this.$props.$error = null;
+                this.$props.$data = null;
 
-                // Setup timeout
-                const timeoutId = setTimeout(() => this._fetchAbortController.abort('Timeout'), settings.fetchTimeout);
+                // Enforce request timeout via AbortController cancellation
+                const timeoutId = setTimeout(() => this._fetchAbortController.abort('Timeout'), settings.dataFetchTimeout);
 
                 try {
-                    // Prepare options
-                    let options = {
-                        method: 'GET',
-                        headers: { 'Accept': 'application/json' },
-                        ...AlpineComponentLoader.globalConfig?.fetchOptions || {},
-                        ...settings?.fetchOptions || {},
-                        signal
+                    // Helper to resolve attributes as JSON, Expressions, or Functions (Sync/Async)
+                    const resolveValue = async (attrName, configVal) => {
+                        let result = {};
+                        const attrVal = this.getAttribute(attrName),
+                            context = {
+                                el: this,
+                                $el: this,
+                                props: this.$props,
+                                $props: this.$props,
+                                root: this._root,
+                                $root: this._root,
+                            };
+                        if (attrVal) {
+                            const trimmed = attrVal.trim();
+                            try {
+                                // Attempt standard JSON parsing first
+                                if (trimmed.startsWith('{') || trimmed.startsWith('['))
+                                    result = JSON.parse(trimmed.replace(/'/g, '"'));
+                                else throw new Error();
+                            } catch {
+                                try {
+                                    // Evaluate as JS: supports arrow functions and dynamic expressions
+                                    // We inject $props and $el into the function scope for convenience
+                                    const evaled = (new Function('$props', '$el', `return (${trimmed})`))(this.$props, this);
+                                    result = typeof evaled === 'function' ? await evaled.call(this, context) : evaled;
+                                } catch (e) {
+                                    console.warn(`[ACL] Invalid value in ${attrName} for <${tagName}>`, e);
+                                }
+                            }
+                        }
+
+                        // Merge with JS-based configuration (if provided)
+                        if (configVal) {
+                            result = {
+                                ...result,
+                                ...(
+                                    (
+                                        typeof configVal === 'function'
+                                            ? await configVal.call(this, context)
+                                            : configVal
+                                    ) || {})
+                            };
+                        }
+
+                        return result;
                     };
 
-                    // Allows modifying headers (Auth) or options before sending
-                    if (typeof settings?.hooks?.beforeFetch === 'function') {
-                        const modifiedOptions = await settings.hooks.beforeFetch(options);
-                        if (modifiedOptions && typeof modifiedOptions === 'object')
-                            options = modifiedOptions;
+                    // Resolve placeholders and query parameters from both HTML and JS config
+                    const keys = await resolveValue('data-fetch-keys', settings.dataFetchKeys),
+                        params = await resolveValue('data-fetch-params', settings.dataFetchParams);
+
+                    // Perform URL placeholder replacement (e.g., :userId -> 123)
+                    let resolvedUrl = url;
+                    Object.entries(keys).forEach(([k, v]) => resolvedUrl = resolvedUrl.replace(`:${k}`, toUrlValue(v)));
+
+                    // Build final URL string with appended query parameters
+                    let finalUrl = new URL(resolvedUrl, window.location.origin);
+                    if (Object.keys(params).length > 0)
+                        finalUrl.search = toSearchParamsDeep(params).toString();
+
+                    // Convert to string for caching
+                    finalUrl = finalUrl.toString();
+
+                    // Bypass shared cache if requested
+                    if (skipCache)
+                        dataFetchCache.delete(finalUrl);
+
+                    // Shared cache management (Deduplicate identical requests)
+                    if (!dataFetchCache.has(finalUrl)) {
+                        const fetchTask = (async () => {
+                            let options = {
+                                method: 'GET',
+                                headers: { 'Accept': 'application/json' },
+                                ...AlpineComponentLoader.globalConfig?.dataFetchOptions || {},
+                                ...settings?.dataFetchOptions || {}
+                            };
+
+                            // Apply beforeFetch hook for global or local request customization
+                            if (typeof settings?.hooks?.beforeFetch === 'function') {
+                                try {
+                                    const modified = await settings.hooks.beforeFetch(options);
+                                    if (modified && typeof modified === 'object')
+                                        options = modified;
+                                } catch (e) {
+                                    console.warn(`[ACL] beforeFetch hook error for <${tagName}>`, e);
+                                }
+                            }
+
+                            // Fetch and validate response status and content type
+                            const res = await fetch(finalUrl, options);
+                            if (!res.ok)
+                                throw new Error(`API Error: ${res.status}`);
+
+                            // Validate content type header as JSON
+                            const contentType = res.headers.get("content-type");
+                            if (!contentType?.includes("application/json"))
+                                throw new Error("Invalid JSON response");
+
+                            // Parse JSON response
+                            return await res.json();
+                        })();
+
+                        // Store pending promise in cache and prune on failure
+                        dataFetchCache.set(finalUrl, fetchTask);
+                        fetchTask.catch(() => dataFetchCache.delete(finalUrl));
                     }
 
-                    // Merge options (global + instance) for Fetch request
-                    const res = await fetch(url, options);
+                    // Race the shared network task against local abort/timeout logic
+                    const json = await Promise.race([
+                        dataFetchCache.get(finalUrl),
+                        new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('Aborted')), { once: true }))
+                    ]);
 
-                    // Clear the fetch timeout
-                    clearTimeout(timeoutId);
-
-                    // Validate response
-                    if (!res.ok)
-                        throw new Error(`API Error: ${res.status} ${res.statusText}`);
-
-                    // Validate content type as JSON
-                    const contentType = res.headers.get("content-type");
-                    if (!contentType || !contentType.includes("application/json"))
-                        throw new Error(`Invalid response. Expected JSON, got "${contentType}"`);
-
-                    // Parse JSON
-                    let json;
-                    try {
-                        json = await res.json();
-                    } catch (e) {
-                        throw new Error(`Invalid JSON: ${e.message}`);
-                    }
-
-                    // Allows transforming data (filtering, formatting) before assignment
+                    // Transform received data via afterFetch hook
+                    let processedData = json;
                     if (typeof settings?.hooks?.afterFetch === 'function') {
-                        let modified = await settings.hooks.afterFetch(json);
-                        if (modified && typeof modified === 'object')
-                            json = modified;
+                        try {
+                            let modified = await settings.hooks.afterFetch(json);
+                            if (modified && typeof modified === 'object')
+                                processedData = modified;
+                        } catch (e) {
+                            console.warn(`[ACL] afterFetch hook error for <${tagName}>`, e);
+                        }
                     }
 
-                    // Only update if not aborted
+                    // Finalize component data update if not locally aborted
                     if (!signal.aborted)
-                        this.$props.$data = json;
+                        this.$props.$data = processedData;
+
                 } catch (e) {
-                    // Ignore abort errors
-                    if (e.name === 'AbortError' || signal.aborted) {
+                    // Handle errors or timeout cancellations for the specific instance
+                    if (signal.aborted) {
                         if (signal.reason === 'Timeout') {
                             this.$props.$error = `Request timed out after ${settings.fetchTimeout}ms`;
                             this.$props.$data = null;
@@ -693,10 +871,8 @@ export default class AlpineComponentLoader {
                     this.$props.$error = e.message;
                     this.$props.$data = null;
                 } finally {
-                    // Cleanup
+                    // Cleanup timers and unlock component loading states
                     clearTimeout(timeoutId);
-
-                    // Only turn off loading if this request wasn't superseded by a new one
                     if (!signal.aborted || signal.reason === 'Timeout') {
                         this.$props.$loading = false;
                         if (this._fetchAbortController?.signal === signal)
@@ -790,6 +966,22 @@ export default class AlpineComponentLoader {
             // Render logic using DOM manipulation
             async _renderSafe(content, lightSlots) {
                 let rootNode;
+
+                // Convert stream to string if needed
+                if (content instanceof ReadableStream) {
+                    const reader = content.getReader(),
+                        decoder = new TextDecoder(),
+                        accumulator = [];
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done)
+                            break;
+                        accumulator.push(typeof value === 'string' ? value : decoder.decode(value, { stream: true }));
+                    }
+                    content = accumulator.join('') + decoder.decode();
+
+                    console.log('[ACL] Stream content loaded as string.');
+                }
 
                 // Parse string to DOM if needed, otherwise clone fragment
                 if (typeof content === 'string') {
@@ -1297,8 +1489,8 @@ class AlpineDeclarativeLoader extends HTMLElement {
             // Heuristic: Check other attributes to guess Prop Types
             for (const attr of this.attributes) {
                 if ([
-                    'src', 'url', 'tag', 'shadow', 'loading', 'class',
-                    'style', 'id', 'data-src', 'bind-store', 'fallback'
+                    'src', 'url', 'tag', 'shadow', 'loading', 'class', 'style', 'id', 'bind-store', 'fallback',
+                    'data-src', 'data-fetch-keys', 'data-fetch-params', 'data-fetch-timeout', 'data-fetch-poll'
                 ].includes(attr.name))
                     continue;
 
@@ -1369,82 +1561,93 @@ class AlpineDynamicLoader extends HTMLElement {
         this._cache.clear();
     }
 
-    // Switch to a new component
+    // Switch to a new component with View Transitions support
     async _switch(tag) {
         if (!tag)
             return;
         tag = tag.toLowerCase();
 
-        const keepAlive = this.hasAttribute('keep-alive'),
-            current = this.firstElementChild;
+        const updateDOM = () => {
+            const keepAlive = this.hasAttribute('keep-alive'),
+                current = this.firstElementChild;
 
-        // Fade out current component
-        if (current) {
-            current.style.transition = 'opacity 0.1s ease-out';
-            current.style.opacity = '0';
-            await new Promise(r => setTimeout(r, 100));
-        }
+            // Cache the current component if keep-alive is active
+            if (current && keepAlive) {
+                // Save scroll position before detaching
+                current._savedScroll = current.scrollTop;
 
-        // Cache the current component if keep-alive is active
-        if (current && keepAlive) {
-            // Save scroll position before detaching
-            current._savedScroll = current.scrollTop;
+                // Mark as kept alive so disconnectedCallback doesn't destroy it
+                current._isKeptAlive = true;
+                this._cache.set(current.tagName.toLowerCase(), current);
 
-            // Mark as kept alive so disconnectedCallback doesn't destroy it
-            current._isKeptAlive = true;
-            this._cache.set(current.tagName.toLowerCase(), current);
+                // Detach
+                current.remove();
 
-            // Detach
-            current.remove();
+                // Reset flag for future legitimate removals
+                current._isKeptAlive = false;
+            } else {
+                // Standard tear down
+                this.replaceChildren();
 
-            // Clean styles before caching
-            current.style.opacity = '';
-            current.style.transition = '';
-
-            // Reset flag for future legitimate removals
-            current._isKeptAlive = false;
-        } else {
-            // Standard tear down
-            this.replaceChildren();
-            // If we turned off keep-alive, ensure we don't hold onto old refs
-            if (current && !keepAlive)
-                this._cache.delete(current.tagName.toLowerCase());
-        }
-
-        // Restore or Create new component
-        let el;
-        if (keepAlive && this._cache.has(tag)) {
-            el = this._cache.get(tag);
-            // Restore scroll position
-            if (el._savedScroll)
-                setTimeout(() => el.scrollTop = el._savedScroll, 0);
-        } else {
-            try {
-                el = document.createElement(tag);
-                // Forward attributes (excluding loader-specific ones)
-                Array.from(this.attributes).forEach(attr => {
-                    if (!['is', 'keep-alive'].includes(attr.name))
-                        el.setAttribute(attr.name, attr.value);
-                });
-            } catch (e) {
-                console.error(`[ACL] Failed to create: <${tag}>`, e);
+                // If we turned off keep-alive, ensure we don't hold onto old refs
+                if (current && !keepAlive)
+                    this._cache.delete(current.tagName.toLowerCase());
             }
-        }
 
-        // Fade in new component
-        if (el) {
-            el.style.opacity = '0';
-            el.style.transition = 'opacity 0.1s ease-in';
-            this.appendChild(el);
+            // Restore or Create new component
+            let el;
+            if (keepAlive && this._cache.has(tag)) {
+                el = this._cache.get(tag);
 
-            // Trigger transitions
-            requestAnimationFrame(() => {
-                el.style.opacity = '1';
-                setTimeout(() => {
-                    el.style.transition = '';
-                    el.style.opacity = '';
-                }, 100);
-            });
+                // Restore scroll position
+                if (el._savedScroll)
+                    setTimeout(() => el.scrollTop = el._savedScroll, 0);
+            } else {
+                try {
+                    el = document.createElement(tag);
+                    // Forward attributes (excluding loader-specific ones)
+                    Array.from(this.attributes).forEach(attr => {
+                        if (!['is', 'keep-alive'].includes(attr.name))
+                            el.setAttribute(attr.name, attr.value);
+                    });
+                } catch (e) {
+                    console.error(`[ACL] Failed to create: <${tag}>`, e);
+                }
+            }
+
+            // Add to DOM
+            if (el)
+                this.appendChild(el);
+
+            // Return the new element
+            return el;
+        };
+
+        // Use native View Transitions if available for animated switching
+        if (document.startViewTransition) {
+            document.startViewTransition(() => updateDOM());
+        } else {
+            // Manual fallback transition logic (Fade out/in)
+            const current = this.firstElementChild;
+            if (current) {
+                current.style.transition = 'opacity 0.1s ease-out';
+                current.style.opacity = '0';
+                await new Promise(r => setTimeout(r, 100));
+            }
+
+            // Update DOM
+            const el = updateDOM();
+            if (el) {
+                el.style.opacity = '0';
+                el.style.transition = 'opacity 0.1s ease-in';
+                requestAnimationFrame(() => {
+                    el.style.opacity = '1';
+                    setTimeout(() => {
+                        el.style.transition = '';
+                        el.style.opacity = '';
+                    }, 100);
+                });
+            }
         }
     }
 }
