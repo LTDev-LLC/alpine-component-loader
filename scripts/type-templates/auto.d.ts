@@ -1,0 +1,15 @@
+export * from './index.js';
+
+import type AlpineComponentLoaderClass from './index.d.ts';
+import type { ACLComponentOptions } from './index.d.ts';
+
+export function startAutoLoader(): Promise<void>;
+
+declare global {
+    interface Window {
+        AlpineComponentLoaderConfig?: Partial<ACLComponentOptions>;
+    }
+}
+
+declare const AlpineComponentLoader: typeof AlpineComponentLoaderClass;
+export default AlpineComponentLoader;

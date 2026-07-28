@@ -1,0 +1,13 @@
+<style>
+    :host {
+        display: block;
+        border: 1px solid #99f6e4;
+        background: #f0fdfa;
+        border-radius: 8px;
+        padding: 14px;
+    }
+</style>
+<div>
+    <strong x-text="$props.label || 'Resolved source'"></strong>
+    <p style="margin:6px 0 0;color:#0f766e">The source was rewritten before basePath was applied.</p>
+</div>

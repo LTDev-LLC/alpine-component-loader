@@ -1,0 +1,33 @@
+<style>
+    :host {
+        display: block;
+    }
+
+    article {
+        height: 100%;
+        padding: 1rem;
+        border: 1px solid #dbe4ef;
+        border-radius: 9px;
+        background: #fff;
+        box-sizing: border-box;
+        font-family: system-ui, sans-serif;
+    }
+
+    strong {
+        display: block;
+        color: #1d4ed8;
+    }
+
+    output {
+        display: block;
+        min-height: 2.7rem;
+        margin-top: 0.35rem;
+        color: #475569;
+        font-size: 0.86rem;
+        overflow-wrap: anywhere;
+    }
+</style>
+<article x-data="ssrResponseMode">
+    <strong x-text="label">JSON response</strong>
+    <output x-text="value">Server fallback · JSON decoding starts after hydration</output>
+</article>

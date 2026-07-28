@@ -1,0 +1,175 @@
+{
+  "schemaVersion": "2.1.0",
+  "readme": "",
+  "modules": [
+    {
+      "kind": "javascript-module",
+      "path": "acl-components",
+      "declarations": [
+        {
+          "kind": "class",
+          "customElement": true,
+          "name": "ProfileAvatarElement",
+          "tagName": "profile-avatar",
+          "description": "Shadow DOM dependency inferred from the account dashboard template.",
+          "members": [
+            {
+              "kind": "field",
+              "name": "initials",
+              "attribute": "initials",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "attributes": [
+            {
+              "name": "initials",
+              "fieldName": "initials",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "events": [],
+          "slots": []
+        },
+        {
+          "kind": "class",
+          "customElement": true,
+          "name": "AccountDashboardElement",
+          "tagName": "account-dashboard",
+          "description": "Account route demonstrating group roots, inferred dependencies, props, and events.",
+          "members": [
+            {
+              "kind": "field",
+              "name": "accountId",
+              "attribute": "accountId",
+              "type": {
+                "text": "string"
+              }
+            },
+            {
+              "kind": "field",
+              "name": "plan",
+              "attribute": "plan",
+              "type": {
+                "text": "\"starter\" | \"pro\""
+              }
+            }
+          ],
+          "attributes": [
+            {
+              "name": "accountId",
+              "fieldName": "accountId",
+              "type": {
+                "text": "string"
+              }
+            },
+            {
+              "name": "plan",
+              "fieldName": "plan",
+              "type": {
+                "text": "\"starter\" | \"pro\""
+              }
+            }
+          ],
+          "events": [
+            {
+              "name": "plan-change",
+              "type": {
+                "text": "CustomEvent<{ \"plan\": string; }>"
+              },
+              "description": "Emitted when the example plan changes."
+            }
+          ],
+          "slots": []
+        },
+        {
+          "kind": "class",
+          "customElement": true,
+          "name": "QuantityFieldElement",
+          "tagName": "quantity-field",
+          "description": "A form-associated quantity control.",
+          "members": [
+            {
+              "kind": "field",
+              "name": "quantity",
+              "attribute": "quantity",
+              "type": {
+                "text": "number"
+              }
+            },
+            {
+              "kind": "field",
+              "name": "disabledState",
+              "attribute": "disabledState",
+              "type": {
+                "text": "boolean"
+              }
+            }
+          ],
+          "attributes": [
+            {
+              "name": "quantity",
+              "fieldName": "quantity",
+              "type": {
+                "text": "number"
+              }
+            },
+            {
+              "name": "disabledState",
+              "fieldName": "disabledState",
+              "type": {
+                "text": "boolean"
+              }
+            }
+          ],
+          "events": [
+            {
+              "name": "quantity-change",
+              "type": {
+                "text": "CustomEvent<unknown>"
+              },
+              "description": "Emitted after the quantity changes."
+            }
+          ],
+          "slots": []
+        },
+        {
+          "kind": "class",
+          "customElement": true,
+          "name": "HomeDashboardElement",
+          "tagName": "home-dashboard",
+          "description": "Home route demonstrating dependency expansion, slots, and form association.",
+          "members": [
+            {
+              "kind": "field",
+              "name": "visitor",
+              "attribute": "visitor",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "attributes": [
+            {
+              "name": "visitor",
+              "fieldName": "visitor",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "events": [],
+          "slots": [
+            {
+              "name": "tip",
+              "description": "Route-specific guidance supplied by the application router."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

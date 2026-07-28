@@ -1,0 +1,98 @@
+<style>
+    :host {
+        display: block;
+    }
+
+    .card {
+        padding: 1rem;
+        border: 2px solid #d97706;
+        border-radius: 0.75rem;
+        background: #fffbeb;
+        color: #451a03;
+    }
+
+    h3 {
+        margin: 0 0 0.5rem;
+    }
+
+    p {
+        margin: 0 0 0.75rem;
+        line-height: 1.5;
+    }
+
+    .profile-row,
+    .actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .avatar {
+        width: 3rem;
+        height: 3rem;
+        border-radius: 999px;
+    }
+
+    input {
+        min-height: 2.5rem;
+        flex: 1 1 12rem;
+        padding: 0.55rem 0.7rem;
+        border: 1px solid #92400e;
+        border-radius: 0.5rem;
+        box-sizing: border-box;
+        font: inherit;
+    }
+
+    .actions {
+        margin-top: 0.75rem;
+    }
+
+    button,
+    a {
+        min-height: 2.5rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.55rem 0.8rem;
+        border: 1px solid #92400e;
+        border-radius: 0.5rem;
+        background: #92400e;
+        color: white;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .icon-button {
+        width: 2.5rem;
+        padding: 0;
+    }
+
+    .icon-button::before {
+        content: "?";
+    }
+
+    a {
+        text-decoration: underline;
+    }
+</style>
+<div class="card">
+    <h3>Intentionally inaccessible profile card</h3>
+    <p>This component deliberately contains several common mistakes for the development scanner to report.</p>
+    <div class="profile-row">
+        <!-- Intentionally missing alt text. -->
+        <img class="avatar"
+            src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' rx='32' fill='%23f59e0b'/%3E%3Ccircle cx='32' cy='24' r='11' fill='%23783f04'/%3E%3Cpath d='M13 57c2-13 10-20 19-20s17 7 19 20' fill='%23783f04'/%3E%3C/svg%3E">
+        <!-- A placeholder is not a label. -->
+        <input type="text" placeholder="Display name">
+    </div>
+    <div class="actions">
+        <!-- The visible question mark is CSS-only, leaving this button unnamed. -->
+        <button class="icon-button" type="button"></button>
+        <!-- Positive tabindex disrupts the natural focus order. -->
+        <button type="button" tabindex="2">Save draft</button>
+        <!-- Focusable content must not be placed inside aria-hidden content. -->
+        <span aria-hidden="true"><a href="#feature-23">Discard draft</a></span>
+    </div>
+</div>

@@ -1,0 +1,16 @@
+{
+    "entries": {
+        "core": { "initial": 9506, "full": 80051 },
+        "debugger": { "initial": 12217, "full": 14415 },
+        "auto": { "initial": 9969, "full": 80537 },
+        "dev": { "initial": 12219, "full": 82696 },
+        "offline": { "initial": 1203, "full": 1203 },
+        "a11y": { "initial": 4723, "full": 4723 },
+        "scanner": { "initial": 9248, "full": 11764 },
+        "testing": { "initial": 16930, "full": 83934 },
+        "testingPlaywright": { "initial": 1033, "full": 1033 },
+        "testingVitest": { "initial": 17165, "full": 84163 },
+        "observabilityExporters": { "initial": 2334, "full": 2334 }
+    },
+    "sharedGraph": 88845
+}

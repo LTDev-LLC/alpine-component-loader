@@ -1,0 +1,15 @@
+{
+    "version": 1,
+    "options": {
+        "shadow": true,
+        "attributes": {
+            "initials": {
+                "type": "String",
+                "required": true
+            }
+        }
+    },
+    "metadata": {
+        "description": "Shadow DOM dependency inferred from the account dashboard template."
+    }
+}

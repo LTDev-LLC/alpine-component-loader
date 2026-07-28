@@ -1,0 +1,83 @@
+{
+    "version": 1,
+    "engines": {
+        "chromium": {
+            "maxRegressionPercent": 200,
+            "baseline": {
+                "coldRender100Ms": 30,
+                "warmRender100P95Ms": 15,
+                "thousandComponentMs": 125,
+                "teardownP95Ms": 25,
+                "cacheHitMedianMs": 1,
+                "preservedReloadMs": 5,
+                "cachePruneMs": 20,
+                "accessibilityAuditMs": 1
+            },
+            "ceilings": {
+                "coldRender100Ms": 90,
+                "warmRender100P95Ms": 45,
+                "thousandComponentMs": 375,
+                "teardownP95Ms": 75,
+                "cacheHitMedianMs": 3,
+                "preservedReloadMs": 15,
+                "cachePruneMs": 60,
+                "accessibilityAuditMs": 3,
+                "debuggerStartMedianMs": 50,
+                "maxComponentMs": 75,
+                "debuggerRows": 200
+            }
+        },
+        "firefox": {
+            "maxRegressionPercent": 200,
+            "baseline": {
+                "coldRender100Ms": 100,
+                "warmRender100P95Ms": 40,
+                "thousandComponentMs": 250,
+                "teardownP95Ms": 40,
+                "cacheHitMedianMs": 2,
+                "preservedReloadMs": 10,
+                "cachePruneMs": 40,
+                "accessibilityAuditMs": 2
+            },
+            "ceilings": {
+                "coldRender100Ms": 300,
+                "warmRender100P95Ms": 120,
+                "thousandComponentMs": 750,
+                "teardownP95Ms": 120,
+                "cacheHitMedianMs": 6,
+                "preservedReloadMs": 30,
+                "cachePruneMs": 120,
+                "accessibilityAuditMs": 6,
+                "debuggerStartMedianMs": 80,
+                "maxComponentMs": 240,
+                "debuggerRows": 200
+            }
+        },
+        "webkit": {
+            "maxRegressionPercent": 200,
+            "baseline": {
+                "coldRender100Ms": 60,
+                "warmRender100P95Ms": 25,
+                "thousandComponentMs": 125,
+                "teardownP95Ms": 30,
+                "cacheHitMedianMs": 2,
+                "preservedReloadMs": 12,
+                "cachePruneMs": 40,
+                "accessibilityAuditMs": 5
+            },
+            "ceilings": {
+                "coldRender100Ms": 180,
+                "warmRender100P95Ms": 75,
+                "thousandComponentMs": 375,
+                "teardownP95Ms": 90,
+                "cacheHitMedianMs": 6,
+                "preservedReloadMs": 36,
+                "cachePruneMs": 120,
+                "accessibilityAuditMs": 15,
+                "debuggerStartMedianMs": 80,
+                "maxComponentMs": 150,
+                "debuggerRows": 200
+            }
+        }
+    }
+}

@@ -1,0 +1,16 @@
+<style>
+    button {
+        min-height: 2.5rem;
+        background: #1d4ed8;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+</style>
+<div x-data>
+    <button @click="$dispatch('action', { text: 'Last clicked at: ' + new Date().toLocaleTimeString() })">
+        Dispatch Event
+    </button>
+</div>

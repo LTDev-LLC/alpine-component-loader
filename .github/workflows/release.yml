@@ -1,0 +1,73 @@
+name: Release tag
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-tag-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Tag ACL version
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 22
+
+      - name: Read and validate ACL version
+        id: version
+        shell: bash
+        run: |
+          VERSION="$(node --input-type=module -e "
+            const { readFile } = await import('node:fs/promises');
+            const { version: ACL_VERSION } = JSON.parse(await readFile('./package.json', 'utf8'));
+            if (typeof ACL_VERSION !== 'string' || !/^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$/.test(ACL_VERSION)) {
+              throw new Error('ACL_VERSION must be a valid semantic version');
+            }
+            process.stdout.write(ACL_VERSION);
+          ")"
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether tag exists
+        id: existing_tag
+        shell: bash
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if git show-ref --verify --quiet "refs/tags/$TAG"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "$TAG already exists; nothing to do."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create and push tag
+        if: steps.existing_tag.outputs.exists == 'false'
+        shell: bash
+        env:
+          RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag --annotate "$TAG" --message "Release $TAG" "$RELEASE_SHA"
+          git push origin "refs/tags/$TAG"

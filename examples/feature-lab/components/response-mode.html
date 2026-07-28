@@ -1,0 +1,32 @@
+<style>
+    :host {
+        display: block;
+        height: 100%;
+    }
+
+    .response {
+        height: 100%;
+        border: 1px solid #dbe4ef;
+        border-radius: 9px;
+        padding: 0.9rem;
+        background: #fff;
+        box-sizing: border-box;
+    }
+
+    strong {
+        display: block;
+        color: #1d4ed8;
+    }
+
+    output {
+        display: block;
+        margin-top: 0.35rem;
+        color: #475569;
+        font-size: 0.86rem;
+        overflow-wrap: anywhere;
+    }
+</style>
+<div class="response">
+    <strong x-text="$props.label"></strong>
+    <output x-text="$props.$loading ? 'decoding…' : ($props.payload || $props.$error || 'waiting')"></output>
+</div>

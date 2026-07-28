@@ -1,0 +1,26 @@
+{
+    "version": 1,
+    "options": {
+        "shadow": true,
+        "attributes": {
+            "quantity": {
+                "type": "Number",
+                "default": 1
+            },
+            "disabledState": "Boolean"
+        },
+        "form": {
+            "value": "quantity",
+            "state": "quantity",
+            "disabled": "disabledState"
+        }
+    },
+    "metadata": {
+        "description": "A form-associated quantity control.",
+        "events": {
+            "quantity-change": {
+                "description": "Emitted after the quantity changes."
+            }
+        }
+    }
+}

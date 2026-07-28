@@ -1,0 +1,68 @@
+<style>
+    :host {
+        display: block;
+        border: 1px solid #d9e0ea;
+        border-radius: 8px;
+        padding: 14px;
+        background: #fff;
+    }
+
+    input {
+        width: 100%;
+        min-height: 2.5rem;
+        margin: 0.75rem 0;
+        padding: 0.55rem 0.7rem;
+        border: 1px solid #94a3b8;
+        border-radius: 0.5rem;
+        box-sizing: border-box;
+        font: inherit;
+    }
+
+    .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    button {
+        min-height: 2.5rem;
+        padding: 0.55rem 0.8rem;
+        border: 1px solid #1d4ed8;
+        border-radius: 0.5rem;
+        background: #2563eb;
+        color: white;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    output {
+        display: block;
+        min-height: 1.5em;
+        margin-top: 8px;
+        color: #475569;
+        font-size: 0.9rem;
+    }
+</style>
+<div x-data="{
+    status: 'Changes save automatically',
+    async flush() {
+        const pending = this.$props.$persistence.$save();
+        await this.$props.$persistence.$flush();
+        await pending;
+        this.status = `Flushed ${this.$props.storage || 'custom adapter'}`;
+    },
+    async clear() {
+        await this.$props.$persistence.$clear();
+        this.status = `Cleared ${this.$props.storage || 'custom adapter'} record`;
+    }
+}">
+    <h3><span x-text="$props.storage || 'Custom adapter'"></span> note</h3>
+    <input x-model="$props.note" aria-label="Persistent note">
+    <div class="actions">
+        <button @click="$props.count = ($props.count || 0) + 1">Count <span x-text="$props.count || 0"></span></button>
+        <button @click="flush()" :aria-label="`Flush ${$props.storage || 'custom adapter'}`">Flush now</button>
+        <button @click="clear()" :aria-label="`Clear ${$props.storage || 'custom adapter'}`">Clear stored record</button>
+    </div>
+    <output aria-live="polite" x-text="status"></output>
+</div>

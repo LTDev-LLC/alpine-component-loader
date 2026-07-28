@@ -1,0 +1,56 @@
+<style>
+    :host {
+        display: block;
+    }
+
+    article {
+        height: 100%;
+        padding: 1rem;
+        border: 1px solid #d9e0ea;
+        border-radius: 8px;
+        background: #fff;
+        box-sizing: border-box;
+        font-family: system-ui, sans-serif;
+    }
+
+    h3,
+    p {
+        margin: 0 0 0.55rem;
+    }
+
+    p {
+        min-height: 2.7rem;
+        color: #4b5563;
+    }
+
+    .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    button {
+        min-height: 2.5rem;
+        padding: 0.55rem 0.8rem;
+        border: 1px solid #1d4ed8;
+        border-radius: 0.5rem;
+        color: white;
+        background: #2563eb;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+</style>
+<article x-data="ssrCacheControl">
+    <h3>Cache request <span x-text="count">0</span></h3>
+    <p>Last fetched at <span x-text="fetchedAt">available after hydration</span></p>
+    <div class="actions">
+        <button type="button" :disabled="busy" @click="reload">Reload</button>
+        <button type="button" :disabled="busy" @click="clearCache">Clear data cache</button>
+    </div>
+</article>

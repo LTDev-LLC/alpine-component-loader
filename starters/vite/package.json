@@ -1,0 +1,26 @@
+{
+    "name": "acl-vite-starter",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview",
+        "acl:manifest": "alpine-component-loader manifest --config acl.config.mjs --update",
+        "acl:validate": "alpine-component-loader validate public/acl-manifest.json",
+        "acl:routes": "alpine-component-loader routes --config acl.config.mjs --force",
+        "acl:contracts": "alpine-component-loader types --config acl.config.mjs --force",
+        "acl:infer": "alpine-component-loader manifest --config acl.config.mjs --infer report --dry-run",
+        "acl:generate": "npm run acl:manifest && npm run acl:routes && npm run acl:contracts",
+        "acl:watch": "alpine-component-loader watch --config acl.config.mjs",
+        "acl:audit": "npm run build && alpine-component-loader audit --config acl.config.mjs --no-axe",
+        "acl:audit:update": "npm run build && alpine-component-loader audit --config acl.config.mjs --no-axe --update-baseline"
+    },
+    "dependencies": {
+        "alpine-component-loader": "github:LTDev-LLC/alpine-component-loader",
+        "alpinejs": "^3.15.0"
+    },
+    "devDependencies": {
+        "vite": "^7.0.0"
+    }
+}

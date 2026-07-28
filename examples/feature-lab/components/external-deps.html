@@ -1,0 +1,13 @@
+<style>
+    :host {
+        display: block;
+        border: 1px solid #d9e0ea;
+        border-radius: 8px;
+        padding: 14px;
+        background: #fff;
+    }
+</style>
+<div x-data>
+    <h3 class="external-token">External dependencies</h3>
+    <p>Script loaded: <strong x-text="window.__aclDemoExternalScript === true ? 'yes' : 'pending'"></strong></p>
+</div>

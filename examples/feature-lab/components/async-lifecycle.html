@@ -1,0 +1,35 @@
+<style>
+    :host {
+        display: block;
+        border: 1px solid #c4b5fd;
+        border-radius: 9px;
+        padding: 1rem;
+        background: #f5f3ff;
+    }
+
+    pre {
+        margin: 0.75rem 0;
+        border-radius: 6px;
+        padding: 0.75rem;
+        color: #ede9fe;
+        background: #2e1065;
+        white-space: pre-wrap;
+    }
+
+    button {
+        min-height: 2.5rem;
+        padding: 0.55rem 0.8rem;
+        border: 1px solid #6d28d9;
+        border-radius: 0.5rem;
+        background: #7c3aed;
+        color: white;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+    }
+</style>
+<div>
+    <strong>Async lifecycle log</strong>
+    <pre x-text="($props.logs || []).join('\n')"></pre>
+    <button data-acl-autofocus @click="$props.$reload()">Reload and run cleanup</button>
+</div>

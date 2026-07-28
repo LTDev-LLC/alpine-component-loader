@@ -1,0 +1,29 @@
+<style>
+    :host {
+        display: block;
+        border: 1px solid #d9e0ea;
+        border-radius: 8px;
+        padding: 14px;
+        background: #fff;
+    }
+
+    h3 {
+        margin: 0 0 0.75rem;
+    }
+
+    button {
+        min-height: 2.5rem;
+        padding: 0.55rem 0.8rem;
+        border: 1px solid #1d4ed8;
+        border-radius: 0.5rem;
+        background: #2563eb;
+        color: white;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+    }
+</style>
+<div>
+    <h3>Store: <span x-text="$props.mode"></span></h3>
+    <button @click="$props.mode = $props.mode === 'Light' ? 'Dark' : 'Light'">Toggle store</button>
+</div>

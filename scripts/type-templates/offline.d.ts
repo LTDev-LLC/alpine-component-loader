@@ -1,0 +1,32 @@
+export interface ACLOfflineStatus {
+    supported: boolean;
+    controlled: boolean;
+    storage?: {
+        usage: number | null;
+        quota: number | null;
+        remaining: number | null;
+    } | null;
+    registrations: Array<{
+        scope: string;
+        active: ServiceWorkerState | null;
+        waiting: ServiceWorkerState | null;
+        installing: ServiceWorkerState | null;
+    }>;
+}
+
+export function registerOfflineWorker(
+    url?: string | URL,
+    options?: RegistrationOptions
+): Promise<ServiceWorkerRegistration>;
+
+export function activateOfflineWorker(registration: ServiceWorkerRegistration): Promise<boolean>;
+
+export function getOfflineStatus(): Promise<ACLOfflineStatus>;
+
+declare const ACLOffline: {
+    activateOfflineWorker: typeof activateOfflineWorker;
+    registerOfflineWorker: typeof registerOfflineWorker;
+    getOfflineStatus: typeof getOfflineStatus;
+};
+
+export default ACLOffline;

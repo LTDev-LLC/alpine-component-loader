@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Focused server-rendering and hydration example for AlpineComponentLoader">
+    <title>Alpine Component Loader SSR Example</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script defer src="/node_modules/@alpinejs/csp/dist/cdn.min.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "alpine-component-loader": "/__acl_hmr/modules/index.min.js",
+                "alpine-component-loader/auto": "/__acl_hmr/modules/auto.min.js",
+                "alpine-component-loader/dev": "/__acl_hmr/modules/dev.min.js",
+                "alpine-component-loader/debugger": "/__acl_hmr/modules/debugger.min.js",
+                "alpine-component-loader/a11y": "/__acl_hmr/modules/a11y.min.js",
+                "alpine-component-loader/a11y-scanner": "/__acl_hmr/modules/a11y-scanner.min.js",
+                "alpine-component-loader/offline": "/__acl_hmr/modules/offline.min.js",
+                "alpine-component-loader/testing": "/__acl_hmr/modules/testing.min.js"
+            }
+        }
+    </script>
+    <script type="module" src="/client.js"></script>
+</head>
+
+<body>
+    <header id="top" class="site-header">
+        <div>
+            <h1>AlpineComponentLoader</h1>
+            <div class="subtitle">
+                A lightweight, build-free component loader for
+                <a href="https://alpinejs.dev/" target="_blank" rel="noreferrer">Alpine.js</a>
+            </div>
+            <a class="github-link" href="https://github.com/LTDev-LLC/alpine-component-loader" target="_blank"
+                rel="noreferrer">View on GitHub</a>
+        </div>
+    </header>
+
+    <main>
+        <section class="lab-overview" aria-labelledby="overview-heading">
+            <p class="eyebrow">Focused example</p>
+            <h2 id="overview-heading">Server-rendered profile hydration</h2>
+            <p>Node renders typed props, named and default slots, safe initial data, and Declarative Shadow DOM before
+                the browser adopts the component without another template request.</p>
+            <div class="metrics" aria-label="SSR example capabilities">
+                <div class="metric"><strong>DSD</strong><span>Shadow output</span></div>
+                <div class="metric"><strong>0</strong><span>Hydration fetches</span></div>
+                <div class="metric"><strong>Typed</strong><span>Initial props</span></div>
+                <div class="metric"><strong>Safe</strong><span>Data resolver</span></div>
+            </div>
+        </section>
+
+        <p id="hydration-status" class="page-status" role="status">Server rendered; waiting for JavaScript</p>
+
+        <section class="example-section" aria-labelledby="profile-heading">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Live component</p>
+                    <h2 id="profile-heading">Profile card</h2>
+                </div>
+                <div>
+                    <a class="mismatch-link" href="/?hydrate=interaction">Defer until interaction</a>
+                    <a class="mismatch-link" href="/?data=policy">Use data policy</a>
+                    <a class="mismatch-link" href="/?mismatch=1">Test revision fallback</a>
+                </div>
+            </div>
+            {{PROFILE_CARD}}
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="inner">
+                <div class="meta">
+                    <div><strong>AlpineComponentLoader</strong> - A lightweight, build-free component loader for
+                        Alpine.js.</div>
+                    <div>&copy; 2026 LTDev LLC · MIT License</div>
+                </div>
+                <nav aria-label="Footer">
+                    <a href="https://github.com/LTDev-LLC/alpine-component-loader" target="_blank"
+                        rel="noreferrer">GitHub</a>
+                    <a href="https://github.com/LTDev-LLC/alpine-component-loader/issues" target="_blank"
+                        rel="noreferrer">Issues</a>
+                    <a href="https://alpinejs.dev/" target="_blank" rel="noreferrer">Alpine.js</a>
+                    <a href="#top">Back to top</a>
+                </nav>
+            </div>
+        </div>
+    </footer>
+</body>
+
+</html>

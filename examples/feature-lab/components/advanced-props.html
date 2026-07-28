@@ -1,0 +1,40 @@
+<style>
+    :host {
+        display: block;
+        border: 1px solid #bfdbfe;
+        border-radius: 10px;
+        padding: 1rem;
+        background: #eff6ff;
+    }
+
+    dl {
+        display: grid;
+        grid-template-columns: minmax(90px, auto) 1fr;
+        gap: 0.4rem 1rem;
+        margin: 0;
+    }
+
+    dt {
+        font-weight: 800;
+        color: #1e40af;
+    }
+
+    dd {
+        margin: 0;
+        overflow-wrap: anywhere;
+    }
+</style>
+<div>
+    <dl>
+        <dt>mode</dt>
+        <dd x-text="$props.mode"></dd>
+        <dt>score</dt>
+        <dd x-text="`${$props.score}% (attribute: ${$el.getRootNode().host.getAttribute('score')})`"></dd>
+        <dt>caption</dt>
+        <dd x-text="$props.caption === null ? 'null (allowed)' : $props.caption"></dd>
+        <dt>tags</dt>
+        <dd x-text="JSON.stringify($props.tags)"></dd>
+        <dt>profile</dt>
+        <dd x-text="JSON.stringify($props.profile)"></dd>
+    </dl>
+</div>

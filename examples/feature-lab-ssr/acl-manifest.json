@@ -1,0 +1,415 @@
+{
+    "version": 1,
+    "components": {
+        "lab-hero": {
+            "source": "components/lab-hero.html",
+            "options": {
+                "shadow": true,
+                "sanitize": true,
+                "attributes": {
+                    "title": {
+                        "type": "String",
+                        "required": true
+                    },
+                    "summary": {
+                        "type": "String",
+                        "required": true
+                    },
+                    "mode": {
+                        "type": "String",
+                        "default": "SSR"
+                    },
+                    "count": {
+                        "type": "Number",
+                        "default": 0
+                    }
+                }
+            },
+            "metadata": {
+                "description": "The server-rendered feature lab introduction and hydration control",
+                "slots": {
+                    "default": {
+                        "description": "Supplementary server-rendered copy"
+                    },
+                    "eyebrow": {
+                        "description": "Short context above the heading"
+                    },
+                    "actions": {
+                        "description": "Related navigation or actions"
+                    }
+                }
+            }
+        },
+        "lab-metric": {
+            "source": "components/lab-metric.html",
+            "options": {
+                "shadow": true,
+                "sanitize": true
+            },
+            "metadata": {
+                "description": "A compact server-rendered metric card",
+                "slots": {
+                    "default": {
+                        "description": "Metric label"
+                    },
+                    "value": {
+                        "description": "Metric value"
+                    }
+                }
+            }
+        },
+        "lab-slot-panel": {
+            "source": "components/lab-slot-panel.html",
+            "options": {
+                "shadow": true,
+                "sanitize": true
+            },
+            "metadata": {
+                "description": "Demonstrates default and named slot projection through Declarative Shadow DOM",
+                "slots": {
+                    "default": {
+                        "description": "Panel content"
+                    },
+                    "title": {
+                        "description": "Panel heading"
+                    },
+                    "badge": {
+                        "description": "Status badge"
+                    },
+                    "footer": {
+                        "description": "Panel footer"
+                    }
+                }
+            }
+        },
+        "lab-data-card": {
+            "source": "components/lab-data-card.html",
+            "options": {
+                "shadow": true,
+                "sanitize": true,
+                "templateRevision": "sha256-VZJLU_s54DcPg3y2riMS5OOpP1pgY5_-YCI_Y_o3w2Y",
+                "attributes": {
+                    "heading": {
+                        "type": "String",
+                        "default": "Hydration data"
+                    }
+                },
+                "data": {
+                    "src": "/api/activity",
+                    "target": "$data",
+                    "cacheStrategy": "no-store"
+                }
+            },
+            "metadata": {
+                "description": "Fetches normal component data while hydrating existing server markup"
+            }
+        },
+        "lab-counter-card": {
+            "source": "components/lab-counter-card.html",
+            "options": {
+                "shadow": true,
+                "sanitize": true,
+                "templateRevision": "sha256-EugqB4opH4jFb9nYFpnc746Bxea1UGF1UFu3H-ZjXeQ",
+                "attributes": {
+                    "label": {
+                        "type": "String",
+                        "default": "Forwarded event"
+                    },
+                    "count": {
+                        "type": "Number",
+                        "default": 0
+                    }
+                },
+                "events": {
+                    "forward": [
+                        {
+                            "from": "internal-increment",
+                            "as": "lab-increment"
+                        }
+                    ]
+                }
+            },
+            "metadata": {
+                "description": "Adds Alpine interaction and forwards an event after hydration",
+                "events": {
+                    "lab-increment": {
+                        "description": "Emitted whenever the hydrated counter advances",
+                        "detail": {
+                            "type": "object",
+                            "properties": {
+                                "count": {
+                                    "type": "number"
+                                }
+                            },
+                            "required": [
+                                "count"
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "lab-security-card": {
+            "source": "components/lab-security-card.html",
+            "options": {
+                "shadow": true,
+                "sanitize": true
+            },
+            "metadata": {
+                "description": "Shows SSR and client sanitizer parity for executable markup"
+            }
+        },
+        "shadow-card": {
+            "source": "components/shadow-card.html",
+            "options": {
+                "shadow": true,
+                "sanitize": true,
+                "attributes": {
+                    "title": {
+                        "type": "String",
+                        "default": "Shadow Component"
+                    },
+                    "active": {
+                        "type": "Boolean",
+                        "default": false
+                    }
+                }
+            },
+            "metadata": {
+                "description": "Demonstrates encapsulated styles and typed Boolean props"
+            }
+        },
+        "strict-progress": {
+            "source": "components/strict-progress.html",
+            "options": {
+                "shadow": true,
+                "sanitize": true,
+                "attributes": {
+                    "percent": {
+                        "type": "Number",
+                        "required": true,
+                        "default": 0
+                    }
+                }
+            },
+            "metadata": {
+                "description": "Demonstrates required numeric props and bounded presentation"
+            }
+        },
+        "lifecycle-log": {
+            "source": "components/lifecycle-log.html",
+            "options": {
+                "shadow": true,
+                "sanitize": true,
+                "attributes": {
+                    "title": {
+                        "type": "String",
+                        "default": "Lifecycle hydration"
+                    }
+                }
+            },
+            "metadata": {
+                "description": "Shows the transition from server output to browser lifecycle work"
+            }
+        },
+        "cache-control-demo": {
+            "source": "components/cache-control.html",
+            "options": {
+                "shadow": true,
+                "sanitize": true,
+                "data": {
+                    "src": "/api/cache",
+                    "target": "payload",
+                    "cacheStrategy": "cache-first",
+                    "cacheTtl": 30000
+                }
+            },
+            "metadata": {
+                "description": "Demonstrates request-aware data caching after hydration"
+            }
+        },
+        "polling-demo": {
+            "source": "components/x-polling.html",
+            "options": {
+                "shadow": true,
+                "sanitize": true,
+                "data": {
+                    "src": "/api/poll",
+                    "target": "payload",
+                    "poll": 2000,
+                    "cacheStrategy": "no-store",
+                    "pauseWhenHidden": true,
+                    "pauseWhenOffline": true,
+                    "pauseWhenOffscreen": true
+                }
+            },
+            "metadata": {
+                "description": "Starts resilient polling after the server host hydrates"
+            }
+        },
+        "response-json-demo": {
+            "source": "components/response-mode.html",
+            "options": {
+                "shadow": true,
+                "sanitize": true,
+                "attributes": {
+                    "label": {
+                        "type": "String",
+                        "default": "JSON response"
+                    }
+                },
+                "data": {
+                    "src": "/api/response",
+                    "target": "payload",
+                    "responseType": "json",
+                    "cacheStrategy": "no-store"
+                }
+            },
+            "metadata": {
+                "description": "Decodes a JSON response through the component data pipeline"
+            }
+        },
+        "mapped-event-demo": {
+            "source": "components/mapped-event.html",
+            "options": {
+                "shadow": true,
+                "sanitize": true,
+                "events": {
+                    "forward": [
+                        {
+                            "from": "internal-save",
+                            "as": "public-save"
+                        }
+                    ]
+                }
+            },
+            "metadata": {
+                "description": "Renames an internal component event before forwarding it",
+                "events": {
+                    "public-save": {
+                        "description": "Carries the mapped save result",
+                        "detail": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "message"
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "store-display": {
+            "source": "components/store-display.html",
+            "options": {
+                "shadow": true,
+                "sanitize": true,
+                "bindStore": "theme"
+            },
+            "metadata": {
+                "description": "Binds two hydrated hosts to the same Alpine store"
+            }
+        },
+        "persistent-note": {
+            "source": "components/persistent-note.html",
+            "options": {
+                "shadow": true,
+                "sanitize": true,
+                "persist": "local",
+                "persistKey": "acl:ssr-feature-lab:note",
+                "persistDebounce": 150,
+                "attributes": {
+                    "note": {
+                        "type": "String",
+                        "default": ""
+                    },
+                    "count": {
+                        "type": "Number",
+                        "default": 0
+                    },
+                    "storage": {
+                        "type": "String",
+                        "default": "localStorage"
+                    }
+                }
+            },
+            "metadata": {
+                "description": "Restores and writes component props through localStorage after hydration"
+            }
+        },
+        "advanced-props-demo": {
+            "source": "components/advanced-props.html",
+            "options": {
+                "shadow": true,
+                "sanitize": true,
+                "strictProps": true,
+                "attributes": {
+                    "mode": {
+                        "type": "String",
+                        "options": [
+                            "compact",
+                            "comfortable"
+                        ],
+                        "default": "comfortable",
+                        "reflect": true
+                    },
+                    "score": {
+                        "type": "Number",
+                        "default": 50,
+                        "reflect": true
+                    },
+                    "caption": {
+                        "type": "String",
+                        "nullable": true
+                    },
+                    "tags": {
+                        "type": "Array",
+                        "default": []
+                    },
+                    "profile": {
+                        "type": "Object",
+                        "default": {}
+                    }
+                }
+            },
+            "metadata": {
+                "description": "Serializes and hydrates primitive, nullable, array, and object props"
+            }
+        },
+        "a11y-issues-demo": {
+            "source": "components/a11y-issues.html",
+            "options": {
+                "shadow": true,
+                "sanitize": true
+            },
+            "metadata": {
+                "description": "Intentionally inaccessible fixture for debugger and scanner demonstrations"
+            }
+        }
+    },
+    "groups": {
+        "ssr-lab": [
+            "lab-hero",
+            "lab-metric",
+            "lab-slot-panel",
+            "lab-data-card",
+            "lab-counter-card",
+            "lab-security-card",
+            "shadow-card",
+            "strict-progress",
+            "lifecycle-log",
+            "cache-control-demo",
+            "polling-demo",
+            "response-json-demo",
+            "mapped-event-demo",
+            "store-display",
+            "persistent-note",
+            "advanced-props-demo",
+            "a11y-issues-demo"
+        ]
+    }
+}

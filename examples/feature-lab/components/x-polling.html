@@ -1,0 +1,45 @@
+<style>
+    :host {
+        display: block;
+        border: 1px solid #a7f3d0;
+        border-radius: 9px;
+        padding: 1rem;
+        background: #ecfdf5;
+    }
+
+    .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+
+    button {
+        min-height: 2.5rem;
+        padding: 0.55rem 0.8rem;
+        border: 1px solid #047857;
+        border-radius: 0.5rem;
+        background: #047857;
+        color: white;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+</style>
+<div x-data="{ paused: false }">
+    <strong>Polling request <span x-text="$props.payload?.count || 0"></span></strong>
+    <p
+        x-text="paused ? `Paused manually · ${$props.payload?.at || 'waiting'}` : ($props.payload ? `${$props.payload.state} · ${$props.payload.at}` : 'Starting poll…')">
+    </p>
+    <div class="actions">
+        <button :disabled="paused"
+            @click="paused = true; $el.getRootNode().host.setAttribute('data-fetch-poll', '0')">Pause</button>
+        <button :disabled="!paused"
+            @click="paused = false; $el.getRootNode().host.setAttribute('data-fetch-poll', '1000')">Resume</button>
+    </div>
+</div>

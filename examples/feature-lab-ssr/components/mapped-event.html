@@ -1,0 +1,36 @@
+<style>
+    :host {
+        display: block;
+    }
+
+    article {
+        height: 100%;
+        padding: 1rem;
+        border: 1px dashed #cbd5e1;
+        border-radius: 8px;
+        background: #fafafa;
+        box-sizing: border-box;
+        font-family: system-ui, sans-serif;
+    }
+
+    p {
+        margin: 0 0 0.75rem;
+        color: #4b5563;
+    }
+
+    button {
+        min-height: 2.5rem;
+        padding: 0.55rem 0.8rem;
+        border: 1px solid #1d4ed8;
+        border-radius: 0.5rem;
+        color: white;
+        background: #2563eb;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+    }
+</style>
+<article x-data="ssrMappedEvent">
+    <p>Internal events can be renamed before crossing the component boundary.</p>
+    <button type="button" @click="dispatchSave">Dispatch internal-save</button>
+</article>

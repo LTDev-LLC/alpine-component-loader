@@ -1,0 +1,33 @@
+<style>
+    :host {
+        display: block;
+        padding: 1.5rem;
+        background: #2f3e46;
+        color: white;
+        border-radius: 12px;
+        margin-bottom: 1rem;
+    }
+
+    .tags {
+        margin-top: 10px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+
+    .tag {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+    }
+</style>
+<div>
+    <h3 style="margin:0 0 5px 0" x-text="$props.title"></h3>
+    <div style="opacity: 0.8" x-text="$props.description"></div>
+    <div class="tags">
+        <template x-for="tag in ($props.tags || [])">
+            <span class="tag" x-text="tag"></span>
+        </template>
+    </div>
+</div>

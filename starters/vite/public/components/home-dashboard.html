@@ -1,0 +1,21 @@
+<section class="route-card" x-data="{ submitted: '', changes: 0 }" @quantity-change="changes += 1">
+    <p class="component-kicker">Home shard</p>
+    <h2 x-text="`Welcome, ${$props.visitor}`"></h2>
+    <p>
+        This route requested only <code>home-dashboard</code>. Safe inference found <code>quantity-field</code>, and the
+        route generator expanded that dependency into the same shard.
+    </p>
+
+    <form @submit.prevent="submitted = `Submitted quantity: ${new FormData($event.currentTarget).get('quantity')}`">
+        <quantity-field name="quantity" quantity="2"></quantity-field>
+        <div class="actions">
+            <button type="reset">Reset quantity</button>
+            <button type="submit">Submit native form</button>
+        </div>
+    </form>
+
+    <p class="result" aria-live="polite" x-text="submitted || `Quantity changes: ${changes}`"></p>
+    <aside class="route-tip">
+        <slot name="tip">Route-specific slotted guidance appears here.</slot>
+    </aside>
+</section>

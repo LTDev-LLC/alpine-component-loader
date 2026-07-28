@@ -1,0 +1,39 @@
+<style>
+    :host {
+        display: block;
+        font-family: system-ui, sans-serif;
+    }
+
+    article {
+        max-width: 34rem;
+        padding: 1.5rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 1rem;
+        background: white;
+    }
+
+    .heading {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    button {
+        padding: .55rem .85rem;
+        border: 0;
+        border-radius: .5rem;
+        background: #0f172a;
+        color: white;
+    }
+</style>
+<article x-data="profileCard">
+    <div class="heading">
+        <slot name="avatar"><span aria-hidden="true">👤</span></slot>
+        <div>
+            <h1 x-text="name">Server-rendered profile</h1>
+            <p x-text="status">Available before JavaScript</p>
+        </div>
+    </div>
+    <slot></slot>
+    <button type="button" @click="increment">Count: <span x-text="count">0</span></button>
+</article>

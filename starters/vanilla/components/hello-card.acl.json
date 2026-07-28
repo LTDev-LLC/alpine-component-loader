@@ -1,0 +1,11 @@
+{
+    "version": 1,
+    "options": {
+        "attributes": {
+            "name": "String"
+        }
+    },
+    "metadata": {
+        "description": "A minimal Alpine Component Loader component."
+    }
+}

@@ -1,0 +1,39 @@
+<style>
+    :host {
+        display: block;
+        padding: 1rem;
+        border: 1px solid #bfdbfe;
+        border-radius: 10px;
+        background: #eff6ff;
+        font-family: system-ui, sans-serif;
+    }
+
+    dl {
+        display: grid;
+        grid-template-columns: minmax(90px, auto) 1fr;
+        gap: 0.4rem 1rem;
+        margin: 0;
+    }
+
+    dt {
+        color: #1e40af;
+        font-weight: 800;
+    }
+
+    dd {
+        margin: 0;
+        overflow-wrap: anywhere;
+    }
+</style>
+<dl x-data="ssrAdvancedProps">
+    <dt>mode</dt>
+    <dd x-text="mode">compact</dd>
+    <dt>score</dt>
+    <dd x-text="scoreLabel">72% (typed number)</dd>
+    <dt>caption</dt>
+    <dd x-text="captionLabel">null (allowed)</dd>
+    <dt>tags</dt>
+    <dd x-text="tagsLabel">[&quot;typed&quot;,&quot;isolated&quot;]</dd>
+    <dt>profile</dt>
+    <dd x-text="profileLabel">{&quot;name&quot;:&quot;Ada&quot;,&quot;active&quot;:true}</dd>
+</dl>

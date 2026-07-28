@@ -1,0 +1,29 @@
+<style>
+    :host {
+        display: block;
+        border: 1px solid var(--alert-border, #bae6fd);
+        border-left: 5px solid var(--alert-accent, #0284c7);
+        background: var(--alert-bg, #f0f9ff);
+        color: var(--alert-text, #0c4a6e);
+        padding: 14px 16px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+    }
+
+    :host [data-title] {
+        font-weight: 800;
+        margin-bottom: 4px;
+    }
+
+    :host p {
+        margin: 0;
+    }
+</style>
+<div>
+    <div data-title>
+        <slot name="title">Alert</slot>
+    </div>
+    <p>
+        <slot></slot>
+    </p>
+</div>

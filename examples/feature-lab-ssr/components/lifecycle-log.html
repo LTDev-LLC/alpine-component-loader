@@ -1,0 +1,39 @@
+<style>
+    :host {
+        display: block;
+    }
+
+    article {
+        padding: 1rem;
+        border: 1px solid #d9e0ea;
+        border-radius: 8px;
+        background: #fff;
+        font-family: system-ui, sans-serif;
+    }
+
+    h3 {
+        margin: 0 0 0.75rem;
+    }
+
+    p {
+        margin: 0 0 0.75rem;
+        color: #4b5563;
+    }
+
+    button {
+        min-height: 2.5rem;
+        padding: 0.55rem 0.8rem;
+        border: 1px solid #1d4ed8;
+        border-radius: 0.5rem;
+        color: white;
+        background: #2563eb;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+    }
+</style>
+<article x-data="ssrLifecycleLog">
+    <h3 x-text="title">Lifecycle hydration</h3>
+    <p x-text="message">Server render complete · waiting for the browser lifecycle</p>
+    <button type="button" @click="updateTitle">Update reflected title</button>
+</article>

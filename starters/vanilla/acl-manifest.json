@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "components": {
+    "hello-card": {
+      "source": "components/hello-card.html",
+      "dependencies": [],
+      "options": {
+        "attributes": {
+          "name": "String"
+        },
+        "templateRevision": "sha256-APEpb6nLDibruiMvdQ-rZHUrEge1-VYWXkfB0x8b7fc"
+      },
+      "metadata": {
+        "description": "A minimal Alpine Component Loader component."
+      }
+    }
+  },
+  "groups": {}
+}

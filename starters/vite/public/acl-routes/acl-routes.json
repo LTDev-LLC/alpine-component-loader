@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "routes": {
+    "home": {
+      "manifest": "./acl-route-home-5bab86c2.json",
+      "revision": "sha256-W6uGwujZNOaMKUxPEfquptQPwQjRCyxPWCuOS6nyDWc",
+      "components": [
+        "quantity-field",
+        "home-dashboard"
+      ]
+    },
+    "account": {
+      "manifest": "./acl-route-account-006d901e.json",
+      "revision": "sha256-AG2QHqXGNygzJBGSjqJlPhX_ojLCOErzAVmxbZHjA_0",
+      "components": [
+        "profile-avatar",
+        "account-dashboard"
+      ]
+    }
+  }
+}

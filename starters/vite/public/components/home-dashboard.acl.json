@@ -1,0 +1,20 @@
+{
+    "version": 1,
+    "groups": ["home"],
+    "options": {
+        "attributes": {
+            "visitor": {
+                "type": "String",
+                "default": "developer"
+            }
+        }
+    },
+    "metadata": {
+        "slots": {
+            "tip": {
+                "description": "Route-specific guidance supplied by the application router."
+            }
+        },
+        "description": "Home route demonstrating dependency expansion, slots, and form association."
+    }
+}

@@ -1,0 +1,35 @@
+<style>
+    :host {
+        display: block;
+    }
+
+    article {
+        height: 100%;
+        padding: 1rem;
+        border: 1px solid #d9e0ea;
+        border-radius: 8px;
+        background: #fff;
+        box-sizing: border-box;
+        font-family: system-ui, sans-serif;
+    }
+
+    h3 {
+        margin: 0 0 0.75rem;
+    }
+
+    button {
+        min-height: 2.5rem;
+        padding: 0.55rem 0.8rem;
+        border: 1px solid #1d4ed8;
+        border-radius: 0.5rem;
+        color: white;
+        background: #2563eb;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+    }
+</style>
+<article x-data="ssrStoreDisplay">
+    <h3>Store: <span x-text="mode">Light</span></h3>
+    <button type="button" @click="toggle">Toggle shared store</button>
+</article>

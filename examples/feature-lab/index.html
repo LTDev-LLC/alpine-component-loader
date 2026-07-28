@@ -1,0 +1,2712 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Complete interactive test page and usage cookbook for AlpineComponentLoader">
+    <title>AlpineComponentLoader Feature Lab</title>
+
+    <link rel="stylesheet" href="./styles.css">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "alpine-component-loader": "/__acl_hmr/modules/index.min.js",
+                "alpine-component-loader/auto": "/__acl_hmr/modules/auto.min.js",
+                "alpine-component-loader/dev": "/__acl_hmr/modules/dev.min.js",
+                "alpine-component-loader/debugger": "/__acl_hmr/modules/debugger.min.js",
+                "alpine-component-loader/a11y": "/__acl_hmr/modules/a11y.min.js",
+                "alpine-component-loader/a11y-scanner": "/__acl_hmr/modules/a11y-scanner.min.js",
+                "alpine-component-loader/offline": "/__acl_hmr/modules/offline.min.js",
+                "alpine-component-loader/testing": "/__acl_hmr/modules/testing.min.js"
+            }
+        }
+    </script>
+
+    <script>
+        (() => {
+            const realFetch = window.fetch.bind(window);
+            const counts = new Map();
+            const json = (body, status = 200) => new Response(JSON.stringify(body), {
+                status,
+                headers: { 'content-type': 'application/json' }
+            });
+            const delayWithSignal = (delay, signal) => new Promise((resolve, reject) => {
+                let timer;
+                const cleanup = () => signal?.removeEventListener('abort', abort),
+                    finish = () => {
+                        cleanup();
+                        resolve();
+                    },
+                    abort = () => {
+                        clearTimeout(timer);
+                        cleanup();
+                        reject(signal?.reason || new DOMException('Aborted', 'AbortError'));
+                    };
+                if (signal?.aborted) {
+                    abort();
+                    return;
+                }
+                timer = setTimeout(finish, delay);
+                signal?.addEventListener('abort', abort, { once: true });
+            });
+
+            window.__resetDemoRequestCount = pathname => {
+                for (const key of counts.keys()) {
+                    if (key.startsWith(`GET:${pathname}:`))
+                        counts.delete(key);
+                }
+            };
+
+            window.fetch = async (input, init = {}) => {
+                const url = new URL(typeof input === 'string' ? input : input.url, location.href);
+                if (!url.pathname.startsWith('/demo-api/'))
+                    return realFetch(input, init);
+
+                const key = `${init.method || 'GET'}:${url.pathname}:${url.search}:${init.body || ''}`;
+                counts.set(key, (counts.get(key) || 0) + 1);
+
+                if (url.pathname === '/demo-api/audit') {
+                    if (counts.get(key) === 1 && url.searchParams.get('flaky') === 'true')
+                        return json({ error: 'temporary' }, 503);
+                    return json({
+                        id: url.searchParams.get('id') || '42',
+                        method: init.method || 'GET',
+                        body: init.body ? JSON.parse(init.body) : null,
+                        count: counts.get(key),
+                        header: init.headers?.['x-demo'] || init.headers?.get?.('x-demo') || null
+                    });
+                }
+
+                if (url.pathname === '/demo-api/cache') {
+                    return json({
+                        count: counts.get(key),
+                        at: new Date().toLocaleTimeString()
+                    });
+                }
+
+                if (url.pathname === '/demo-api/user') {
+                    const id = url.searchParams.get('id') || '1';
+                    const isGrace = id === '2';
+                    return json({
+                        id,
+                        name: isGrace ? 'Grace Hopper' : 'Ada Lovelace',
+                        username: isGrace ? 'grace-hopper' : 'ada-lovelace',
+                        email: isGrace ? 'grace@example.test' : 'ada@example.test',
+                        image: isGrace
+                            ? 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72"%3E%3Crect width="72" height="72" fill="%23dbeafe"/%3E%3Ctext x="36" y="45" text-anchor="middle" font-size="28" fill="%231d4ed8"%3EGH%3C/text%3E%3C/svg%3E'
+                            : 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72"%3E%3Crect width="72" height="72" fill="%23ede9fe"/%3E%3Ctext x="36" y="45" text-anchor="middle" font-size="28" fill="%236d28d9"%3EAL%3C/text%3E%3C/svg%3E',
+                        address: {
+                            city: isGrace ? 'Arlington' : 'London',
+                            stateCode: isGrace ? 'VA' : 'UK'
+                        },
+                        company: { name: isGrace ? 'United States Navy' : 'Analytical Engine' }
+                    });
+                }
+
+                if (url.pathname === '/demo-api/slow') {
+                    const initialDelay = Number(url.searchParams.get('delay')) || 700,
+                        retryDelay = Number(url.searchParams.get('retry-delay')),
+                        requestDelay = retryDelay > 0 && counts.get(key) > 1 ? retryDelay : initialDelay;
+                    await delayWithSignal(requestDelay, init.signal);
+                    return json({ message: 'Loaded after a deliberate pause', count: counts.get(key) });
+                }
+
+                if (url.pathname === '/demo-api/poll') {
+                    return json({
+                        count: counts.get(key),
+                        state: document.hidden ? 'paused while hidden' : 'active',
+                        at: new Date().toLocaleTimeString()
+                    });
+                }
+
+                if (url.pathname === '/demo-api/response') {
+                    const kind = url.searchParams.get('kind') || 'json',
+                        value = `Decoded ${kind} response`;
+                    if (kind === 'text' || kind === 'custom')
+                        return new Response(kind === 'custom' ? 'alpha|beta|gamma' : value, {
+                            headers: { 'content-type': 'text/plain' }
+                        });
+                    if (kind === 'auto')
+                        return new Response(JSON.stringify({ value, detected: 'vendor JSON' }), {
+                            headers: { 'content-type': 'application/vnd.acl-demo+json' }
+                        });
+                    if (['blob', 'arrayBuffer', 'stream'].includes(kind))
+                        return new Response(new TextEncoder().encode(value), {
+                            headers: { 'content-type': 'application/octet-stream' }
+                        });
+                    return json({ value, detected: 'JSON' });
+                }
+
+                return json({ ok: true, count: counts.get(key) });
+            };
+
+            document.addEventListener('alpine:init', () => {
+                Alpine.store('theme', {
+                    mode: 'Light',
+                    color: '#2563eb'
+                });
+            });
+        })();
+    </script>
+
+    <script type="module">
+        import AlpineComponentLoader, { createIndexedDBPersistenceAdapter } from 'alpine-component-loader';
+        import ACLDebugger from 'alpine-component-loader/debugger';
+        import ACLA11y from 'alpine-component-loader/a11y';
+        import ACLA11yScanner from 'alpine-component-loader/a11y-scanner';
+        import {
+            installFetchMock,
+            mountComponent,
+            recordACLEvents,
+            waitForComponent
+        } from 'alpine-component-loader/testing';
+
+        ACLDebugger.inject(AlpineComponentLoader);
+        const accessibilityObserver = ACLA11y.observe(AlpineComponentLoader);
+        const accessibilityScanner = ACLA11yScanner.mount({
+            button: { companionSelector: '.debug-toggle' }
+        });
+        window.AlpineComponentLoader = AlpineComponentLoader;
+        window.ACLDebugger = ACLDebugger;
+        window.ACLA11y = ACLA11y;
+        window.__aclAccessibilityObserver = accessibilityObserver;
+        window.__aclAccessibilityScanner = accessibilityScanner;
+
+        const demoRuntimeEvents = [],
+            adaptivePrefetchEvents = [];
+        let adaptivePrefetchResults = {};
+        const renderAdaptivePrefetch = () => {
+            const output = document.getElementById('adaptive-prefetch-output');
+            if (output)
+                output.textContent = JSON.stringify({
+                    events: adaptivePrefetchEvents,
+                    results: adaptivePrefetchResults
+                }, null, 2);
+        };
+        ['loadstart', 'loadend', 'error', 'cachehit', 'cacheevict', 'revalidated', 'dev-reload-start', 'dev-reload-end', 'prefetchstart', 'prefetchend', 'prefetchskip', 'a11y'].forEach(name => {
+            document.addEventListener(`acl:${name}`, event => {
+                const error = event.detail?.error,
+                    record = {
+                        event: `acl:${name}`,
+                        component: event.detail?.tagName || event.target?.localName || 'unknown',
+                        phase: event.detail?.phase || null,
+                        code: error?.code || null,
+                        status: error?.status ?? null,
+                        at: new Date().toLocaleTimeString()
+                    };
+                demoRuntimeEvents.unshift(record);
+                demoRuntimeEvents.splice(10);
+                const output = document.getElementById('runtime-event-log');
+                if (output)
+                    output.textContent = JSON.stringify(demoRuntimeEvents, null, 2);
+                if (name.startsWith('prefetch')) {
+                    adaptivePrefetchEvents.push({
+                        event: `acl:${name}`,
+                        tags: event.detail?.tags || [],
+                        reason: event.detail?.reason || null,
+                        fulfilled: event.detail?.fulfilled ?? null,
+                        rejected: event.detail?.rejected ?? null
+                    });
+                    adaptivePrefetchEvents.splice(0, Math.max(0, adaptivePrefetchEvents.length - 8));
+                    renderAdaptivePrefetch();
+                }
+            });
+        });
+
+        AlpineComponentLoader.config({
+            executeScripts: true,
+            sanitize: false,
+            basePath: new URL('./components/', document.baseURI).href,
+            dynamicTransition: 'fade',
+            templateCacheTtl: 60_000,
+            templateCacheMax: 50,
+            observability: {
+                bufferSize: 80,
+                performanceMarks: true,
+                logger: false
+            },
+            sourceResolver(source) {
+                const aliases = {
+                    'demo:resolver': 'source-result.html',
+                    'demo:declarative': 'info-card.html'
+                };
+                return aliases[source] || source;
+            }
+        });
+
+        const observedRuntimeRecords = [],
+            renderObservedRuntimeRecords = () => {
+                const output = document.getElementById('observability-live-output');
+                if (output)
+                    output.textContent = JSON.stringify(observedRuntimeRecords.slice(-8).map(record => ({
+                        sequence: record.sequence,
+                        type: record.type,
+                        severity: record.severity,
+                        tagName: record.tagName,
+                        phase: record.phase,
+                        duration: record.duration,
+                        detail: record.detail
+                    })), null, 2);
+            },
+            unsubscribeObservability = AlpineComponentLoader.subscribe(record => {
+                observedRuntimeRecords.push(record);
+                observedRuntimeRecords.splice(0, Math.max(0, observedRuntimeRecords.length - 20));
+                renderObservedRuntimeRecords();
+            });
+        window.__aclObservedRuntimeRecords = observedRuntimeRecords;
+        window.addEventListener('pagehide', unsubscribeObservability, { once: true });
+
+        const sharedSheet = new CSSStyleSheet();
+        sharedSheet.replaceSync(`
+      .shared-box {
+        border: 1px solid #99f6e4;
+        background: #ecfeff;
+        color: #134e4a;
+        border-radius: 8px;
+        padding: 12px;
+      }
+    `);
+        AlpineComponentLoader.config({ sharedStyleSheets: [sharedSheet] });
+
+        AlpineComponentLoader.define('shadow-card', 'shadow-card.html', {
+            shadow: true,
+            attributes: {
+                title: String,
+                active: Boolean
+            }
+        });
+
+        AlpineComponentLoader.define('event-button', 'event-button.html', {
+            shadow: true,
+            events: { forward: ['action'] }
+        });
+
+        AlpineComponentLoader.define('strict-progress', 'strict-progress.html', {
+            shadow: true,
+            attributes: {
+                percent: {
+                    type: Number,
+                    required: true,
+                    default: 0,
+                    validator: value => value >= 0 && value <= 100
+                }
+            }
+        });
+
+        AlpineComponentLoader.define('external-icon', 'external-icon.html', {
+            shadow: true,
+            externalCss: [
+                'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
+            ],
+            attributes: { icon: String, label: String }
+        });
+
+        AlpineComponentLoader.define('confetti-btn', 'x-confetti.html', {
+            shadow: true,
+            externalScripts: ['https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js']
+        });
+
+        AlpineComponentLoader.define('boundary-demo', '#tpl-fallback-error', {
+            fallback: '#tpl-fallback-error'
+        });
+
+        AlpineComponentLoader.define('grouped-card', 'response-mode.html', {
+            shadow: true,
+            attributes: { label: String },
+            data: {
+                src: '/demo-api/response?kind=text',
+                responseType: 'text',
+                target: 'payload',
+                cacheStrategy: 'no-store'
+            }
+        });
+
+        AlpineComponentLoader.define('source-demo', 'demo:resolver', {
+            shadow: true,
+            attributes: { label: String }
+        });
+
+        AlpineComponentLoader.define('lazy-image', 'lazy-image.html', {
+            loading: 'lazy',
+            loadingTemplate: 'loading-state.html'
+        });
+
+        AlpineComponentLoader.define('advanced-fetch', 'advanced-fetch.html', {
+            shadow: true,
+            data: {
+                src: '/demo-api/audit?id=42&flaky=true',
+                method: 'POST',
+                body: { includeHistory: true },
+                target: 'audit',
+                retries: 1,
+                retryDelay: 100,
+                retryUnsafeMethods: true,
+                cacheStrategy: 'network-first',
+                options: { headers: { 'x-demo': 'grouped' } }
+            }
+        });
+
+        AlpineComponentLoader.define('cache-control-demo', 'cache-control.html', {
+            shadow: true,
+            templateRevision: 'feature-lab-cache-v1',
+            data: {
+                src: '/demo-api/cache',
+                target: 'payload',
+                cacheStrategy: 'cache-first',
+                cacheTtl: 30000
+            }
+        });
+
+        AlpineComponentLoader.define('loading-demo', 'loading-final.html', {
+            shadow: true,
+            data: { src: '/demo-api/slow' },
+            loadingTemplate: 'loading-state.html'
+        });
+
+        AlpineComponentLoader.define('secure-render-demo', '#tpl-unsafe-content', {
+            shadow: true,
+            executeScripts: false, sanitize: true
+        });
+
+        AlpineComponentLoader.define('mapped-event-demo', 'mapped-event.html', {
+            shadow: true,
+            events: {
+                forward: [{ from: 'internal-save', as: 'public-save' }]
+            }
+        });
+
+        AlpineComponentLoader.define('a11y-issues-demo', 'a11y-issues.html', {
+            shadow: true
+        });
+
+        AlpineComponentLoader.define('store-display', 'store-display.html', {
+            shadow: true,
+            bindStore: 'theme'
+        });
+
+        const lightAlertThemes = {
+            success: {
+                border: '#bbf7d0',
+                accent: '#16a34a',
+                bg: '#f0fdf4',
+                text: '#14532d'
+            },
+            error: {
+                border: '#fecaca',
+                accent: '#dc2626',
+                bg: '#fef2f2',
+                text: '#991b1b'
+            },
+            warning: {
+                border: '#fde68a',
+                accent: '#d97706',
+                bg: '#fffbeb',
+                text: '#92400e'
+            },
+            info: {
+                border: '#bae6fd',
+                accent: '#0284c7',
+                bg: '#f0f9ff',
+                text: '#0c4a6e'
+            }
+        };
+
+        const applyLightAlertTheme = ({ el, props }) => {
+            const theme = lightAlertThemes[props.type] || lightAlertThemes.info;
+            el.style.setProperty('--alert-border', theme.border);
+            el.style.setProperty('--alert-accent', theme.accent);
+            el.style.setProperty('--alert-bg', theme.bg);
+            el.style.setProperty('--alert-text', theme.text);
+        };
+
+        AlpineComponentLoader.define('light-alert', 'light-alert.html', {
+            shadow: false,
+            attributes: { type: String },
+            hooks: {
+                mounted: applyLightAlertTheme,
+                updated: applyLightAlertTheme
+            }
+        });
+
+        AlpineComponentLoader.define('lifecycle-log', 'lifecycle-log.html', {
+            shadow: true,
+            attributes: { title: String, logs: Array },
+            hooks: {
+                beforeMount() {
+                    this.$props.logs.push('beforeMount');
+                },
+                mounted() {
+                    this.$props.logs.push('mounted');
+                },
+                updated({ name }) {
+                    this.$props.logs.push(`updated:${name}`);
+                }
+            }
+        });
+
+        AlpineComponentLoader.define('shared-style-demo', 'shared-style.html', {
+            shadow: true
+        });
+
+        AlpineComponentLoader.define('external-deps-demo', 'external-deps.html', {
+            shadow: true,
+            externalCss: [{
+                url: 'data:text/css,.external-token{font-weight:800;color:%230f766e}',
+                media: 'all',
+                referrerPolicy: 'no-referrer',
+                timeout: 2000
+            }],
+            externalScripts: [{
+                url: 'data:text/javascript,window.__aclDemoExternalScript=true',
+                referrerPolicy: 'no-referrer',
+                timeout: 2000
+            }]
+        });
+
+        AlpineComponentLoader.define('persistent-note', 'persistent-note.html', {
+            shadow: true,
+            attributes: { note: String, count: Number, storage: String },
+            persistDebounce: 250
+        });
+
+        AlpineComponentLoader.define('dynamic-a', 'info-card.html', {
+            shadow: true,
+            attributes: { title: String, body: String }
+        });
+
+        AlpineComponentLoader.define('dynamic-b', 'source-result.html', {
+            shadow: true,
+            attributes: { label: String }
+        });
+
+        AlpineComponentLoader.define('advanced-props-demo', 'advanced-props.html', {
+            shadow: true,
+            strictProps: true,
+            attributes: {
+                mode: { type: String, options: ['compact', 'comfortable'], default: 'comfortable', reflect: true },
+                score: {
+                    type: Number,
+                    default: 50,
+                    reflect: true,
+                    coerce: value => Number(String(value).replace('%', '')),
+                    validator: value => value >= 0 && value <= 100
+                },
+                caption: { type: String, nullable: true },
+                tags: { type: Array, default: () => [] },
+                profile: {
+                    type: Object,
+                    schema: { name: String, active: Boolean }
+                }
+            }
+        });
+
+        const responseModes = [
+            ['response-json-demo', 'json', value => JSON.stringify(value)],
+            ['response-text-demo', 'text', value => value],
+            ['response-auto-demo', 'auto', value => JSON.stringify(value)],
+            ['response-blob-demo', 'blob', value => value.text()],
+            ['response-buffer-demo', 'arrayBuffer', value => new TextDecoder().decode(value)],
+            ['response-stream-demo', 'stream', value => new Response(value).text()]
+        ];
+        responseModes.forEach(([tagName, responseType, format]) => {
+            AlpineComponentLoader.define(tagName, 'response-mode.html', {
+                shadow: true,
+                attributes: { label: { type: String, default: responseType } },
+                data: {
+                    src: `/demo-api/response?kind=${responseType}`,
+                    target: 'payload',
+                    responseType,
+                    cacheStrategy: 'no-store'
+                },
+                hooks: {
+                    async afterFetch(value) {
+                        return await format(value);
+                    }
+                }
+            });
+        });
+
+        AlpineComponentLoader.define('response-custom-demo', 'response-mode.html', {
+            shadow: true,
+            attributes: { label: { type: String, default: 'custom parser' } },
+            data: {
+                src: '/demo-api/response?kind=custom',
+                target: 'payload',
+                cacheStrategy: 'no-store',
+                parser: async response => (await response.text()).split('|').join(' → ')
+            }
+        });
+
+        AlpineComponentLoader.define('polling-demo', 'x-polling.html', {
+            shadow: true,
+            data: {
+                src: '/demo-api/poll',
+                target: 'payload',
+                poll: 1000,
+                cacheStrategy: 'no-store',
+                pauseWhenHidden: true,
+                pauseWhenOffline: true,
+                pauseWhenOffscreen: true
+            }
+        });
+
+        AlpineComponentLoader.define('recovery-demo', 'x-recovery.html', {
+            shadow: true,
+            data: {
+                target: 'payload',
+                timeout: 5000,
+                cacheStrategy: 'no-store'
+            }
+        });
+
+        AlpineComponentLoader.define('async-lifecycle-demo', 'async-lifecycle.html', {
+            shadow: true,
+            attributes: { logs: { type: Array, default: () => [] } },
+            hooks: {
+                async beforeMount({ props }) {
+                    await Promise.resolve();
+                    props.logs.push('async beforeMount complete');
+                },
+                mounted({ props }) {
+                    props.logs.push('mounted; cleanup registered');
+                    return () => {
+                        const count = window.__aclLifecycleCleanups = (window.__aclLifecycleCleanups || 0) + 1;
+                        window.dispatchEvent(new CustomEvent('acl:lifecycle-cleanup', { detail: { count } }));
+                    };
+                },
+                activated({ props }) {
+                    props.logs.push('activated from keep-alive');
+                },
+                deactivated({ props }) {
+                    props.logs.push('deactivated into keep-alive');
+                },
+                loaded({ props }) {
+                    props.logs.push('loaded after Alpine initTree');
+                }
+            }
+        });
+
+        const adapterDemos = new Map([
+            ['local', {
+                tagName: 'local-adapter-note',
+                label: 'localStorage adapter',
+                key: 'acl:adapter-demo:local',
+                adapter: window.localStorage,
+            }],
+            ['session', {
+                tagName: 'session-adapter-note',
+                label: 'sessionStorage adapter',
+                key: 'acl:adapter-demo:session',
+                adapter: window.sessionStorage,
+            }],
+            ['indexeddb', {
+                tagName: 'indexeddb-adapter-note',
+                label: 'IndexedDB adapter',
+                key: 'acl:adapter-demo:indexeddb',
+                adapter: createIndexedDBPersistenceAdapter({
+                    databaseName: 'alpine-component-loader-feature-lab',
+                    storeName: 'adapter-migrations',
+                }),
+            }],
+        ]);
+
+        // Seed each backend once so every adapter demonstrates the same schema migration.
+        await Promise.all(Array.from(adapterDemos.values(), async demo => {
+            if (await demo.adapter.getItem(demo.key) == null) {
+                await demo.adapter.setItem(demo.key, JSON.stringify({
+                    version: 1,
+                    data: { note: `Migrated ${demo.label} from schema v1`, count: 1 },
+                }));
+            }
+        }));
+
+        const readAdapterRecord = async mode => {
+            const demo = adapterDemos.get(mode);
+            if (!demo)
+                throw new Error(`Unknown persistence adapter: ${mode}`);
+            const raw = await demo.adapter.getItem(demo.key);
+            return raw == null ? null : JSON.parse(raw);
+        }, renderAdapterPersistence = async (message = '') => {
+            const records = Object.fromEntries(await Promise.all(Array.from(adapterDemos, async ([mode]) =>
+                [mode, await readAdapterRecord(mode)]
+            ))), serialized = JSON.stringify(records, null, 2);
+            document.getElementById('adapter-output').textContent = message ? `${message}\n${serialized}` : serialized;
+        };
+
+        window.__aclAdapterPersistence = adapterDemos;
+        window.__readAdapterPersistence = readAdapterRecord;
+        window.__inspectAdapterPersistence = () => renderAdapterPersistence();
+        window.__flushAdapterPersistence = async () => {
+            await Promise.all(Array.from(adapterDemos.values(), async demo => {
+                const persistence = document.querySelector(demo.tagName)?.$props?.$persistence;
+                if (!persistence)
+                    throw new Error(`${demo.label} persistence is not initialized.`);
+                // Queue the current reactive state before forcing each pending write.
+                const pending = persistence.$save();
+                await persistence.$flush();
+                await pending;
+            }));
+            await renderAdapterPersistence('Flushed current props:');
+        };
+
+        adapterDemos.forEach(demo => AlpineComponentLoader.define(demo.tagName, 'persistent-note.html', {
+            shadow: true,
+            attributes: { note: String, count: Number, storage: String },
+            persist: 'custom',
+            persistKey: demo.key,
+            persistAdapter: demo.adapter,
+            persistVersion: 2,
+            persistDebounce: 100,
+            async persistMigrate(data, { fromVersion }) {
+                return { ...data, note: `${data.note} (v${fromVersion} → v2)` };
+            }
+        }));
+
+        AlpineComponentLoader.define('custom-sanitizer-demo', '#tpl-custom-sanitizer', {
+            shadow: true,
+            executeScripts: false,
+            async sanitize(fragment) {
+                fragment.querySelectorAll('[data-private]').forEach(node => node.remove());
+                fragment.querySelector('[data-sanitize-root]')?.setAttribute('data-sanitized', 'custom');
+            }
+        });
+
+        let trustedTypesPolicyCalls = 0,
+            urlPolicyCalls = 0,
+            featureLabTrustedTypesPolicy = null;
+        const createTrustedHTML = html => {
+            trustedTypesPolicyCalls++;
+            return html;
+        };
+        if (window.trustedTypes?.createPolicy) {
+            try {
+                featureLabTrustedTypesPolicy = window.trustedTypes.createPolicy('acl-feature-lab', {
+                    createHTML: createTrustedHTML
+                });
+            } catch {
+                // Fall back to the loader's policy interface when policy creation is restricted.
+            }
+        }
+        featureLabTrustedTypesPolicy ||= { createHTML: createTrustedHTML };
+
+        AlpineComponentLoader.define('security-policy-demo', 'security-policy.html', {
+            shadow: true,
+            sanitize: true,
+            executeScripts: false,
+            security: {
+                trustedTypesPolicy: featureLabTrustedTypesPolicy,
+                urlPolicy(value) {
+                    urlPolicyCalls++;
+                    try {
+                        return new URL(value, document.baseURI).origin === location.origin;
+                    } catch {
+                        return false;
+                    }
+                }
+            }
+        });
+
+        window.inspectSecurityPolicy = () => {
+            const element = document.querySelector('security-policy-demo'),
+                result = {
+                    nativeTrustedTypes: Boolean(window.trustedTypes?.createPolicy),
+                    trustedTypesPolicyCalls,
+                    urlPolicyCalls,
+                    allowedHref: element?.shadowRoot.querySelector('#policy-allowed')?.getAttribute('href') || null,
+                    blockedHref: element?.shadowRoot.querySelector('#policy-blocked')?.getAttribute('href') || null
+                },
+                output = document.getElementById('security-policy-output');
+            if (output)
+                output.textContent = JSON.stringify(result, null, 2);
+            return result;
+        };
+
+        const featureLabManifest = {
+            version: 1,
+            components: {
+                'manifest-base': {
+                    source: 'info-card.html',
+                    options: {
+                        shadow: true,
+                        attributes: { title: String, body: String }
+                    }
+                },
+                'manifest-card': {
+                    source: 'info-card.html',
+                    dependencies: ['manifest-base'],
+                    options: {
+                        shadow: true,
+                        attributes: { title: String, body: String }
+                    },
+                    metadata: {
+                        description: 'A feature-lab card registered from a version-one component manifest.',
+                        events: {
+                            'manifest-ready': {
+                                description: 'Reports that the manifest card is ready.',
+                                detail: {
+                                    type: 'object',
+                                    properties: {
+                                        id: { type: 'string' },
+                                        ready: { type: 'boolean' }
+                                    },
+                                    required: ['id', 'ready']
+                                }
+                            }
+                        },
+                        slots: {
+                            default: { description: 'Additional manifest card content.' }
+                        }
+                    }
+                },
+                'adaptive-card': {
+                    source: 'source-result.html',
+                    dependencies: ['manifest-base'],
+                    options: {
+                        shadow: true,
+                        attributes: { label: String }
+                    },
+                    metadata: {
+                        description: 'A dependency-aware target reserved for adaptive prefetch.'
+                    }
+                }
+            },
+            groups: {
+                dashboard: ['manifest-card'],
+                preview: ['adaptive-card']
+            }
+        };
+        const manifestResult = await AlpineComponentLoader.registerManifest(featureLabManifest, {
+            prefetch: ['dashboard'],
+            concurrency: 2
+        });
+        window.__aclManifestResult = manifestResult;
+        window.__aclFeatureLabManifest = featureLabManifest;
+        await AlpineComponentLoader.start();
+
+        let adaptivePrefetchController = null,
+            stopTemplateObservation = null;
+        const startAdaptivePrefetch = async () => {
+            adaptivePrefetchController = await AlpineComponentLoader.observePrefetch({
+                triggers: ['hover', 'focus'],
+                hoverDelay: 75,
+                concurrency: 2
+            });
+            window.__aclAdaptivePrefetchController = adaptivePrefetchController;
+            return adaptivePrefetchController;
+        };
+        window.resetAdaptivePrefetch = async () => {
+            AlpineComponentLoader.stopObservingPrefetch();
+            adaptivePrefetchEvents.length = 0;
+            adaptivePrefetchResults = {};
+            await startAdaptivePrefetch();
+            renderAdaptivePrefetch();
+        };
+        window.stopAdaptivePrefetch = () => {
+            AlpineComponentLoader.stopObservingPrefetch();
+            adaptivePrefetchController = null;
+            window.__aclAdaptivePrefetchController = null;
+            adaptivePrefetchEvents.push({
+                event: 'observer:disconnected',
+                tags: [],
+                reason: null,
+                fulfilled: null,
+                rejected: null
+            });
+            renderAdaptivePrefetch();
+        };
+        window.demoAdaptivePrefetch = async (target = 'preview') => {
+            adaptivePrefetchController ||= await startAdaptivePrefetch();
+            const results = await adaptivePrefetchController.prefetch(target);
+            adaptivePrefetchResults = Object.fromEntries(Object.entries(results).map(([tag, result]) => [
+                tag,
+                result.status
+            ]));
+            renderAdaptivePrefetch();
+            return adaptivePrefetchResults;
+        };
+        await startAdaptivePrefetch();
+        window.addEventListener('pagehide', () => AlpineComponentLoader.stopObservingPrefetch(), { once: true });
+
+        window.demoRegistry = async () => {
+            const tags = AlpineComponentLoader.getRegisteredTags(),
+                prefetched = await AlpineComponentLoader.prefetchGraph(['manifest-card'], { concurrency: 2 }),
+                definition = AlpineComponentLoader.getDefinition('manifest-card'),
+                output = document.getElementById('registry-output');
+            output.textContent = JSON.stringify({
+                version: AlpineComponentLoader.version,
+                registeredCount: tags.length,
+                hasManifestCard: AlpineComponentLoader.has('manifest-card'),
+                definition: { tagName: definition?.tagName, source: definition?.source, dependencies: definition?.dependencies },
+                directDependencies: AlpineComponentLoader.getDependencies('manifest-card'),
+                transitiveDependencies: AlpineComponentLoader.getDependencies('manifest-card', { transitive: true }),
+                contractMetadata: featureLabManifest.components['manifest-card'].metadata,
+                manifestResult,
+                prefetched: Object.fromEntries(Object.entries(prefetched).map(([tag, result]) => [tag, result.status]))
+            }, null, 2);
+        };
+
+        window.demoTemplateCache = async (prune = false) => {
+            const evicted = prune ? await AlpineComponentLoader.pruneTemplateCache() : [],
+                info = await AlpineComponentLoader.getTemplateCacheInfo(),
+                output = document.getElementById('template-cache-output');
+            output.textContent = JSON.stringify({
+                size: info.size,
+                evicted: evicted.map(entry => ({ source: entry.source, reason: entry.reason })),
+                entries: info.entries.map(entry => ({
+                    source: entry.source,
+                    revision: entry.revision,
+                    ttl: entry.ttl,
+                    lastAccess: entry.lastAccess
+                }))
+            }, null, 2);
+        };
+
+        window.demoAccessibility = async () => {
+            const element = document.querySelector('a11y-issues-demo'),
+                result = await accessibilityObserver.audit(element),
+                output = document.getElementById('accessibility-output');
+            output.textContent = JSON.stringify({
+                component: element.localName,
+                duration: Number(result.duration.toFixed(2)),
+                violations: result.violations
+            }, null, 2);
+        };
+
+        window.demoObserveTemplate = async () => {
+            stopTemplateObservation ||= AlpineComponentLoader.observeTemplates();
+            if (!AlpineComponentLoader.has('observed-card')) {
+                const template = document.createElement('template');
+                template.setAttribute('acl-component', 'observed-card');
+                template.setAttribute('acl-props', '{ "message": "String" }');
+                template.innerHTML = '<div class="surface"><strong x-text="$props.message"></strong><p>Registered by MutationObserver after start().</p></div>';
+                document.body.appendChild(template);
+                await customElements.whenDefined('observed-card');
+            }
+            const card = document.createElement('observed-card');
+            card.setAttribute('message', 'Dynamically observed template is live');
+            document.getElementById('observed-template-target').replaceChildren(card);
+            document.getElementById('observation-status').textContent = 'Template observer registered <observed-card> successfully.';
+        };
+
+        window.demoDiagnostics = () => {
+            const snapshot = ACLDebugger.getSnapshot(AlpineComponentLoader),
+                templateInfo = AlpineComponentLoader.getTemplateLoadInfo('info-card.html'),
+                output = document.getElementById('diagnostics-output');
+            output.textContent = JSON.stringify({
+                schemaVersion: snapshot.schemaVersion,
+                loaderVersion: snapshot.loaderVersion,
+                registeredTags: snapshot.registeredTags.length,
+                renderedComponents: snapshot.components.length,
+                timelineEntries: snapshot.timeline?.length || 0,
+                requestActivityEntries: snapshot.requestActivity?.length || 0,
+                componentSnapshots: snapshot.snapshots?.length || 0,
+                dataCache: AlpineComponentLoader.getDataCacheInfo(),
+                templateInfo
+            }, null, 2);
+        };
+
+        const clearACLPerformanceMeasures = () => {
+            performance.getEntriesByType('measure')
+                .filter(entry => entry.name.startsWith('acl:'))
+                .forEach(entry => performance.clearMeasures(entry.name));
+        };
+        window.clearObservabilityDemo = () => {
+            AlpineComponentLoader.clearMetrics();
+            observedRuntimeRecords.length = 0;
+            clearACLPerformanceMeasures();
+            renderObservedRuntimeRecords();
+            const snapshot = AlpineComponentLoader.getMetrics(),
+                output = document.getElementById('observability-metrics-output');
+            if (output)
+                output.textContent = JSON.stringify({
+                    totals: snapshot.totals,
+                    durations: snapshot.durations,
+                    recent: snapshot.recent,
+                    subscriberRecords: observedRuntimeRecords.length,
+                    performanceMeasures: []
+                }, null, 2);
+            return snapshot;
+        };
+        window.demoObservability = async () => {
+            window.clearObservabilityDemo();
+            const element = document.querySelector('cache-control-demo');
+            await element.reload({
+                preserveState: true,
+                clearTemplate: false,
+                clearData: false,
+                reason: 'feature-lab-observability'
+            });
+            const snapshot = AlpineComponentLoader.getMetrics(),
+                measures = performance.getEntriesByType('measure')
+                    .filter(entry => entry.name.startsWith('acl:'))
+                    .slice(-8)
+                    .map(entry => ({
+                        name: entry.name,
+                        duration: Number(entry.duration.toFixed(2))
+                    })),
+                result = {
+                    totals: snapshot.totals,
+                    durations: snapshot.durations,
+                    recent: snapshot.recent,
+                    subscriberRecords: observedRuntimeRecords.length,
+                    performanceMeasures: measures
+                },
+                output = document.getElementById('observability-metrics-output');
+            if (output)
+                output.textContent = JSON.stringify(result, null, 2);
+            renderObservedRuntimeRecords();
+            return result;
+        };
+
+        window.runTestingDemo = async () => {
+            const output = document.getElementById('testing-helper-output'),
+                fixture = document.getElementById('testing-helper-fixture'),
+                originalFetch = window.fetch,
+                recorder = recordACLEvents(fixture, [
+                    'acl:loadstart',
+                    'acl:loadend',
+                    'acl:dev-reload-start',
+                    'acl:dev-reload-end'
+                ]),
+                mock = installFetchMock([
+                    {
+                        match: /\/demo-api\/testing$/,
+                        method: 'GET',
+                        response: { message: 'Loaded from installFetchMock' }
+                    },
+                    {
+                        match: () => true,
+                        response: ({ request }) => originalFetch(request)
+                    }
+                ]);
+            let mounted = null,
+                result = null;
+            fixture.replaceChildren();
+            output.textContent = 'Running browser testing helpers…';
+            try {
+                mounted = await mountComponent({
+                    loader: AlpineComponentLoader,
+                    container: fixture,
+                    template: `
+                        <article class="surface">
+                            <strong x-text="$props.name"></strong>
+                            <span x-text="$props.count"></span>
+                            <p x-text="$props.payload?.message"></p>
+                            <slot name="note"></slot>
+                        </article>
+                    `,
+                    options: {
+                        shadow: true,
+                        attributes: {
+                            name: { type: String, required: true },
+                            count: Number
+                        },
+                        data: {
+                            src: '/demo-api/testing',
+                            target: 'payload',
+                            cacheStrategy: 'no-store'
+                        }
+                    },
+                    attributes: { name: 'Ada', count: 1 },
+                    slots: { note: '<em>Named slot mounted</em>' }
+                });
+                await waitForComponent(mounted.element, { state: 'ready' });
+                const initialName = mounted.element.$props.name,
+                    payload = mounted.element.$props.payload?.message,
+                    slottedText = mounted.element.querySelector('[slot="note"]')?.textContent || null;
+                await mounted.update({
+                    attributes: { name: 'Grace' },
+                    properties: { count: 2 }
+                });
+                await mounted.reload({
+                    preserveState: true,
+                    clearTemplate: false,
+                    clearData: false,
+                    reason: 'feature-lab-testing'
+                });
+                const tagName = mounted.element.localName,
+                    updatedName = mounted.element.$props.name,
+                    updatedCount = mounted.element.$props.count,
+                    element = mounted.element;
+                await mounted.unmount();
+                await waitForComponent(element, { state: 'destroyed' });
+                result = {
+                    tagName,
+                    initialName,
+                    updatedName,
+                    updatedCount,
+                    payload,
+                    slottedText,
+                    requestCount: mock.requests.filter(request => /\/demo-api\/testing$/.test(request.url)).length,
+                    events: recorder.records.map(event => event.type),
+                    destroyed: element._state === 'destroyed'
+                };
+            } catch (error) {
+                output.textContent = JSON.stringify({
+                    error: error.message
+                }, null, 2);
+                throw error;
+            } finally {
+                await mounted?.unmount();
+                recorder.stop();
+                mock.restore();
+                if (result) {
+                    result.fetchRestored = window.fetch === originalFetch;
+                    output.textContent = JSON.stringify(result, null, 2);
+                }
+            }
+            return result;
+        };
+
+        const sections = Array.from(document.querySelectorAll('main > section:not(.lab-overview)')),
+            featureJump = document.getElementById('feature-jump');
+        sections.forEach((section, index) => {
+            section.id ||= `feature-${index + 1}`;
+            const headingNode = section.querySelector('h2'),
+                heading = headingNode?.textContent.replace(/\s+/g, ' ').trim() || `Feature ${index + 1}`,
+                option = document.createElement('option');
+            if (headingNode && !headingNode.querySelector(':scope > .feature-heading-link')) {
+                const link = document.createElement('a');
+                link.className = 'feature-heading-link';
+                link.href = `#${section.id}`;
+                link.append(...headingNode.childNodes);
+                headingNode.appendChild(link);
+            }
+            option.value = section.id;
+            option.textContent = heading;
+            featureJump.appendChild(option);
+        });
+        document.getElementById('feature-count').textContent = String(sections.length);
+        document.getElementById('registered-count').textContent = String(AlpineComponentLoader.getRegisteredTags().length);
+        document.getElementById('loader-version').textContent = AlpineComponentLoader.version;
+        const scrollToFeatureHash = behavior => {
+            const target = sections.find(section => `#${section.id}` === location.hash);
+            if (!target)
+                return;
+            featureJump.value = target.id;
+            requestAnimationFrame(() => target.scrollIntoView({ behavior, block: 'start' }));
+        };
+        featureJump.addEventListener('change', () => {
+            if (!featureJump.value)
+                return;
+            if (location.hash === `#${featureJump.value}`)
+                scrollToFeatureHash('smooth');
+            else
+                location.hash = featureJump.value;
+        });
+        window.addEventListener('hashchange', () => scrollToFeatureHash('smooth'));
+        scrollToFeatureHash('auto');
+        window.addEventListener('load', () => scrollToFeatureHash('auto'), { once: true });
+        let componentLayoutFrame = null;
+        document.addEventListener('acl:loadend', () => {
+            cancelAnimationFrame(componentLayoutFrame);
+            componentLayoutFrame = requestAnimationFrame(() => scrollToFeatureHash('auto'));
+        });
+        window.toggleUsagePanels = open => document.querySelectorAll('main section details').forEach(details => {
+            details.open = open;
+        });
+    </script>
+</head>
+
+<body>
+    <button class="debug-btn debug-toggle" type="button" onclick="AlpineComponentLoader.toggleDebug()">Debug
+        Mode</button>
+
+    <site-header id="top" title="AlpineComponentLoader" github="https://github.com/LTDev-LLC/alpine-component-loader">
+        A lightweight, build-free component loader for <a href="https://alpinejs.dev/" target="_blank"
+            rel="noreferrer">Alpine.js</a>
+    </site-header>
+
+    <main>
+        <section class="lab-overview" aria-labelledby="lab-title">
+            <h2 id="lab-title">Feature Lab</h2>
+            <p>This page is both an interactive smoke test and a usage cookbook.<br />Every feature section contains a
+                live
+                example followed by an expandable <strong>Example usage</strong> panel.</p>
+
+            <div class="metrics" aria-label="Feature lab status">
+                <div class="metric"><strong id="loader-version">—</strong><span>Loader version</span></div>
+                <div class="metric"><strong id="feature-count">—</strong><span>Example sections</span></div>
+                <div class="metric"><strong id="registered-count">—</strong><span>Registered tags</span></div>
+                <div class="metric"><strong>7</strong><span>Response modes</span></div>
+                <div class="metric"><strong>4</strong><span>Cache strategies</span></div>
+            </div>
+
+            <div class="lab-controls">
+                <label class="sr-only" for="feature-jump">Jump to a feature</label>
+                <select id="feature-jump">
+                    <option value="">Jump to a feature…</option>
+                </select>
+                <button type="button" onclick="toggleUsagePanels(true)">Expand all usage</button>
+                <button type="button" onclick="toggleUsagePanels(false)">Collapse all usage</button>
+                <button type="button" onclick="AlpineComponentLoader.toggleDebug()">Open debugger</button>
+            </div>
+        </section>
+
+        <section>
+            <h2>1. Inline Templates <span class="badge">Auto Discovery</span></h2>
+            <p>Define components directly in HTML. No JavaScript registration needed.</p>
+
+            <template acl-component="inline-counter"
+                acl-props='{ "count": "Number", "title": { "type": "String", "default": "Default Counter" } }'>
+                <style>
+                    .box {
+                        background: #fff;
+                        border: 1px solid #e5e7eb;
+                        padding: 1.5rem;
+                        border-radius: 12px;
+                        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                        max-width: 100%;
+                        margin-bottom: 1rem;
+                    }
+
+                    h3 {
+                        margin: 0 0 0.75rem 0;
+                        color: #1f2937;
+                        font-size: 1.1rem;
+                    }
+
+                    button {
+                        background: #1d4ed8;
+                        color: white;
+                        border: none;
+                        padding: 0.5rem 1rem;
+                        border-radius: 6px;
+                        font-weight: 600;
+                        cursor: pointer;
+                    }
+
+                    .count-badge {
+                        background: rgba(255, 255, 255, 0.2);
+                        padding: 2px 6px;
+                        border-radius: 4px;
+                    }
+                </style>
+                <div class="box">
+                    <h3 x-text="$props.title || 'Default Counter'"></h3>
+                    <button @click="$props.count = ($props.count || 0) + 1">
+                        Clicks <span class="count-badge" x-text="$props.count || 0"></span>
+                    </button>
+                </div>
+            </template>
+
+            <div class="grid">
+                <inline-counter persist="session"></inline-counter>
+                <inline-counter title="Interactive Widget" count="5"></inline-counter>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>&lt;template acl-component="inline-counter" acl-props='{ "count": "Number", "title": { "type": "String" } }'&gt;
+  &lt;div&gt;
+    &lt;h3 x-text="$props.title || 'Default Counter'"&gt;&lt;/h3&gt;
+    &lt;button @click="$props.count = ($props.count || 0) + 1"&gt;
+      Clicks &lt;span x-text="$props.count || 0"&gt;&lt;/span&gt;
+    &lt;/button&gt;
+  &lt;/div&gt;
+&lt;/template&gt;
+
+&lt;inline-counter persist="session"&gt;&lt;/inline-counter&gt;
+&lt;inline-counter title=&quot;Interactive Widget&quot; count=&quot;5&quot;&gt;&lt;/inline-counter&gt;</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>2. Shadow DOM & Typed Props</h2>
+            <p>Styles are encapsulated. Attributes like <code>active="true"</code> are converted to real Booleans.</p>
+
+            <shadow-card title="Shadow Component" active="true"></shadow-card>
+            <shadow-card title="Inactive Card"></shadow-card>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>AlpineComponentLoader.define('shadow-card', 'shadow-card.html', {
+  shadow: true,
+  attributes: { title: String, active: Boolean }
+});</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>3. Lifecycle Hooks</h2>
+            <p>Hook into component events: <code>beforeMount</code>, <code>mounted</code>, <code>updated</code>, and
+                <code>unmounted</code>.
+            </p>
+
+            <lifecycle-log title="Watcher Demo"></lifecycle-log>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>AlpineComponentLoader.define('lifecycle-log', 'lifecycle-log.html', {
+  shadow: true,
+  attributes: { title: String, logs: Array },
+  hooks: {
+    beforeMount() { this.$props.logs.push('beforeMount'); },
+    mounted() { this.$props.logs.push('mounted'); },
+    updated({ name }) { this.$props.logs.push(`updated:${name}`); }
+  }
+});</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>4. External Dependencies</h2>
+            <p>Load external CSS/JS automatically, including FontAwesome icons and the canvas-confetti script.</p>
+
+            <div style="display:flex; gap:10px; flex-wrap: wrap;">
+                <external-icon icon="fa-brands fa-github" label="GitHub"></external-icon>
+                <external-icon icon="fa-brands fa-facebook" label="Facebook"></external-icon>
+                <external-icon icon="fa-brands fa-youtube" label="YouTube"></external-icon>
+            </div>
+
+            <p style="margin-top: 1rem">Loads a demo script before mounting.</p>
+            <confetti-btn></confetti-btn>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>AlpineComponentLoader.define('external-icon', 'external-icon.html', {
+  shadow: true,
+  externalCss: [
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
+  ],
+  attributes: { icon: String, label: String }
+});
+
+AlpineComponentLoader.define('confetti-btn', 'confetti.html', {
+  shadow: true,
+  externalScripts: ['https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js']
+});</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>5. Strict Validation</h2>
+            <p>Props can enforce <code>required</code>, <code>default</code> values, and custom validator functions.</p>
+
+            <strict-progress percent="75"></strict-progress>
+            <strict-progress percent="150"></strict-progress>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>AlpineComponentLoader.define('strict-progress', 'strict-progress.html', {
+  shadow: true,
+  attributes: {
+    percent: {
+      type: Number,
+      required: true,
+      default: 0,
+      validator: value =&gt; value &gt;= 0 &amp;&amp; value &lt;= 100
+    }
+  }
+});</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>6. Light DOM Slots <span class="badge">Polyfill</span></h2>
+            <p>Use named <code>&lt;slot&gt;</code> elements even without Shadow DOM. CSS is auto-scoped.</p>
+
+            <light-alert type="success">
+                <span slot="title">Success!</span>
+                Data saved successfully.
+            </light-alert>
+
+            <light-alert type="error">
+                <span slot="title">Error!</span>
+                Data save failed.
+            </light-alert>
+
+            <light-alert type="warning">
+                <span slot="title">Warning!</span>
+                Storage is almost full.
+            </light-alert>
+
+            <light-alert type="info">
+                <span slot="title">Info</span>
+                Background sync is enabled.
+            </light-alert>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>const lightAlertThemes = {
+  success: { border: '#bbf7d0', accent: '#16a34a', bg: '#f0fdf4', text: '#14532d' },
+  error: { border: '#fecaca', accent: '#dc2626', bg: '#fef2f2', text: '#991b1b' },
+  warning: { border: '#fde68a', accent: '#d97706', bg: '#fffbeb', text: '#92400e' },
+  info: { border: '#bae6fd', accent: '#0284c7', bg: '#f0f9ff', text: '#0c4a6e' }
+};
+
+AlpineComponentLoader.define('light-alert', 'light-alert.html', {
+  shadow: false,
+  attributes: { type: String },
+  hooks: {
+    mounted({ el, props }) {
+      const theme = lightAlertThemes[props.type] || lightAlertThemes.info;
+      el.style.setProperty('--alert-border', theme.border);
+      el.style.setProperty('--alert-accent', theme.accent);
+      el.style.setProperty('--alert-bg', theme.bg);
+      el.style.setProperty('--alert-text', theme.text);
+    }
+  }
+});
+
+&lt;light-alert type="success"&gt;
+  &lt;span slot="title"&gt;Success!&lt;/span&gt;
+  Data saved successfully.
+&lt;/light-alert&gt;
+
+&lt;light-alert type="error"&gt;
+  &lt;span slot="title"&gt;Error!&lt;/span&gt;
+  Data save failed.
+&lt;/light-alert&gt;
+
+&lt;light-alert type="warning"&gt;
+  &lt;span slot="title"&gt;Warning!&lt;/span&gt;
+  Storage is almost full.
+&lt;/light-alert&gt;
+
+&lt;light-alert type="info"&gt;
+  &lt;span slot="title"&gt;Info&lt;/span&gt;
+  Background sync is enabled.
+&lt;/light-alert&gt;</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>7. Lazy Loading</h2>
+            <p>This component initializes when it enters the viewport, with a new eager fallback when
+                IntersectionObserver is unavailable.</p>
+
+            <div class="demo-panel">
+                <lazy-image loading="lazy"></lazy-image>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>AlpineComponentLoader.define('lazy-image', 'lazy-image.html', {
+  loading: 'lazy',
+  loadingTemplate: 'loading-state.html'
+});
+
+&lt;lazy-image loading="lazy"&gt;&lt;/lazy-image&gt;</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>8. Declarative Loading <span class="badge">acl-component</span></h2>
+            <p>Load components purely via HTML without writing <code>define()</code> in JavaScript.</p>
+
+            <acl-component src="declarative-card.html" tag="declarative-card" shadow="true"
+                title="Declarative Component"
+                description="Loaded via acl-component without component-specific JavaScript."
+                tags='["HTML", "Easy", "NoJS"]'>
+            </acl-component>
+
+            <acl-component src="declarative-card.html" tag="declarative-card" shadow="true" title="Another Instance"
+                description="Attributes are auto-detected as props." tags='["Reuse", "Components"]'>
+            </acl-component>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>&lt;acl-component
+  src="declarative-card.html"
+  tag="declarative-card"
+  shadow="true"
+  title="Declarative Component"
+  description="Loaded via acl-component."
+  tags='["HTML", "Easy", "NoJS"]'
+&gt;&lt;/acl-component&gt;</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>9. Declarative Fetching <span class="badge">data-src</span></h2>
+            <p>Provide a <code>data-src</code> attribute to fetch JSON and inject it into <code>$props.$data</code>.</p>
+
+            <div class="grid">
+                <acl-component src="user-card.html" tag="api-user" shadow="true"
+                    data-src="/demo-api/user?id=1"></acl-component>
+                <acl-component src="user-card.html" tag="api-user" shadow="true"
+                    data-src="/demo-api/user?id=2"></acl-component>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>&lt;acl-component
+  src="user-card.html"
+  tag="api-user"
+  shadow="true"
+  data-src="/demo-api/user?id=1"
+&gt;&lt;/acl-component&gt;</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>10. Global Store Binding <span class="badge">Two-Way</span></h2>
+            <p>Components can bind directly to an Alpine global store. Updates sync across all bound instances.</p>
+
+            <div class="button-row">
+                <button
+                    onclick="Alpine.store('theme').mode = (Alpine.store('theme').mode === 'Light' ? 'Dark' : 'Light')">Toggle
+                    Global Store</button>
+            </div>
+
+            <div class="grid">
+                <store-display></store-display>
+                <store-display></store-display>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>document.addEventListener('alpine:init', () =&gt; {
+  Alpine.store('theme', { mode: 'Light', color: '#2563eb' });
+});
+
+AlpineComponentLoader.define('store-display', 'store-display.html', {
+  shadow: true,
+  bindStore: 'theme'
+});</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>11. Error Boundaries <span class="badge">fallback</span></h2>
+            <p>If a component fails to load, it can render a fallback template instead of exposing a broken UI.</p>
+
+            <boundary-demo></boundary-demo>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>AlpineComponentLoader.define('boundary-demo', '#tpl-fallback-error', {
+  fallback: '#tpl-fallback-error'
+});
+
+&lt;boundary-demo&gt;&lt;/boundary-demo&gt;</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>12. Idle Loading</h2>
+            <p>Uses <code>requestIdleCallback</code> to load low-priority components when the CPU is idle.</p>
+
+            <acl-component src="info-card.html" tag="idle-card" loading="idle" shadow="true" title="Idle Loaded"
+                body="I loaded when the browser had idle time.">
+            </acl-component>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>&lt;acl-component
+  src="info-card.html"
+  tag="idle-card"
+  loading="idle"
+  shadow="true"
+  title="Idle Loaded"
+&gt;&lt;/acl-component&gt;</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>13. Dynamic Component Switching</h2>
+            <p>Dynamically swap components using the <code>is</code> attribute. Attributes are forwarded to the active
+                component.</p>
+
+            <div class="demo-panel" x-data="{ currentView: 'shadow-card' }">
+                <div class="toolbar">
+                    <strong>Select View:</strong>
+                    <select x-model="currentView" aria-label="Classic dynamic component">
+                        <option value="shadow-card">Shadow Card</option>
+                        <option value="strict-progress">Strict Progress</option>
+                        <option value="inline-counter">Inline Counter</option>
+                    </select>
+                </div>
+
+                <acl-dynamic :is="currentView" title="Dynamic Component" active="true" percent="70" count="4"
+                    keep-alive></acl-dynamic>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>&lt;div x-data="{ currentView: 'shadow-card' }"&gt;
+  &lt;select x-model="currentView"&gt;
+    &lt;option value="shadow-card"&gt;Shadow Card&lt;/option&gt;
+    &lt;option value="strict-progress"&gt;Strict Progress&lt;/option&gt;
+    &lt;option value="inline-counter"&gt;Inline Counter&lt;/option&gt;
+  &lt;/select&gt;
+
+  &lt;acl-dynamic :is="currentView" keep-alive&gt;&lt;/acl-dynamic&gt;
+&lt;/div&gt;</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>14. Emits Helper <span class="badge">$emit</span></h2>
+            <p>Components can use <code>$props.$emit('name', detail)</code> to dispatch events easily.</p>
+
+            <template acl-component="emit-demo">
+                <style>
+                    button {
+                        background: #6d28d9;
+                        color: white;
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                    }
+                </style>
+                <div>
+                    <button @click="$props.$emit('custom-alert', { message: 'Hello from Shadow DOM!' })">
+                        Emit Event
+                    </button>
+                </div>
+            </template>
+
+            <div class="demo-panel" x-data="{ lastMessage: 'Waiting...' }"
+                @custom-alert="lastMessage = $event.detail.message + ' at ' + new Date().toLocaleTimeString()">
+                <emit-demo></emit-demo>
+                <p class="status-line">Event Output: <span x-text="lastMessage"></span></p>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>&lt;template acl-component="emit-demo"&gt;
+  &lt;div&gt;
+    &lt;button @click="$props.$emit('custom-alert', { message: 'Hello from Shadow DOM!' })"&gt;
+      Emit Event
+    &lt;/button&gt;
+  &lt;/div&gt;
+&lt;/template&gt;
+
+&lt;div @custom-alert="lastMessage = $event.detail.message"&gt;
+  &lt;emit-demo&gt;&lt;/emit-demo&gt;
+&lt;/div&gt;</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>15. Shared Constructible Stylesheets</h2>
+            <p>Define shared styles once and apply them across Shadow DOM components without duplication.</p>
+
+            <div class="grid">
+                <shared-style-demo></shared-style-demo>
+                <shared-style-demo></shared-style-demo>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>const sharedSheet = new CSSStyleSheet();
+sharedSheet.replaceSync(`
+  .shared-box {
+    border: 1px solid #99f6e4;
+    background: #ecfeff;
+  }
+`);
+
+AlpineComponentLoader.config({ sharedStyleSheets: [sharedSheet] });
+
+AlpineComponentLoader.define('shared-style-demo', 'shared-style.html', {
+  shadow: true
+});</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>16. State Persistence <span class="badge">localStorage / sessionStorage / IndexedDB</span></h2>
+            <p>Each backend uses the same component persistence API. Edit a note, flush it immediately, clear only that
+                component's stored record, or reload the page to see automatic restoration.</p>
+
+            <div class="grid-three">
+                <persistent-note storage="localStorage" persist="local" persist-key="acl:demo-note:local" note=""
+                    count="0"></persistent-note>
+                <persistent-note storage="sessionStorage" persist="session" persist-key="acl:demo-note:session" note=""
+                    count="0"></persistent-note>
+                <persistent-note storage="IndexedDB" persist="indexeddb" persist-key="acl:demo-note:indexeddb" note=""
+                    count="0"></persistent-note>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>AlpineComponentLoader.define('persistent-note', 'persistent-note.html', {
+  shadow: true,
+  attributes: { note: String, count: Number, storage: String },
+  persistDebounce: 250
+});
+
+&lt;persistent-note persist="local" persist-key="note:local" storage="localStorage"&gt;&lt;/persistent-note&gt;
+&lt;persistent-note persist="session" persist-key="note:session" storage="sessionStorage"&gt;&lt;/persistent-note&gt;
+&lt;persistent-note persist="indexeddb" persist-key="note:indexeddb" storage="IndexedDB"&gt;&lt;/persistent-note&gt;
+
+const persistence = document.querySelector('[persist="indexeddb"]').$props.$persistence;
+const pending = persistence.$save();
+await persistence.$flush();
+await pending;
+await persistence.$clear();</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>17. Grouped Data API <span class="badge">Required</span></h2>
+            <p>Programmatic data loading uses one <code>data</code> object so request, parsing, retry, polling, and
+                cache
+                controls stay together.</p>
+
+            <div class="grid">
+                <grouped-card label="Grouped text response"></grouped-card>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>AlpineComponentLoader.define('grouped-card', 'response-mode.html', {
+  shadow: true,
+  attributes: { label: String },
+  data: {
+    src: '/api/message',
+    responseType: 'text',
+    target: 'payload',
+    cacheStrategy: 'no-store'
+  }
+});</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>18. Source Resolver and Base Path <span class="badge">New</span></h2>
+            <p><code>sourceResolver</code> rewrites aliases before relative paths receive <code>basePath</code>.
+                Absolute and root-relative paths stay untouched.</p>
+
+            <div class="grid">
+                <source-demo label="Alias resolved to an inline template"></source-demo>
+                <lazy-image loading="lazy"></lazy-image>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>AlpineComponentLoader.config({
+  basePath: './components/',
+  sourceResolver(source) {
+    return source === 'demo:resolver' ? 'source-result.html' : source;
+  }
+});</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>19. Advanced Data Fetching <span class="badge">New</span></h2>
+            <p>Data requests now support method, body, headers, retries, custom target props, and request-aware cache
+                keys.</p>
+
+            <div class="grid">
+                <advanced-fetch></advanced-fetch>
+                <acl-component src="advanced-fetch.html" tag="declarative-fetch-demo" shadow="true"
+                    data-src="/demo-api/audit?id=99" data-method="POST" data-body='{ "declarative": true }'
+                    data-target="audit" data-response-type="json" data-retries="1" data-retry-delay="100"
+                    data-retry-max-delay="1000" data-retry-jitter="0" data-retry-unsafe-methods="true"
+                    data-cache-strategy="no-store" data-fetch-cache-ttl="0" data-fetch-cache-max="0"
+                    data-cache-key="feature-lab-declarative" pause-polling-when-hidden="false"
+                    pause-polling-when-offline="false" data-fetch-options='{ "headers": { "x-demo": "declarative" } }'>
+                </acl-component>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>&lt;acl-component
+  src="advanced-fetch.html"
+  tag="declarative-fetch-demo"
+  data-method="POST"
+  data-body='{ "declarative": true }'
+  data-target="audit"
+  data-response-type="json"
+  data-retries="1"
+  data-retry-max-delay="1000"
+  data-retry-jitter="0"
+  data-retry-unsafe-methods="true"
+  data-cache-strategy="no-store"
+  data-fetch-cache-ttl="0"
+  data-fetch-cache-max="0"
+  data-cache-key="feature-lab-declarative"
+&gt;&lt;/acl-component&gt;</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>20. Template and Data Cache Controls <span class="badge">New</span></h2>
+            <p>Components can clear their own data cache, reload on demand, and opt into revision-aware template cache
+                entries with freshness and capacity bounds. Clearing this example also resets its demo request counter,
+                so the next reload visibly starts at one.
+            </p>
+
+            <div class="grid">
+                <cache-control-demo></cache-control-demo>
+                <acl-component src="info-card.html" tag="template-network-demo" shadow="true"
+                    template-cache-strategy="network-first" title="Template strategy"
+                    body="This declarative component uses network-first template caching.">
+                </acl-component>
+            </div>
+
+            <div class="demo-panel" style="margin-top:1rem">
+                <div class="button-row">
+                    <button type="button" onclick="demoTemplateCache()">Inspect template cache</button>
+                    <button type="button" onclick="demoTemplateCache(true)">Prune template cache</button>
+                </div>
+                <pre id="template-cache-output" class="runtime-log" tabindex="0"
+                    aria-label="Persistent template cache output">Inspect the persistent template cache to see revisions, TTLs, and access times.</pre>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>&lt;cache-control-demo&gt;&lt;/cache-control-demo&gt;
+
+// Clear the current component's exact request-aware cache entry.
+await element.$props.$cache.clearData();
+await element.$props.$reload();
+
+const info = await AlpineComponentLoader.getTemplateCacheInfo();
+const evicted = await AlpineComponentLoader.pruneTemplateCache();
+
+&lt;acl-component
+  src="info-card.html"
+  tag="template-network-demo"
+  template-cache-strategy="network-first"
+&gt;&lt;/acl-component&gt;</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>21. Loading Templates and Safe Mode <span class="badge">New</span></h2>
+            <p>Loading UI renders before data work completes, and secure rendering strips scripts plus inline handlers
+                from
+                rendered content.</p>
+
+            <div class="grid">
+                <loading-demo></loading-demo>
+                <secure-render-demo></secure-render-demo>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>AlpineComponentLoader.define('secure-render-demo', '#tpl-unsafe-content', {
+  shadow: true,
+  executeScripts: false, sanitize: true
+});</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>22. Mapped Event Forwarding <span class="badge">New</span></h2>
+            <p>Forwarded events can be renamed, and reloads clean up old listeners so handlers do not fire twice.</p>
+
+            <div class="demo-panel" x-data="{ message: 'Waiting for public-save' }"
+                @public-save="message = $event.detail.message">
+                <mapped-event-demo></mapped-event-demo>
+                <p class="status-line" x-text="message"></p>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>AlpineComponentLoader.define('mapped-event-demo', 'mapped-event.html', {
+  shadow: true,
+  events: {
+    forward: [{ from: 'internal-save', as: 'public-save' }]
+  }
+});</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>23. Floating Debugger Panel <span class="badge">New</span></h2>
+            <p>The debug button opens the inspector with component search and status filters, selected props, request
+                and cache activity, accessibility results, state snapshots and diffs, scroll-to-element, reload, and
+                clear-cache actions.</p>
+
+            <div class="demo-panel">
+                <aside class="intentional-a11y-note">
+                    <strong>Intentional accessibility errors</strong>
+                    <p>The component below deliberately includes missing names, labels, alternate text, and unsafe
+                        focus behavior. Use it to see grouped scanner findings and remediation guidance.</p>
+                </aside>
+                <a11y-issues-demo></a11y-issues-demo>
+                <div class="button-row">
+                    <button onclick="AlpineComponentLoader.toggleDebug()">Toggle Debug Panel</button>
+                    <button type="button" onclick="__aclAccessibilityScanner.open()">Open A11y Audit</button>
+                    <button type="button" onclick="demoAccessibility()">Audit intentional issues</button>
+                </div>
+                <p class="status-line">The scanner audits every active ACL component; the debugger receives the same
+                    composed <code>acl:a11y</code> results.</p>
+                <pre id="accessibility-output" class="runtime-log" tabindex="0"
+                    aria-label="Accessibility audit output">Run the focused audit or open the scanner to inspect the intentional findings.</pre>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>import ACLA11y from 'alpine-component-loader/a11y';
+import ACLA11yScanner from 'alpine-component-loader/a11y-scanner';
+
+ACLDebugger.inject(AlpineComponentLoader);
+const audits = ACLA11y.observe(AlpineComponentLoader);
+await audits.audit(document.querySelector('a11y-issues-demo'));
+ACLA11yScanner.mount().open();
+AlpineComponentLoader.toggleDebug();</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>24. Registry, Manifests, Prefetch & Template Observation <span class="badge">1.0</span></h2>
+            <p>Inspect immutable definitions, validate component contract metadata, register version-one dependency
+                graphs, prefetch transitive groups with bounded concurrency, and discover templates inserted after
+                startup.</p>
+
+            <div class="grid">
+                <manifest-base title="Dependency component"
+                    body="Registered first because manifest-card declares it as a dependency."></manifest-base>
+                <manifest-card title="Manifest component"
+                    body="Registered from the same version: 1 manifest and prefetched with its dependency graph."></manifest-card>
+                <div class="demo-panel">
+                    <div class="button-row">
+                        <button type="button" onclick="demoRegistry()">Inspect registry</button>
+                        <button type="button" onclick="demoObserveTemplate()">Insert observed template</button>
+                    </div>
+                    <p id="observation-status" class="status-line">Observer is ready to start.</p>
+                </div>
+            </div>
+            <div id="observed-template-target" style="margin-top:1rem"></div>
+            <pre id="registry-output" class="runtime-log" tabindex="0"
+                aria-label="Registry diagnostics output">Run “Inspect registry” to see snapshots and settled prefetch results.</pre>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>const result = await AlpineComponentLoader.registerManifest({
+  version: 1,
+  components: {
+    'manifest-base': 'info-card.html',
+    'manifest-card': {
+      source: 'info-card.html',
+      dependencies: ['manifest-base'],
+      options: { shadow: true, attributes: { title: String } },
+      metadata: {
+        description: 'A manifest-backed card.',
+        events: {
+          'manifest-ready': {
+            detail: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                ready: { type: 'boolean' }
+              },
+              required: ['id', 'ready']
+            }
+          }
+        },
+        slots: { default: { description: 'Additional content.' } }
+      }
+    },
+    'adaptive-card': {
+      source: 'source-result.html',
+      dependencies: ['manifest-base'],
+      options: { shadow: true }
+    }
+  },
+  groups: {
+    dashboard: ['manifest-card'],
+    preview: ['adaptive-card']
+  }
+}, { prefetch: ['dashboard'], concurrency: 2 });
+
+const stop = AlpineComponentLoader.observeTemplates();
+AlpineComponentLoader.has('manifest-card');
+AlpineComponentLoader.getDefinition('manifest-card');
+AlpineComponentLoader.getDependencies('manifest-card', { transitive: true });
+await AlpineComponentLoader.prefetchGraph(['manifest-card'], { concurrency: 4 });
+stop();</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>25. Advanced Prop Contracts <span class="badge">Coerce · Schema · Reflect</span></h2>
+            <p>Prop definitions support factories, nullable values, enums, custom coercion and validation, nested
+                schemas, property accessors, and optional attribute reflection.</p>
+
+            <advanced-props-demo id="advanced-props" mode="compact" score="72%" caption="null"
+                tags='["typed", "isolated"]' profile='{ "name": "Ada", "active": true }'></advanced-props-demo>
+            <div class="button-row">
+                <button type="button" onclick="document.getElementById('advanced-props').score = 88">Set score property
+                    to 88</button>
+                <button type="button"
+                    onclick="document.getElementById('advanced-props').mode = document.getElementById('advanced-props').mode === 'compact' ? 'comfortable' : 'compact'">Toggle
+                    reflected mode</button>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>AlpineComponentLoader.define('advanced-props-demo', 'advanced-props.html', {
+  shadow: true,
+  strictProps: true,
+  attributes: {
+    mode: {
+      type: String,
+      options: ['compact', 'comfortable'],
+      default: 'comfortable',
+      reflect: true
+    },
+    score: {
+      type: Number,
+      coerce: value =&gt; Number(value.replace('%', '')),
+      validator: value =&gt; value &gt;= 0 &amp;&amp; value &lt;= 100,
+      reflect: true
+    },
+    caption: { type: String, nullable: true },
+    tags: { type: Array, default: () =&gt; [] },
+    profile: { type: Object, schema: { name: String, active: Boolean } }
+  }
+});
+
+const card = document.querySelector('advanced-props-demo');
+card.score = 88; // Updates $props and reflects score="88"</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>26. Response Types & Custom Parsers <span class="badge">7 modes</span></h2>
+            <p>The fetch layer can decode JSON, text, vendor JSON automatically, blobs, array buffers, streams, or a
+                user-supplied parser. Binary and streaming responses bypass shared caching unless explicitly keyed.</p>
+
+            <div class="feature-list">
+                <response-json-demo label="json"></response-json-demo>
+                <response-text-demo label="text"></response-text-demo>
+                <response-auto-demo label="auto"></response-auto-demo>
+                <response-blob-demo label="blob"></response-blob-demo>
+                <response-buffer-demo label="arrayBuffer"></response-buffer-demo>
+                <response-stream-demo label="stream"></response-stream-demo>
+                <response-custom-demo label="custom parser"></response-custom-demo>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>AlpineComponentLoader.define('binary-report', 'response-mode.html', {
+  data: {
+    src: '/report.bin',
+    target: 'payload',
+    responseType: 'arrayBuffer',
+    cacheStrategy: 'no-store'
+  },
+  hooks: {
+    afterFetch(buffer) {
+      return new TextDecoder().decode(buffer);
+    }
+  }
+});
+
+AlpineComponentLoader.define('custom-report', 'response-mode.html', {
+  data: {
+    src: '/report.pipe',
+    parser: async response =&gt; (await response.text()).split('|')
+  }
+});</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>27. Polling, Cancellation & Recovery <span class="badge">Resilient fetch</span></h2>
+            <p>Polling can pause while hidden, offline, or outside the viewport. Requests can be canceled and retried
+                through component methods or the built-in <code>$cancel</code>, <code>$retry</code>, and
+                <code>$reload</code> helpers.
+            </p>
+
+            <div class="grid">
+                <polling-demo></polling-demo>
+                <recovery-demo></recovery-demo>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>AlpineComponentLoader.define('live-feed', 'polling.html', {
+  data: {
+    src: '/api/feed',
+    poll: 1000,
+    timeout: 5000,
+    retries: 3,
+    retryDelay: 250,
+    retryMaxDelay: 10000,
+    retryJitter: 0.2,
+    cacheStrategy: 'no-store',
+    pauseWhenHidden: true,
+    pauseWhenOffline: true,
+    pauseWhenOffscreen: true
+  }
+});
+
+// Unsafe methods require an explicit retry opt-in.
+data: { method: 'POST', retries: 2, retryUnsafeMethods: true }
+
+$props.$cancel('User canceled');
+await $props.$retry();</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>28. Runtime Events & Typed Errors <span class="badge">Observable</span></h2>
+            <p>Namespaced events expose load, cache, revalidation, and failure activity. Errors carry stable
+                <code>code</code>, <code>phase</code>, <code>status</code>, and <code>retryable</code> fields.
+            </p>
+
+            <div class="demo-panel">
+                <div class="button-row">
+                    <button type="button"
+                        onclick="document.querySelector('cache-control-demo').$props.$reload()">Generate load
+                        events</button>
+                    <button type="button"
+                        onclick="document.querySelector('cache-control-demo').$props.$cache.clearData()">Generate cache
+                        activity</button>
+                </div>
+                <pre id="runtime-event-log" class="runtime-log" tabindex="0"
+                    aria-label="Runtime event log">Runtime events will appear here.</pre>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>document.addEventListener('acl:error', event =&gt; {
+  const { error, phase } = event.detail;
+  console.log(error.code, phase, error.status, error.retryable);
+});
+
+document.addEventListener('acl:cachehit', event =&gt; {
+  console.log(event.detail.url, event.detail.strategy);
+});
+
+import { ACLLoadError } from 'alpine-component-loader';
+throw new ACLLoadError('Unavailable', {
+  code: 'APP_UNAVAILABLE', phase: 'fetch', status: 503, retryable: true
+});</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>29. Async Lifecycle, Cleanup & Keep-Alive <span class="badge">Deterministic</span></h2>
+            <p>Hooks can await work and return cleanup callbacks. Kept-alive components receive activation and
+                deactivation hooks while polling and observers pause safely.</p>
+
+            <div id="async-lifecycle-panel" class="demo-panel"
+                x-data="{ active: true, cleanupCount: window.__aclLifecycleCleanups || 0 }"
+                @acl:lifecycle-cleanup.window="cleanupCount = $event.detail.count">
+                <div class="button-row">
+                    <button type="button" @click="active = !active">Toggle lifecycle component</button>
+                    <span>Cleanup callbacks run on reload/destroy: <strong id="lifecycle-cleanup-count"
+                            x-text="cleanupCount"></strong></span>
+                </div>
+                <acl-dynamic :is="active ? 'async-lifecycle-demo' : 'dynamic-a'" keep-alive keep-alive-max="1"
+                    transition="fade" transition-duration="120" title="Temporary alternate view"
+                    body="Switch back to reactivate the cached lifecycle component."></acl-dynamic>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>hooks: {
+  async beforeMount({ props }) {
+    await prepare();
+    props.ready = true;
+  },
+  mounted({ el }) {
+    const controller = new AbortController();
+    el.addEventListener('refresh', refresh, { signal: controller.signal });
+    return () =&gt; controller.abort();
+  },
+  activated({ props }) { props.active = true; },
+  deactivated({ props }) { props.active = false; },
+  loaded() { /* Alpine initTree is complete */ }
+}</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>30. Dynamic Transitions, Focus & Bounded Keep-Alive <span class="badge">Accessible</span></h2>
+            <p>The dynamic loader supports native view, fade, scale, slide, blur, and no-motion transitions,
+                stale-switch cancellation, focus restoration, reduced-motion preferences, attribute forwarding, and
+                an LRU-style keep-alive bound.</p>
+
+            <div class="demo-panel" x-data="{ view: 'dynamic-a', transition: 'auto' }">
+                <div class="toolbar">
+                    <select x-model="view" aria-label="Advanced dynamic component">
+                        <option value="dynamic-a">Info card</option>
+                        <option value="dynamic-b">Resolved card</option>
+                        <option value="async-lifecycle-demo">Focusable lifecycle card</option>
+                    </select>
+                    <select x-model="transition" aria-label="Transition mode">
+                        <option value="auto">Auto / View Transition</option>
+                        <option value="fade">Fade</option>
+                        <option value="scale">Scale</option>
+                        <option value="slide-left">Slide left</option>
+                        <option value="slide-right">Slide right</option>
+                        <option value="blur">Blur</option>
+                        <option value="none">None</option>
+                    </select>
+                </div>
+                <acl-dynamic :is="view" :transition="transition" transition-duration="140" keep-alive keep-alive-max="2"
+                    title="Forwarded title" body="Attributes stay synchronized across active and cached children."
+                    label="Resolved alias component"></acl-dynamic>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>&lt;acl-dynamic
+  is="profile-card"
+  transition="auto"
+  transition-duration="140"
+  keep-alive
+  keep-alive-max="2"
+  title="Forwarded prop"
+&gt;&lt;/acl-dynamic&gt;
+
+AlpineComponentLoader.config({
+  dynamicTransition: 'auto',
+  transitionDuration: 140,
+  keepAliveMax: 2
+});</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>31. Persistence Adapters & Schema Migration <span class="badge">localStorage / sessionStorage /
+                    IndexedDB</span></h2>
+            <p>Custom adapters support the same storage backends and component persistence API as state persistence.
+                Each backend starts with a version 1 record, migrates it to version 2, and supports automatic saves,
+                explicit flushes, scoped clears, and safe storage error boundaries.</p>
+
+            <div class="grid-three">
+                <local-adapter-note storage="localStorage adapter" note="" count="0"></local-adapter-note>
+                <session-adapter-note storage="sessionStorage adapter" note="" count="0"></session-adapter-note>
+                <indexeddb-adapter-note storage="IndexedDB adapter" note="" count="0"></indexeddb-adapter-note>
+            </div>
+            <div class="button-row">
+                <button type="button"
+                    onclick="window.__inspectAdapterPersistence().catch(error => document.getElementById('adapter-output').textContent = `Inspect failed: ${error.message}`)">Inspect
+                    adapter records</button>
+                <button type="button"
+                    onclick="window.__flushAdapterPersistence().catch(error => document.getElementById('adapter-output').textContent = `Flush failed: ${error.message}`)">Flush
+                    all adapters</button>
+            </div>
+            <pre id="adapter-output">The seeded version 1 records are migrated to version 2 during mount.</pre>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>import { createIndexedDBPersistenceAdapter } from 'alpine-component-loader';
+
+const adapters = {
+  local: window.localStorage,
+  session: window.sessionStorage,
+  indexeddb: createIndexedDBPersistenceAdapter({
+    databaseName: 'settings',
+    storeName: 'component-state'
+  })
+};
+
+AlpineComponentLoader.define('settings-panel', '#settings', {
+  persist: 'custom',
+  persistAdapter: adapters.indexeddb,
+  persistKey: 'settings:user-42',
+  persistVersion: 2,
+  persistDebounce: 100,
+  async persistMigrate(data, { fromVersion }) {
+    return fromVersion &lt; 2 ? { ...data, theme: 'system' } : data;
+  }
+});
+
+await $props.$persistence.$save();
+await $props.$persistence.$flush();
+await $props.$persistence.$clear();</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>32. Sanitization, CSP & Asset Descriptors <span class="badge">Secure by default</span></h2>
+            <p>Declarative values are strict JSON, while scripts are disabled and rendered fragments are sanitized by
+                default. Custom
+                sanitizers and CSP-aware asset descriptors add application-specific policy.</p>
+
+            <div class="grid">
+                <custom-sanitizer-demo></custom-sanitizer-demo>
+                <external-deps-demo></external-deps-demo>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>AlpineComponentLoader.define('secure-card', '#secure-card', {
+  executeScripts: false,
+  sanitize(fragment) {
+    fragment.querySelectorAll('[data-private]').forEach(node =&gt; node.remove());
+  },
+  externalCss: [{
+    url: '/assets/card.css',
+    integrity: 'sha384-…',
+    crossOrigin: 'anonymous',
+    referrerPolicy: 'no-referrer',
+    media: 'screen',
+    timeout: 5000
+  }],
+  externalScripts: [{ url: '/assets/vendor.js', nonce: window.cspNonce }]
+});</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>33. Diagnostics, Cache Introspection & Export <span class="badge">Redacted</span></h2>
+            <p>Inspect template/data caches and create a redacted, versioned diagnostic snapshot containing component
+                state and the bounded lifecycle timeline.</p>
+
+            <div class="demo-panel">
+                <div class="button-row">
+                    <button type="button" onclick="demoDiagnostics()">Create diagnostic snapshot</button>
+                    <button type="button" onclick="AlpineComponentLoader.clearDataCache(); demoDiagnostics()">Clear data
+                        cache</button>
+                    <button type="button" onclick="AlpineComponentLoader.clearTemplateCaches(); demoDiagnostics()">Clear
+                        template caches</button>
+                </div>
+                <pre id="diagnostics-output" class="runtime-log" tabindex="0"
+                    aria-label="Diagnostic snapshot output">Create a snapshot to inspect the live page.</pre>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>import ACLDebugger, {
+  createComponentSnapshot,
+  createDiagnosticSnapshot,
+  diffDiagnosticSnapshots,
+  redactDiagnostics
+} from 'alpine-component-loader/debugger';
+
+ACLDebugger.inject(AlpineComponentLoader);
+const snapshot = ACLDebugger.getSnapshot(AlpineComponentLoader);
+
+AlpineComponentLoader.getDataCacheSize();
+AlpineComponentLoader.getDataCacheInfo('/api/user');
+AlpineComponentLoader.getTemplateLoadInfo('/components/card.html');
+await AlpineComponentLoader.getTemplateCacheInfo();
+await AlpineComponentLoader.pruneTemplateCache();
+await AlpineComponentLoader.clearTemplateCaches();
+AlpineComponentLoader.clearDataCache();</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>34. Entry Points, SSR, HMR & TypeScript <span class="badge">Production integration</span></h2>
+            <p>The root package is side-effect free and SSR-safe. Browser auto-start, debugger, accessibility,
+                testing helpers, offline registration, and development reloads live in dedicated tree-shakeable
+                entries, all backed by generated declarations.</p>
+
+            <div class="feature-list">
+                <div class="feature-card"><strong class="test-pass">✓ Explicit
+                        root</strong><span><code>alpine-component-loader</code> is powering this page.</span></div>
+                <div class="feature-card"><strong class="test-pass">✓ Debugger
+                        entry</strong><span><code>alpine-component-loader/debugger</code> is injected and ready.</span>
+                </div>
+                <div class="feature-card"><strong class="test-pass">✓ Accessibility
+                        entry</strong><span><code>alpine-component-loader/a11y</code> feeds optional audits to the
+                        debugger.</span>
+                </div>
+                <div class="feature-card"><strong class="test-pass">✓ Offline
+                        entry</strong><span><code>alpine-component-loader/offline</code> explicitly registers generated
+                        workers.</span>
+                </div>
+                <div class="feature-card"><strong class="test-pass">✓ Testing
+                        entry</strong><span><code>alpine-component-loader/testing</code> mounts components, records
+                        events,
+                        and mocks fetch in browsers.</span></div>
+                <div class="feature-card"><strong class="test-pass">✓ SSR-safe</strong><span>Root and optional utility
+                        modules avoid browser import side effects.</span></div>
+                <div class="feature-card"><strong class="test-pass">✓ Generated contracts</strong><span>Loader types,
+                        manifest declarations, JSON Schema, and Custom Elements metadata share one contract.</span>
+                </div>
+            </div>
+            <p class="status-line">Continue to the focused
+                <a href="https://github.com/LTDev-LLC/alpine-component-loader/tree/main/examples/feature-lab-ssr">SSR
+                    feature lab</a>,
+                <a href="https://github.com/LTDev-LLC/alpine-component-loader/tree/main/examples/hmr">HMR example</a>,
+                and <a href="https://github.com/LTDev-LLC/alpine-component-loader/tree/main/examples/offline">offline
+                    example</a> for workflows that require server or service-worker behavior.
+            </p>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>// Explicit, side-effect-free entry (recommended)
+import AlpineComponentLoader from 'alpine-component-loader';
+AlpineComponentLoader.define('site-card', '/components/card.html');
+await AlpineComponentLoader.start();
+
+// Browser-only convenience entry
+import AlpineComponentLoader from 'alpine-component-loader/auto';
+
+// Development-only selective template reloads
+import { connectACLDevServer } from 'alpine-component-loader/dev';
+const hmr = connectACLDevServer({ url: 'http://localhost:3000/__acl_hmr/events' });
+hmr.close();
+
+// Optional development accessibility auditing
+import ACLA11y from 'alpine-component-loader/a11y';
+const audits = ACLA11y.observe(AlpineComponentLoader);
+
+// Browser test helpers
+import { mountComponent, recordACLEvents } from 'alpine-component-loader/testing';
+
+// Explicit generated service-worker registration
+import { registerOfflineWorker } from 'alpine-component-loader/offline';
+await registerOfflineWorker('/offline/acl-sw.js');
+
+// Generate TypeScript and Custom Elements contracts from an enriched manifest.
+// npx alpine-component-loader types acl-manifest.json \
+//   --out generated/acl-components.d.ts \
+//   --custom-elements-out generated/custom-elements.json
+
+// Node/SSR imports are safe; start() intentionally requires DOM APIs.
+const { default: Loader } = await import('alpine-component-loader');</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>35. Adaptive Prefetch <span class="badge">Hover · Focus · Direct</span></h2>
+            <p>Warm a manifest group and its dependencies before navigation. The observer responds to intentional
+                hover or focus, while the controller also supports deterministic direct requests and complete cleanup.
+            </p>
+
+            <div class="demo-panel">
+                <div class="button-row">
+                    <button type="button" data-acl-prefetch="preview">Hover or focus to prefetch preview</button>
+                    <button type="button" onclick="demoAdaptivePrefetch('preview')">Prefetch preview graph now</button>
+                    <button type="button" onclick="resetAdaptivePrefetch()">Reset observer</button>
+                    <button type="button" onclick="stopAdaptivePrefetch()">Disconnect observer</button>
+                </div>
+                <pre id="adaptive-prefetch-output" class="runtime-log" tabindex="0"
+                    aria-label="Adaptive prefetch output">Interact with a prefetch target or run a direct request.</pre>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>const controller = await AlpineComponentLoader.observePrefetch({
+  triggers: ['hover', 'focus'],
+  hoverDelay: 75,
+  concurrency: 2
+});
+
+// &lt;button data-acl-prefetch="preview"&gt;Preview&lt;/button&gt;
+const results = await controller.prefetch('preview');
+
+addEventListener('acl:prefetchstart', event =&gt; console.log(event.detail.tags));
+addEventListener('acl:prefetchend', event =&gt; console.log(event.detail.fulfilled));
+addEventListener('acl:prefetchskip', event =&gt; console.log(event.detail.reason));
+
+controller.disconnect();
+AlpineComponentLoader.stopObservingPrefetch();</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>36. Structured Observability & Performance Metrics <span class="badge">Local · Bounded · Redacted</span>
+            </h2>
+            <p>Subscribe to live redacted records, retain bounded counters and durations, and correlate component loads
+                with browser Performance API measures without sending telemetry anywhere.</p>
+
+            <div class="demo-panel">
+                <div class="button-row">
+                    <button type="button" onclick="demoObservability()">Reset and measure a component reload</button>
+                    <button type="button" onclick="clearObservabilityDemo()">Clear retained metrics</button>
+                </div>
+                <pre id="observability-metrics-output" class="runtime-log" tabindex="0"
+                    aria-label="Observability metrics output">Run the measurement to inspect totals, durations, and performance measures.</pre>
+                <pre id="observability-live-output" class="runtime-log" tabindex="0"
+                    aria-label="Live observability records">Live subscription records appear here.</pre>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>AlpineComponentLoader.config({
+  observability: {
+    bufferSize: 80,
+    performanceMarks: true,
+    logger: false
+  }
+});
+
+const unsubscribe = AlpineComponentLoader.subscribe(record =&gt; {
+  console.log(record.type, record.phase, record.detail);
+});
+
+const snapshot = AlpineComponentLoader.getMetrics();
+AlpineComponentLoader.clearMetrics();
+unsubscribe();</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>37. Trusted Types & URL Policies <span class="badge">Application security boundary</span></h2>
+            <p>A fetched template passes through an application-owned Trusted Types policy and a same-origin URL
+                allowlist. Approved links survive sanitization while the external tracking link loses its URL.</p>
+
+            <security-policy-demo></security-policy-demo>
+            <div class="demo-panel">
+                <div class="button-row">
+                    <button type="button" onclick="inspectSecurityPolicy()">Inspect security policy result</button>
+                </div>
+                <pre id="security-policy-output" class="runtime-log" tabindex="0"
+                    aria-label="Trusted Types and URL policy output">Inspect the rendered component to see policy calls and sanitized URLs.</pre>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>const createHTML = html =&gt; html;
+const policy = window.trustedTypes?.createPolicy('acl-app', { createHTML })
+  || { createHTML };
+
+AlpineComponentLoader.define('secure-links', 'secure-links.html', {
+  sanitize: true,
+  security: {
+    trustedTypesPolicy: policy,
+    urlPolicy(value) {
+      return new URL(value, document.baseURI).origin === location.origin;
+    }
+  }
+});</pre>
+            </details>
+        </section>
+
+        <section>
+            <h2>38. Browser Testing Utilities <span class="badge">Mount · Mock · Record · Unmount</span></h2>
+            <p>Run the public testing entry in this page: mock one request, mount an isolated inline component, wait
+                for readiness, update and reload it, record lifecycle events, then destroy it and restore fetch.</p>
+
+            <div class="demo-panel">
+                <div class="button-row">
+                    <button type="button" onclick="runTestingDemo()">Run browser testing helper demo</button>
+                </div>
+                <div id="testing-helper-fixture" role="region" aria-label="Testing helper fixture"></div>
+                <pre id="testing-helper-output" class="runtime-log" tabindex="0"
+                    aria-label="Browser testing helper output">Run the helper demo to inspect its request and lifecycle results.</pre>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>import {
+  installFetchMock,
+  mountComponent,
+  recordACLEvents,
+  waitForComponent
+} from 'alpine-component-loader/testing';
+
+const recorder = recordACLEvents(fixture);
+const mock = installFetchMock([
+  { match: /\/api\/profile$/, response: { name: 'Ada' } }
+]);
+
+const mounted = await mountComponent({
+  container: fixture,
+  template: '&lt;strong x-text="$props.name"&gt;&lt;/strong&gt;',
+  attributes: { name: 'Ada' }
+});
+
+await waitForComponent(mounted.element);
+await mounted.update({ attributes: { name: 'Grace' } });
+await mounted.unmount();
+recorder.stop();
+mock.restore();</pre>
+            </details>
+        </section>
+    </main>
+
+    <site-footer></site-footer>
+
+    <template acl-component="site-header" acl-props='{ "title": "String", "github": "String" }'>
+        <style>
+            :host {
+                display: block;
+                background: #fff;
+                border-bottom: 1px solid #e5e7eb;
+                padding: clamp(1rem, 3vw, 2rem);
+                text-align: center;
+                position: relative;
+                z-index: 10;
+                box-sizing: border-box;
+            }
+
+            h1 {
+                margin: 0;
+                font-size: clamp(1.8rem, 4vw, 2.5rem);
+                letter-spacing: 0;
+                line-height: 1.2;
+                color: var(--text, #1f2937);
+            }
+
+            .subtitle {
+                color: #4b5563;
+                font-size: 1.1rem;
+                margin-top: 0.5rem;
+            }
+
+            .github-link {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                margin-top: 1rem;
+                text-decoration: none;
+                color: var(--primary, #1d4ed8);
+                font-weight: 600;
+            }
+
+            .github-link:hover {
+                text-decoration: underline;
+            }
+
+            .github-link:focus-visible {
+                outline: 3px solid rgba(37, 99, 235, 0.35);
+                outline-offset: 3px;
+            }
+        </style>
+
+        <div>
+            <h1 x-text="$props.title || 'AlpineComponentLoader'"></h1>
+
+            <div class="subtitle">
+                <slot></slot>
+            </div>
+
+            <template x-if="$props.github">
+                <a :href="$props.github" class="github-link" target="_blank" rel="noreferrer">View on GitHub</a>
+            </template>
+        </div>
+    </template>
+
+    <template acl-component="site-footer">
+        <style>
+            :host {
+                display: block;
+                margin-top: auto;
+                border-top: 1px solid #e5e7eb;
+                background: #fff;
+                color: #4b5563;
+                width: 100%;
+            }
+
+            .container {
+                max-width: 900px;
+                margin: 0 auto;
+                padding: clamp(1rem, 3vw, 2rem);
+                display: flex;
+                box-sizing: border-box;
+            }
+
+            .inner {
+                width: 100%;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 1rem 2rem;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .meta {
+                color: #4b5563;
+                font-size: 0.9rem;
+            }
+
+            .meta strong {
+                color: var(--text);
+            }
+
+            nav {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.75rem 1rem;
+                align-items: center;
+            }
+
+            a {
+                color: var(--primary);
+                text-decoration: none;
+                font-weight: 600;
+            }
+
+            a:hover {
+                text-decoration: underline;
+            }
+
+            a:focus-visible {
+                outline: 3px solid rgba(37, 99, 235, 0.35);
+                outline-offset: 3px;
+            }
+
+            @media (max-width: 760px) {
+                .inner {
+                    align-items: flex-start;
+                    flex-direction: column;
+                }
+            }
+        </style>
+
+        <div class="container">
+            <div class="inner">
+                <div class="meta">
+                    <div><strong>AlpineComponentLoader</strong> - A lightweight, build-free component loader for
+                        Alpine.js.</div>
+                    <div>&copy; <span x-text="new Date().getFullYear()"></span> LTDev LLC · MIT License</div>
+                </div>
+
+                <nav aria-label="Footer">
+                    <a href="https://github.com/LTDev-LLC/alpine-component-loader" target="_blank"
+                        rel="noreferrer">GitHub</a>
+                    <a href="https://github.com/LTDev-LLC/alpine-component-loader/issues" target="_blank"
+                        rel="noreferrer">Issues</a>
+                    <a href="https://alpinejs.dev/" target="_blank" rel="noreferrer">Alpine.js</a>
+                    <a href="#top">Back to top</a>
+                </nav>
+            </div>
+        </div>
+    </template>
+
+    <template id="tpl-fallback-error">
+        <style>
+            :host {
+                display: block;
+                padding: 1rem;
+                border: 1px solid #fca5a5;
+                background: #fee2e2;
+                color: #991b1b;
+                border-radius: 6px;
+            }
+        </style>
+        <div x-data>
+            <strong>Component fallback rendered</strong>
+            <p style="margin:0; font-size: 0.9em">The fallback template is configured for this component.</p>
+        </div>
+    </template>
+
+    <template id="tpl-unsafe-content">
+        <style>
+            :host {
+                display: block;
+                border: 1px solid #d9e0ea;
+                border-radius: 8px;
+                padding: 14px;
+                background: #fff;
+            }
+        </style>
+        <button id="unsafe-button" onclick="window.__unsafeDemoClicked = true">Sanitized button</button>
+        <script>window.__unsafeDemoScript = true;</script>
+        <p style="margin-top:8px">The script tag and inline click handler are removed by the default sanitizer.</p>
+    </template>
+
+    <template id="tpl-custom-sanitizer">
+        <style>
+            :host {
+                display: block;
+                border: 1px solid #bae6fd;
+                border-radius: 9px;
+                padding: 1rem;
+                background: #f0f9ff;
+            }
+        </style>
+        <div data-sanitize-root>
+            <strong>Custom sanitizer completed</strong>
+            <span data-private>This private node is removed before render.</span>
+            <p>The component keeps approved content and adds xxx <code>data-sanitized="custom"</code>.</p>
+        </div>
+    </template>
+</body>
+
+</html>

@@ -1,0 +1,27 @@
+<style>
+    :host {
+        display: block;
+        margin-bottom: 10px;
+    }
+
+    .bar-bg {
+        background: #e5e7eb;
+        height: 20px;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .bar-fill {
+        background: #1d4ed8;
+        height: 100%;
+        transition: width 0.3s;
+    }
+</style>
+<div>
+    <div class="bar-bg">
+        <div class="bar-fill" :style="`width: ${Math.max(0, Math.min(100, $props.percent || 0))}%`"></div>
+    </div>
+    <div style="text-align:right; font-size:0.8em; margin-top:4px;">
+        <span x-text="$props.percent + '%'"></span>
+    </div>
+</div>

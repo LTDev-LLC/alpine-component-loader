@@ -1,0 +1,18 @@
+{
+    "version": 1,
+    "basePath": "components/",
+    "components": {
+        "offline-demo-status": "offline-status.html",
+        "offline-demo-shell": {
+            "source": "offline-shell.html",
+            "dependencies": [
+                "offline-demo-status"
+            ]
+        }
+    },
+    "groups": {
+        "offline-demo": [
+            "offline-demo-shell"
+        ]
+    }
+}

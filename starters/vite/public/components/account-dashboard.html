@@ -1,0 +1,28 @@
+<section class="route-card account-card" x-data>
+    <div class="account-heading">
+        <profile-avatar initials="AV"></profile-avatar>
+        <div>
+            <p class="component-kicker">Account group</p>
+            <h2>Account workspace</h2>
+            <p>Account ID: <code x-text="$props.accountId"></code></p>
+        </div>
+    </div>
+
+    <dl>
+        <div>
+            <dt>Current plan</dt>
+            <dd x-text="$props.plan"></dd>
+        </div>
+        <div>
+            <dt>Registered shard</dt>
+            <dd>account</dd>
+        </div>
+    </dl>
+
+    <button
+        type="button"
+        @click="$props.plan = $props.plan === 'pro' ? 'starter' : 'pro'; $props.$emit('plan-change', { plan: $props.plan })"
+    >
+        Toggle plan
+    </button>
+</section>

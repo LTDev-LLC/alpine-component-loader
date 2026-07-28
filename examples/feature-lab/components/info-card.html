@@ -1,0 +1,26 @@
+<style>
+    :host {
+        display: block;
+    }
+
+    .box {
+        border: 1px solid #d9e0ea;
+        border-radius: 8px;
+        padding: 14px;
+        background: #ffffff;
+    }
+
+    h3 {
+        margin: 0 0 6px;
+        color: #16202a;
+    }
+
+    p {
+        margin: 0;
+        color: #64748b;
+    }
+</style>
+<div class="box">
+    <h3 x-text="$props.title"></h3>
+    <p x-text="$props.body"></p>
+</div>

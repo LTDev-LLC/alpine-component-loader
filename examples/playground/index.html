@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Advanced in-browser workbench for AlpineComponentLoader" />
+    <title>AlpineComponentLoader Playground</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "alpine-component-loader": "/__acl_hmr/modules/index.min.js",
+                "alpine-component-loader/auto": "/__acl_hmr/modules/auto.min.js",
+                "alpine-component-loader/dev": "/__acl_hmr/modules/dev.min.js",
+                "alpine-component-loader/debugger": "/__acl_hmr/modules/debugger.min.js",
+                "alpine-component-loader/a11y": "/__acl_hmr/modules/a11y.min.js",
+                "alpine-component-loader/a11y-scanner": "/__acl_hmr/modules/a11y-scanner.min.js",
+                "alpine-component-loader/offline": "/__acl_hmr/modules/offline.min.js",
+                "alpine-component-loader/testing": "/__acl_hmr/modules/testing.min.js"
+            }
+        }
+    </script>
+    <script type="module" src="playground.js"></script>
+</head>
+
+<body>
+    <template acl-component="playground-site-header">
+        <header id="top" class="site-header">
+            <div>
+                <h1>AlpineComponentLoader</h1>
+                <div class="subtitle">
+                    A lightweight, build-free component loader for
+                    <a href="https://alpinejs.dev/" target="_blank" rel="noreferrer">Alpine.js</a>
+                </div>
+                <a class="github-link" href="https://github.com/LTDev-LLC/alpine-component-loader" target="_blank"
+                    rel="noreferrer">View on GitHub</a>
+            </div>
+        </header>
+    </template>
+
+    <template acl-component="playground-workbench-controls">
+        <div class="workbench-heading">
+            <div>
+                <p class="eyebrow">Editor and preview</p>
+                <h2 id="workbench-heading">Operations dashboard sample</h2>
+            </div>
+            <p id="status" class="run-status" role="status" x-bind:data-state="$store.playground.status.state"
+                x-text="$store.playground.status.message"></p>
+        </div>
+
+        <div class="workbench-toolbar" aria-label="Playground controls">
+            <button id="run" type="button" x-on:click="$dispatch('playground:run')">Run preview</button>
+            <label class="auto-run-control">
+                <input id="auto-run" type="checkbox" x-model="$store.playground.autoRun"
+                    x-on:change="$dispatch('playground:auto-run')" />
+                Auto-run
+            </label>
+            <button id="reset" class="secondary" type="button" x-on:click="$dispatch('playground:reset')">
+                Reset sample
+            </button>
+            <button id="toggle-diagnostics" class="secondary" type="button"
+                x-bind:aria-expanded="$store.playground.diagnosticsOpen"
+                x-text="$store.playground.diagnosticsOpen ? 'Hide diagnostics' : 'Show diagnostics'"
+                x-on:click="$store.playground.diagnosticsOpen = !$store.playground.diagnosticsOpen"></button>
+            <button id="audit" class="secondary" type="button"
+                x-bind:disabled="$store.playground.audit.running || $store.playground.status.state !== 'ready'"
+                x-text="$store.playground.audit.running ? 'Auditing…' : 'Audit accessibility'"
+                x-on:click="$dispatch('playground:audit')"></button>
+            <span class="shortcut-hint"><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>Enter</kbd></span>
+        </div>
+    </template>
+
+    <template acl-component="playground-editor-pane">
+        <div class="editor-pane">
+            <div class="editor-tabs" role="tablist" aria-label="Editable sources">
+                <button id="tab-page" type="button" role="tab"
+                    x-bind:aria-selected="$store.playground.activeEditor === 'page'" aria-controls="panel-page"
+                    data-editor-tab="page" x-bind:tabindex="$store.playground.activeEditor === 'page' ? 0 : -1"
+                    x-on:click="$dispatch('playground:editor', { key: 'page' })">
+                    Page HTML
+                </button>
+                <button id="tab-components" type="button" role="tab"
+                    x-bind:aria-selected="$store.playground.activeEditor === 'components'"
+                    aria-controls="panel-components" data-editor-tab="components"
+                    x-bind:tabindex="$store.playground.activeEditor === 'components' ? 0 : -1"
+                    x-on:click="$dispatch('playground:editor', { key: 'components' })">
+                    Components
+                </button>
+                <button id="tab-css" type="button" role="tab"
+                    x-bind:aria-selected="$store.playground.activeEditor === 'css'" aria-controls="panel-css"
+                    data-editor-tab="css" x-bind:tabindex="$store.playground.activeEditor === 'css' ? 0 : -1"
+                    x-on:click="$dispatch('playground:editor', { key: 'css' })">
+                    CSS
+                </button>
+                <button id="tab-javascript" type="button" role="tab"
+                    x-bind:aria-selected="$store.playground.activeEditor === 'javascript'"
+                    aria-controls="panel-javascript" data-editor-tab="javascript"
+                    x-bind:tabindex="$store.playground.activeEditor === 'javascript' ? 0 : -1"
+                    x-on:click="$dispatch('playground:editor', { key: 'javascript' })">
+                    JavaScript
+                </button>
+            </div>
+
+            <div id="panel-page" class="editor-panel" role="tabpanel" aria-labelledby="tab-page"
+                x-bind:hidden="$store.playground.activeEditor !== 'page'">
+                <label class="sr-only" for="editor-page">Page HTML source</label>
+                <textarea id="editor-page" data-editor="page" spellcheck="false"></textarea>
+                <p class="editor-count" data-editor-count="page"></p>
+            </div>
+            <div id="panel-components" class="editor-panel" role="tabpanel" aria-labelledby="tab-components"
+                x-bind:hidden="$store.playground.activeEditor !== 'components'">
+                <label class="sr-only" for="editor-components">ACL component template source</label>
+                <textarea id="editor-components" data-editor="components" spellcheck="false"></textarea>
+                <p class="editor-count" data-editor-count="components"></p>
+            </div>
+            <div id="panel-css" class="editor-panel" role="tabpanel" aria-labelledby="tab-css"
+                x-bind:hidden="$store.playground.activeEditor !== 'css'">
+                <label class="sr-only" for="editor-css">Dashboard CSS source</label>
+                <textarea id="editor-css" data-editor="css" spellcheck="false"></textarea>
+                <p class="editor-count" data-editor-count="css"></p>
+            </div>
+            <div id="panel-javascript" class="editor-panel" role="tabpanel" aria-labelledby="tab-javascript"
+                x-bind:hidden="$store.playground.activeEditor !== 'javascript'">
+                <label class="sr-only" for="editor-javascript">Playground JavaScript source</label>
+                <textarea id="editor-javascript" data-editor="javascript" spellcheck="false"></textarea>
+                <p class="editor-count" data-editor-count="javascript"></p>
+            </div>
+        </div>
+    </template>
+
+    <template acl-component="playground-preview-pane">
+        <div class="preview-pane">
+            <div class="preview-bar">
+                <span><span class="preview-dot"></span> Live preview</span>
+                <span id="preview-run-label" x-text="$store.playground.runLabel"></span>
+            </div>
+            <iframe id="preview" title="ACL playground preview"></iframe>
+        </div>
+    </template>
+
+    <template acl-component="playground-accessibility-summary">
+        <section id="a11y-summary" class="a11y-summary" aria-labelledby="a11y-heading"
+            x-bind:data-state="$store.playground.audit.state">
+            <div class="a11y-summary-heading">
+                <div>
+                    <p class="eyebrow">Development audit</p>
+                    <h3 id="a11y-heading">Accessibility scanner</h3>
+                </div>
+                <span class="a11y-state" role="status" x-text="$store.playground.audit.message"></span>
+            </div>
+            <div class="a11y-grid">
+                <article>
+                    <span>Workbench</span>
+                    <strong x-text="$store.playground.audit.summary('workbench')"></strong>
+                </article>
+                <article>
+                    <span>Preview</span>
+                    <strong x-text="$store.playground.audit.summary('preview')"></strong>
+                </article>
+                <article>
+                    <span>Combined</span>
+                    <strong x-text="$store.playground.audit.combinedSummary()"></strong>
+                </article>
+            </div>
+            <div class="a11y-actions">
+                <button id="open-workbench-audit" class="text-button" type="button"
+                    x-bind:disabled="!$store.playground.audit.workbench"
+                    x-on:click="$dispatch('playground:audit-open', { scope: 'workbench' })">
+                    Open workbench results
+                </button>
+                <button id="open-preview-audit" class="text-button" type="button"
+                    x-bind:disabled="!$store.playground.audit.preview"
+                    x-on:click="$dispatch('playground:audit-open', { scope: 'preview' })">
+                    Open preview results
+                </button>
+            </div>
+        </section>
+    </template>
+
+    <template acl-component="playground-diagnostics">
+        <div id="diagnostics" class="diagnostics" x-bind:hidden="!$store.playground.diagnosticsOpen">
+            <article>
+                <div class="diagnostic-heading">
+                    <h3>Console</h3>
+                    <button id="clear-console" class="text-button" type="button"
+                        x-on:click="$dispatch('playground:clear-console')">
+                        Clear
+                    </button>
+                </div>
+                <pre id="console-output" tabindex="0" x-text="$store.playground.consoleText"></pre>
+            </article>
+            <article>
+                <h3>ACL runtime</h3>
+                <pre id="metrics" tabindex="0" x-text="$store.playground.metricsText"></pre>
+            </article>
+        </div>
+    </template>
+
+    <template acl-component="playground-site-footer">
+        <footer class="site-footer">
+            <div class="container">
+                <div class="inner">
+                    <div class="meta">
+                        <div><strong>AlpineComponentLoader</strong> - A lightweight, build-free component loader for
+                            Alpine.js.</div>
+                        <div>&copy; <span x-text="new Date().getFullYear()"></span> LTDev LLC · MIT License</div>
+                    </div>
+                    <nav aria-label="Footer">
+                        <a href="https://github.com/LTDev-LLC/alpine-component-loader" target="_blank"
+                            rel="noreferrer">GitHub</a>
+                        <a href="https://github.com/LTDev-LLC/alpine-component-loader/issues" target="_blank"
+                            rel="noreferrer">Issues</a>
+                        <a href="https://alpinejs.dev/" target="_blank" rel="noreferrer">Alpine.js</a>
+                        <a href="#top">Back to top</a>
+                    </nav>
+                </div>
+            </div>
+        </footer>
+    </template>
+
+    <template acl-component="acl-playground-app">
+        <div class="playground-page">
+            <playground-site-header></playground-site-header>
+            <main>
+                <section class="workbench-section" aria-labelledby="workbench-heading">
+                    <playground-workbench-controls></playground-workbench-controls>
+                    <div id="workbench" class="workbench">
+                        <playground-editor-pane></playground-editor-pane>
+                        <div id="workbench-splitter" class="workbench-splitter" role="separator"
+                            aria-label="Resize editor" aria-orientation="vertical" aria-valuemin="35" aria-valuemax="70"
+                            aria-valuenow="50" tabindex="0"></div>
+                        <playground-preview-pane></playground-preview-pane>
+                    </div>
+                    <playground-accessibility-summary></playground-accessibility-summary>
+                    <playground-diagnostics></playground-diagnostics>
+                </section>
+            </main>
+            <playground-site-footer></playground-site-footer>
+        </div>
+    </template>
+
+    <acl-playground-app></acl-playground-app>
+</body>
+
+</html>

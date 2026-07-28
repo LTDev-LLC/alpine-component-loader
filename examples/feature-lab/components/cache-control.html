@@ -1,0 +1,54 @@
+<style>
+    :host {
+        display: block;
+    }
+
+    .panel {
+        border: 1px solid #d9e0ea;
+        border-radius: 8px;
+        padding: 14px;
+        background: #fff;
+    }
+
+    h3 {
+        margin: 0 0 0.5rem;
+    }
+
+    p {
+        margin: 0;
+    }
+
+    .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+
+    button {
+        min-height: 2.5rem;
+        padding: 0.55rem 0.8rem;
+        border: 1px solid #1d4ed8;
+        border-radius: 0.5rem;
+        background: #2563eb;
+        color: white;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+</style>
+<div class="panel" x-data="{ cacheBusy: false }">
+    <h3>Cache count: <span x-text="$props.payload?.count || 0"></span></h3>
+    <p>Last fetched at <span x-text="$props.payload?.at || 'pending'"></span></p>
+    <div class="actions">
+        <button :disabled="cacheBusy || $props.$loading" @click="$props.$reload()">Reload</button>
+        <button :disabled="cacheBusy"
+            @click="cacheBusy = true; $props.payload = null; window.__resetDemoRequestCount('/demo-api/cache'); $props.$cache.clearData().finally(() => cacheBusy = false)">Clear
+            data cache</button>
+    </div>
+</div>

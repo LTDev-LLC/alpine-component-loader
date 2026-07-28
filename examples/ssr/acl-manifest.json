@@ -1,0 +1,50 @@
+{
+    "version": 1,
+    "components": {
+        "profile-card": {
+            "source": "components/profile-card.html",
+            "options": {
+                "shadow": true,
+                "templateRevision": "sha256-4pHxiWDJTM5LrrFuBE6SxTrDpRCk4Qs61CwrZUHIZWg",
+                "attributes": {
+                    "name": {
+                        "type": "String",
+                        "required": true
+                    },
+                    "count": {
+                        "type": "Number",
+                        "default": 0
+                    }
+                },
+                "data": {
+                    "src": "/api/profile",
+                    "target": "$data"
+                }
+            },
+            "metadata": {
+                "description": "A statically rendered profile that hydrates Alpine in place.",
+                "events": {
+                    "loaded": {
+                        "description": "Emitted after hydration finishes.",
+                        "detail": {
+                            "type": "unknown"
+                        }
+                    }
+                },
+                "slots": {
+                    "default": {
+                        "description": "Profile description."
+                    },
+                    "avatar": {
+                        "description": "Profile avatar."
+                    }
+                }
+            }
+        }
+    },
+    "groups": {
+        "profile": [
+            "profile-card"
+        ]
+    }
+}

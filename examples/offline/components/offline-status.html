@@ -1,0 +1,8 @@
+<article class="counter-card" x-data="{ checks: 0 }">
+    <div>
+        <p class="eyebrow">Alpine still runs</p>
+        <h3>Offline interaction counter</h3>
+        <p>Clicks: <strong x-text="checks">0</strong></p>
+    </div>
+    <button type="button" x-on:click="checks++">Run a local check</button>
+</article>

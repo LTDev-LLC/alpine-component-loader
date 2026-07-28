@@ -1,0 +1,34 @@
+{
+    "version": 1,
+    "groups": ["account"],
+    "options": {
+        "attributes": {
+            "accountId": {
+                "type": "String",
+                "required": true
+            },
+            "plan": {
+                "type": "String",
+                "default": "starter",
+                "options": ["starter", "pro"]
+            }
+        }
+    },
+    "metadata": {
+        "description": "Account route demonstrating group roots, inferred dependencies, props, and events.",
+        "events": {
+            "plan-change": {
+                "description": "Emitted when the example plan changes.",
+                "detail": {
+                    "type": "object",
+                    "properties": {
+                        "plan": {
+                            "type": "string"
+                        }
+                    },
+                    "required": ["plan"]
+                }
+            }
+        }
+    }
+}

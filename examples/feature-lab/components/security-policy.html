@@ -1,0 +1,37 @@
+<style>
+    :host {
+        display: block;
+    }
+
+    article {
+        border: 1px solid #bfdbfe;
+        border-radius: 10px;
+        background: #eff6ff;
+        padding: 1rem;
+    }
+
+    h3,
+    p {
+        margin-top: 0;
+    }
+
+    nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+
+    a {
+        color: #1d4ed8;
+        font-weight: 700;
+    }
+</style>
+
+<article>
+    <h3>Application security policy applied</h3>
+    <p>The same-origin link remains usable; the external link is retained as text without a destination.</p>
+    <nav aria-label="Security policy link results">
+        <a id="policy-allowed" href="./README.md">Allowed feature-lab documentation</a>
+        <a id="policy-blocked" href="https://tracker.example.test/collect?token=feature-lab-secret">Blocked tracker</a>
+    </nav>
+</article>

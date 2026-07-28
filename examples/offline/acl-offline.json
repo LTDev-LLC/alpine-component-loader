@@ -1,0 +1,20 @@
+{
+    "version": 1,
+    "activation": "immediate",
+    "navigation": {
+        "fallback": "index.html",
+        "allow": [
+            "/examples/offline/"
+        ],
+        "strategy": "network-first"
+    },
+    "runtimeRoutes": [
+        {
+            "path": "/examples/offline/runtime-message.json",
+            "strategy": "cache-first",
+            "cacheName": "example-runtime",
+            "maxEntries": 4,
+            "maxAgeSeconds": 86400
+        }
+    ]
+}

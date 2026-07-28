@@ -1,0 +1,30 @@
+<style>
+    :host {
+        display: block;
+    }
+
+    .panel {
+        border: 1px solid #d9e0ea;
+        border-radius: 8px;
+        padding: 14px;
+        background: #fff;
+    }
+
+    pre {
+        background: #111827;
+        color: #e5e7eb;
+        border-radius: 6px;
+        padding: 10px;
+        overflow: auto;
+    }
+</style>
+<div class="panel">
+    <h3>Fetched audit payload</h3>
+    <template x-if="$props.$loading">
+        <p>Loading request...</p>
+    </template>
+    <template x-if="$props.$error">
+        <p style="color:#b91c1c" x-text="$props.$error"></p>
+    </template>
+    <pre x-text="JSON.stringify($props.audit || {}, null, 2)"></pre>
+</div>

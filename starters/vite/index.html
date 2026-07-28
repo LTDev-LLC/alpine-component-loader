@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="description" content="Route-aware Alpine Component Loader starter powered by the ACL Vite plugin" />
+        <title>ACL Vite application</title>
+        <script type="module" src="/src/main.js"></script>
+    </head>
+    <body>
+        <div class="app-shell">
+            <header class="site-header">
+                <a class="brand" href="/" data-route="home">ACL + Vite</a>
+                <nav aria-label="Primary navigation">
+                    <a href="/" data-route="home">Home</a>
+                    <a href="/account" data-route="account">Account</a>
+                </nav>
+            </header>
+
+            <main>
+                <div class="route-heading">
+                    <div>
+                        <p class="eyebrow">Independent route manifests</p>
+                        <h1 id="route-title">Loading route…</h1>
+                    </div>
+                    <p id="route-status" role="status" data-state="loading">Loading component shard…</p>
+                </div>
+
+                <acl-boundary id="route-boundary">
+                    <div id="route-outlet" aria-labelledby="route-title"></div>
+                    <section slot="fallback" class="boundary-fallback" role="alert">
+                        <h2>This route could not be rendered</h2>
+                        <p>The nearest ACL boundary caught the component failure.</p>
+                        <button type="button" id="retry-route">Retry failed components</button>
+                    </section>
+                </acl-boundary>
+            </main>
+
+            <aside class="diagnostics" aria-labelledby="diagnostics-title">
+                <div>
+                    <p class="eyebrow">Bounded local observability</p>
+                    <h2 id="diagnostics-title">Recent ACL records</h2>
+                </div>
+                <div class="diagnostic-actions">
+                    <button type="button" id="show-metrics">Show metrics</button>
+                    <button type="button" id="clear-metrics">Clear metrics</button>
+                </div>
+                <ol id="event-log" aria-live="polite"></ol>
+                <pre id="metrics-output" hidden></pre>
+            </aside>
+        </div>
+    </body>
+</html>

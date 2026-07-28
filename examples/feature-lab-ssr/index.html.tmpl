@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Server-rendered interactive feature lab and usage cookbook for AlpineComponentLoader">
+    <title>AlpineComponentLoader SSR Feature Lab</title>
+    <link href="/styles.css" rel="stylesheet">
+    <script defer src="/node_modules/@alpinejs/csp/dist/cdn.min.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "alpine-component-loader": "/__acl_hmr/modules/index.min.js",
+                "alpine-component-loader/auto": "/__acl_hmr/modules/auto.min.js",
+                "alpine-component-loader/dev": "/__acl_hmr/modules/dev.min.js",
+                "alpine-component-loader/debugger": "/__acl_hmr/modules/debugger.min.js",
+                "alpine-component-loader/a11y": "/__acl_hmr/modules/a11y.min.js",
+                "alpine-component-loader/a11y-scanner": "/__acl_hmr/modules/a11y-scanner.min.js",
+                "alpine-component-loader/offline": "/__acl_hmr/modules/offline.min.js",
+                "alpine-component-loader/testing": "/__acl_hmr/modules/testing.min.js"
+            }
+        }
+    </script>
+    <script type="module" src="/client.js"></script>
+</head>
+
+<body>
+    <button id="floating-debug-toggle" class="debug-btn debug-toggle" type="button">Debug Mode</button>
+
+    <header id="top" class="site-header">
+        <div>
+            <h1>AlpineComponentLoader</h1>
+            <div class="subtitle">
+                A lightweight, build-free component loader for
+                <a href="https://alpinejs.dev/" target="_blank" rel="noreferrer">Alpine.js</a>
+            </div>
+            <a class="github-link" href="https://github.com/LTDev-LLC/alpine-component-loader" target="_blank"
+                rel="noreferrer">View on GitHub</a>
+        </div>
+    </header>
+
+    <main>
+        <p id="hydration-status" class="status-line page-status" role="status">Server rendered · JavaScript has not
+            hydrated this page</p>
+        <noscript>
+            <p class="test-note">JavaScript is disabled. Every component, explanation, slot, and server fallback remains
+                available while interactive controls stay inactive.</p>
+        </noscript>
+
+        <section class="lab-overview" aria-labelledby="lab-title">
+            <h2 id="lab-title">SSR Feature Lab</h2>
+            <p>This page mirrors the original feature lab as an interactive smoke test and usage cookbook while proving
+                that meaningful component HTML can arrive from Node before the browser runtime.</p>
+
+            <div class="metrics" aria-label="SSR feature lab status">
+                <div class="metric"><strong id="loader-version">1.1.0</strong><span>Loader version</span></div>
+                <div class="metric"><strong id="feature-count">9</strong><span>Example sections</span></div>
+                <div class="metric"><strong id="registered-count">{{REGISTERED_COUNT}}</strong><span>Registered
+                        tags</span></div>
+                <div class="metric"><strong id="server-instance-count">{{INSTANCE_COUNT}}</strong><span>SSR
+                        instances</span></div>
+                <div class="metric"><strong id="overview-template-count">0</strong><span>Template requests</span></div>
+            </div>
+
+            <div class="lab-controls">
+                <label class="sr-only" for="feature-jump">Jump to a feature</label>
+                <select id="feature-jump">
+                    <option value="">Jump to a feature…</option>
+                    <option value="ssr-output">1. Static SSR Output</option>
+                    <option value="component-fundamentals">2. Shadow DOM, Props & Lifecycle</option>
+                    <option value="slots">3. Declarative Slots</option>
+                    <option value="data-runtime">4. Data, Cache & Polling</option>
+                    <option value="state-events">5. Events, Stores & Persistence</option>
+                    <option value="advanced-contracts">6. Advanced Prop Contracts</option>
+                    <option value="security">7. Sanitization & CSP</option>
+                    <option value="developer-tools">8. Debugger & Accessibility Scanner</option>
+                    <option value="diagnostics">9. Hydration Diagnostics</option>
+                </select>
+                <button id="expand-usage" type="button">Expand all usage</button>
+                <button id="collapse-usage" type="button">Collapse all usage</button>
+                <button id="overview-debug-toggle" class="debug-toggle" type="button">Open debugger</button>
+                <button id="overview-a11y-toggle" type="button">Open A11y Audit</button>
+            </div>
+        </section>
+
+        <section id="ssr-output">
+            <h2><a class="feature-heading-link" href="#ssr-output">1. Static SSR Output <span class="badge">Declarative
+                        Shadow DOM</span></a></h2>
+            <p>One <code>renderMany()</code> call creates verified, sanitized components whose content remains visible
+                before JavaScript loads.</p>
+
+            {{HERO}}
+
+            <div class="metrics component-metrics">
+                {{METRIC_CONTRACTS}}
+                {{METRIC_INSTANCES}}
+                {{METRIC_REQUESTS}}
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>const renderer = createSSRRenderer({ manifest, root });
+const markup = await renderer.renderMany([
+  { tagName: 'lab-hero', props: { title: 'Server-rendered Feature Lab' } },
+  { tagName: 'shadow-card', props: { title: 'Typed SSR component' } }
+]);</pre>
+            </details>
+        </section>
+
+        <section id="component-fundamentals">
+            <h2><a class="feature-heading-link" href="#component-fundamentals">2. Shadow DOM, Typed Props &
+                    Lifecycle</a></h2>
+            <p>These counterparts to the original lab demonstrate Boolean and numeric props, revision-verified
+                templates, encapsulated styles, and lifecycle-aware hydration.</p>
+
+            <div class="grid">
+                <div class="demo-stack">
+                    {{SHADOW_ACTIVE}}
+                    {{SHADOW_INACTIVE}}
+                </div>
+                <div class="demo-stack">
+                    {{PROGRESS_PRIMARY}}
+                    {{PROGRESS_CLAMPED}}
+                </div>
+            </div>
+            <div class="demo-panel spaced-panel">
+                {{LIFECYCLE}}
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>{
+  "shadow-card": {
+    "source": "components/shadow-card.html",
+    "options": {
+      "shadow": true,
+      "attributes": {
+        "title": { "type": "String" },
+        "active": { "type": "Boolean" }
+      }
+    }
+  }
+}</pre>
+            </details>
+        </section>
+
+        <section id="slots">
+            <h2><a class="feature-heading-link" href="#slots">3. Default & Named Slots <span class="badge">Server
+                        projected</span></a></h2>
+            <p>Default, title, badge, and footer content stays in Light DOM and projects through the adopted
+                server-rendered shadow root.</p>
+
+            {{SLOTS}}
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>await renderer.render('lab-slot-panel', {
+  slots: {
+    title: 'Named and default slots',
+    badge: 'Projected by the parser',
+    default: 'Consumer content remains in Light DOM',
+    footer: 'The footer is supplied by Node'
+  }
+});</pre>
+            </details>
+        </section>
+
+        <section id="data-runtime">
+            <h2><a class="feature-heading-link" href="#data-runtime">4. Data, Cache & Polling <span
+                        class="badge">Hydration resumes work</span></a></h2>
+            <p>Server fallbacks stay readable, then ordinary component data requests, request-aware caches, response
+                parsing, and polling begin after hydration without replacing matching templates.</p>
+
+            <div class="grid">
+                {{DATA}}
+                {{CACHE}}
+                {{POLLING}}
+                {{RESPONSE}}
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>"data": {
+  "src": "/api/activity",
+  "target": "$data",
+  "cacheStrategy": "no-store"
+}
+
+"data": {
+  "src": "/api/poll",
+  "target": "payload",
+  "poll": 2000,
+  "pauseWhenHidden": true,
+  "pauseWhenOffline": true
+}</pre>
+            </details>
+        </section>
+
+        <section id="state-events">
+            <h2><a class="feature-heading-link" href="#state-events">5. Events, Stores & Persistence</a></h2>
+            <p>Mapped and forwarded events cross the shadow boundary, shared Alpine store state stays synchronized, and
+                persisted props use the same post-hydration lifecycle as client-rendered components.</p>
+
+            <div class="grid">
+                {{COUNTER}}
+                <div class="demo-panel event-panel">
+                    {{MAPPED_EVENT}}
+                    <p class="status-line">Event output: <output id="event-output">Waiting for an interaction after
+                            hydration</output></p>
+                </div>
+                {{STORE_PRIMARY}}
+                {{STORE_SECONDARY}}
+            </div>
+            <div class="demo-panel spaced-panel">
+                {{PERSISTENT_NOTE}}
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>"events": {
+  "forward": [
+    { "from": "internal-save", "as": "public-save" }
+  ]
+},
+"bindStore": "theme",
+"persist": "local",
+"persistKey": "acl:ssr-feature-lab:note"</pre>
+            </details>
+        </section>
+
+        <section id="advanced-contracts">
+            <h2><a class="feature-heading-link" href="#advanced-contracts">6. Advanced Prop Contracts <span
+                        class="badge">Objects & arrays</span></a></h2>
+            <p>String, number, nullable, array, and object values are serialized from manifest definitions and
+                synchronized with component properties during hydration.</p>
+
+            {{ADVANCED_PROPS}}
+            <div class="button-row">
+                <button id="advanced-score-update" type="button">Set score property to 88</button>
+                <button id="advanced-mode-toggle" type="button">Toggle mode</button>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>await renderer.render('advanced-props-demo', {
+  props: {
+    mode: 'compact',
+    score: 72,
+    caption: null,
+    tags: ['typed', 'isolated'],
+    profile: { name: 'Ada', active: true }
+  }
+});</pre>
+            </details>
+        </section>
+
+        <section id="security">
+            <h2><a class="feature-heading-link" href="#security">7. Sanitization, CSP & Revision Fallback <span
+                        class="badge">Secure by default</span></a></h2>
+            <p>The Node renderer and browser runtime remove executable markup using the same policy. A deliberately
+                mismatched revision falls back through one ordinary template request while other components remain
+                hydrated.</p>
+
+            {{SECURITY}}
+            <p class="mismatch-link"><a href="{{MISMATCH_HREF}}">{{MISMATCH_LABEL}}</a></p>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>Open /?mismatch=1 to replace one data-acl-revision marker on the server response
+
+Matching hosts hydrate in place
+The mismatched host keeps server content visible until one safe client render completes</pre>
+            </details>
+        </section>
+
+        <section id="developer-tools">
+            <h2><a class="feature-heading-link" href="#developer-tools">8. Floating Debugger & Accessibility Scanner
+                    <span class="badge">Development tools</span></a></h2>
+            <p>The same optional entries used by the original feature lab inspect hydrated SSR hosts, component
+                requests, lifecycle records, and grouped accessibility findings.</p>
+
+            <div class="demo-panel">
+                <aside class="intentional-a11y-note">
+                    <strong>Intentional accessibility errors</strong>
+                    <p>The component below deliberately includes missing names, labels, alternate text, and unsafe focus
+                        behavior so the scanner has actionable findings.</p>
+                </aside>
+                {{A11Y_ISSUES}}
+                <div class="button-row">
+                    <button id="section-debug-toggle" class="debug-toggle" type="button">Toggle Debug Panel</button>
+                    <button id="section-a11y-toggle" type="button">Open A11y Audit</button>
+                    <button id="focused-a11y-audit" type="button">Audit intentional issues</button>
+                </div>
+                <p class="status-line">The scanner audits active ACL components and the debugger receives the same
+                    composed <code>acl:a11y</code> results.</p>
+                <pre id="accessibility-output" class="runtime-log" tabindex="0"
+                    aria-label="Accessibility audit output">Run the focused audit or open the scanner to inspect the intentional findings.</pre>
+            </div>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>ACLDebugger.inject(AlpineComponentLoader);
+const audits = ACLA11y.observe(AlpineComponentLoader);
+const scanner = ACLA11yScanner.mount({
+  button: { companionSelector: '.debug-toggle' }
+});
+
+await audits.audit(document.querySelector('a11y-issues-demo'));
+await scanner.open();
+AlpineComponentLoader.toggleDebug();</pre>
+            </details>
+        </section>
+
+        <section id="diagnostics">
+            <h2><a class="feature-heading-link" href="#diagnostics">9. Hydration Diagnostics & Observability <span
+                        class="badge">Redacted</span></a></h2>
+            <p>Structured runtime records stay bounded and local while preserving the existing DOM event surface.</p>
+
+            <div class="diagnostic-grid">
+                <div><strong>Hydrated in place</strong><span id="hydrated-count">0</span></div>
+                <div><strong>Template requests</strong><span id="template-request-count">0</span></div>
+                <div><strong>Runtime records</strong><span id="record-count">0</span></div>
+                <div><strong>Fallback mode</strong><span id="fallback-mode">{{FALLBACK_MODE}}</span></div>
+            </div>
+            <div class="button-row">
+                <button id="refresh-diagnostics" type="button">Refresh diagnostic snapshot</button>
+                <button id="clear-observability" type="button">Clear metrics</button>
+            </div>
+            <pre id="observability-output" class="runtime-log" tabindex="0"
+                aria-label="Observability snapshot">Metrics become available after hydration.</pre>
+
+            <details>
+                <summary>Example usage</summary>
+                <pre>AlpineComponentLoader.subscribe(record =&gt; records.push(record));
+const metrics = AlpineComponentLoader.getMetrics();
+const snapshot = ACLDebugger.getSnapshot(AlpineComponentLoader);
+
+AlpineComponentLoader.clearMetrics();</pre>
+            </details>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="inner">
+                <div class="meta">
+                    <div><strong>AlpineComponentLoader</strong> - A lightweight, build-free component loader for
+                        Alpine.js.</div>
+                    <div>&copy; 2026 LTDev LLC · MIT License</div>
+                </div>
+                <nav aria-label="Footer">
+                    <a href="https://github.com/LTDev-LLC/alpine-component-loader" target="_blank"
+                        rel="noreferrer">GitHub</a>
+                    <a href="https://github.com/LTDev-LLC/alpine-component-loader/issues" target="_blank"
+                        rel="noreferrer">Issues</a>
+                    <a href="https://alpinejs.dev/" target="_blank" rel="noreferrer">Alpine.js</a>
+                    <a href="#top">Back to top</a>
+                </nav>
+            </div>
+        </div>
+    </footer>
+</body>
+
+</html>

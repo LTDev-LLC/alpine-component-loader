@@ -1,0 +1,30 @@
+<style>
+    :host {
+        display: inline-grid;
+        width: 4rem;
+        height: 4rem;
+        place-items: center;
+        border-radius: 1rem;
+        color: #fff;
+        background: linear-gradient(135deg, #2463eb, #7647d8);
+        font:
+            800 1.2rem/1 system-ui,
+            sans-serif;
+        box-shadow: 0 0.75rem 2rem rgb(36 99 235 / 25%);
+    }
+
+    .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+</style>
+
+<span x-text="$props.initials" aria-hidden="true"></span>
+<span class="sr-only">Account avatar</span>

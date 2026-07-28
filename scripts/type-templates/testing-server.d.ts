@@ -1,0 +1,25 @@
+export interface ACLTestServer {
+    origin: string;
+    url: string;
+    root: string;
+    indexPath: string;
+    indexUrl: string;
+    readonly clients: number;
+    close(): Promise<void>;
+}
+
+export interface ACLTestServerOptions {
+    root?: string;
+    index?: string;
+    host?: string;
+    port?: number;
+    watchFiles?: boolean;
+    watchDebounce?: number;
+    watchPollInterval?: number;
+    injectAllHtml?: boolean;
+}
+
+export function startACLTestServer(options?: ACLTestServerOptions): Promise<ACLTestServer>;
+
+declare const ACLTestingServer: { startACLTestServer: typeof startACLTestServer };
+export default ACLTestingServer;

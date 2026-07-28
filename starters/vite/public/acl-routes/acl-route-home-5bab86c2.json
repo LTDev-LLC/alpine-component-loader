@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "basePath": "..",
+  "components": {
+    "quantity-field": {
+      "source": "components/quantity-field.html",
+      "dependencies": [],
+      "options": {
+        "shadow": true,
+        "attributes": {
+          "quantity": {
+            "type": "Number",
+            "default": 1
+          },
+          "disabledState": "Boolean"
+        },
+        "form": {
+          "value": "quantity",
+          "state": "quantity",
+          "disabled": "disabledState"
+        },
+        "templateRevision": "sha256-EDefMLOaxHDGhQDOdj6_LFjN7fVd06TIaOYb91jRfUU"
+      },
+      "metadata": {
+        "description": "A form-associated quantity control.",
+        "events": {
+          "quantity-change": {
+            "description": "Emitted after the quantity changes."
+          }
+        }
+      }
+    },
+    "home-dashboard": {
+      "source": "components/home-dashboard.html",
+      "dependencies": [
+        "quantity-field"
+      ],
+      "options": {
+        "attributes": {
+          "visitor": {
+            "type": "String",
+            "default": "developer"
+          }
+        },
+        "templateRevision": "sha256-QVB1zo_d0l_pzWVeTmuLBdRvrb-JPlsGrhmWQN-sCo0"
+      },
+      "metadata": {
+        "slots": {
+          "tip": {
+            "description": "Route-specific guidance supplied by the application router."
+          }
+        },
+        "description": "Home route demonstrating dependency expansion, slots, and form association."
+      }
+    }
+  },
+  "groups": {
+    "home": [
+      "home-dashboard"
+    ]
+  }
+}

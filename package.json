@@ -1,0 +1,215 @@
+{
+    "name": "alpine-component-loader",
+    "version": "1.0.0",
+    "description": "A lightweight, build-free component loader for Alpine.js.",
+    "type": "module",
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./types/index.d.ts",
+    "bin": {
+        "alpine-component-loader": "./bin/alpine-component-loader.mjs"
+    },
+    "exports": {
+        ".": {
+            "types": "./types/index.d.ts",
+            "import": "./dist/index.js",
+            "default": "./dist/index.js"
+        },
+        "./auto": {
+            "types": "./types/auto.d.ts",
+            "import": "./dist/auto.js",
+            "default": "./dist/auto.js"
+        },
+        "./dev": {
+            "types": "./types/dev.d.ts",
+            "import": "./dist/dev.js",
+            "default": "./dist/dev.js"
+        },
+        "./debugger": {
+            "types": "./types/debugger.d.ts",
+            "import": "./dist/debugger.js",
+            "default": "./dist/debugger.js"
+        },
+        "./offline": {
+            "types": "./types/offline.d.ts",
+            "import": "./dist/offline.js",
+            "default": "./dist/offline.js"
+        },
+        "./a11y": {
+            "types": "./types/a11y.d.ts",
+            "import": "./dist/a11y.js",
+            "default": "./dist/a11y.js"
+        },
+        "./a11y-scanner": {
+            "types": "./types/a11y-scanner.d.ts",
+            "import": "./dist/a11y-scanner.js",
+            "default": "./dist/a11y-scanner.js"
+        },
+        "./testing": {
+            "types": "./types/testing.d.ts",
+            "import": "./dist/testing.js",
+            "default": "./dist/testing.js"
+        },
+        "./testing/playwright": {
+            "types": "./types/testing-playwright.d.ts",
+            "import": "./dist/testing-playwright.js",
+            "default": "./dist/testing-playwright.js"
+        },
+        "./testing/vitest": {
+            "types": "./types/testing-vitest.d.ts",
+            "import": "./dist/testing-vitest.js",
+            "default": "./dist/testing-vitest.js"
+        },
+        "./testing/server": {
+            "types": "./types/testing-server.d.ts",
+            "import": "./server/testing-server.mjs",
+            "default": "./server/testing-server.mjs"
+        },
+        "./ssr": {
+            "types": "./types/ssr.d.ts",
+            "import": "./server/ssr.mjs",
+            "default": "./server/ssr.mjs"
+        },
+        "./project": {
+            "types": "./types/project.d.ts",
+            "import": "./server/project-config.mjs",
+            "default": "./server/project-config.mjs"
+        },
+        "./vite": {
+            "types": "./types/vite.d.ts",
+            "import": "./server/vite-plugin.mjs",
+            "default": "./server/vite-plugin.mjs"
+        },
+        "./observability-exporters": {
+            "types": "./types/observability-exporters.d.ts",
+            "import": "./dist/observability-exporters.js",
+            "default": "./dist/observability-exporters.js"
+        },
+        "./package.json": "./package.json"
+    },
+    "files": [
+        "bin",
+        "dist",
+        "server",
+        "starters",
+        "!starters/**/node_modules",
+        "types",
+        "docs",
+        "README.md",
+        "MIGRATION.md",
+        "SECURITY.md",
+        "LICENSE"
+    ],
+    "sideEffects": [
+        "./dist/auto.js"
+    ],
+    "scripts": {
+        "test": "npm run build && npm run test:unit && npm run test:browser",
+        "test:unit": "node --test tests/unit/*.test.js",
+        "pretest:coverage": "npm run playwright:install -- chromium",
+        "test:coverage": "node scripts/coverage.mjs",
+        "test:types": "tsc -p tsconfig.types.json",
+        "test:implementation-types": "tsc -p tsconfig.implementation.json",
+        "pretest:browser": "npm run playwright:install -- chromium",
+        "test:browser": "playwright test --project=chromium",
+        "pretest:cross-browser": "npm run playwright:install -- chromium firefox webkit",
+        "test:cross-browser": "playwright test",
+        "pretest:other-browsers": "npm run playwright:install -- firefox webkit",
+        "test:other-browsers": "playwright test --project=firefox --project=webkit",
+        "pretest:performance": "npm run playwright:install -- chromium",
+        "test:performance": "playwright test tests/performance.spec.js --project=chromium",
+        "playwright:install": "playwright install",
+        "playwright:install:ci": "playwright install --with-deps",
+        "security:static": "node scripts/security-check.mjs",
+        "security:audit": "npm audit --audit-level=moderate",
+        "check:package": "node scripts/check-package.mjs",
+        "check:docs": "node scripts/check-docs.mjs",
+        "format:js": "prettier --write \"{src,server,scripts,bin,examples,tests}/**/*.{js,mjs}\" playwright.config.js",
+        "check:format:js": "prettier --check \"{src,server,scripts,bin,examples,tests}/**/*.{js,mjs}\" playwright.config.js",
+        "check:javascript-style": "node scripts/check-javascript-style.mjs",
+        "check:reproducible": "node scripts/check-reproducible.mjs",
+        "example:a11y": "node ./bin/alpine-component-loader.mjs serve examples/a11y/",
+        "example:hmr": "node ./bin/alpine-component-loader.mjs serve examples/hmr/",
+        "example:offline": "node ./bin/alpine-component-loader.mjs serve --root . examples/offline/serve.html",
+        "example:offline:generate": "node ./bin/alpine-component-loader.mjs offline examples/offline/acl-manifest.json --group offline-demo --config examples/offline/acl-offline.json --asset index.html --asset app.js --asset styles.css --asset acl-manifest.json --asset ../../dist/index.js --asset ../../dist/acl-load-error.js --asset ../../dist/offline.js --asset ../../dist/runtime/loader.js --asset ../../dist/runtime/config.js --asset ../../dist/runtime/errors.js --asset ../../dist/runtime/values.js --asset ../../dist/runtime/props.js --asset ../../dist/runtime/data-options.js --asset ../../dist/runtime/registry.js --asset ../../dist/runtime/contracts.js --asset ../../dist/runtime/component/factory.js --asset ../../dist/runtime/component/lifecycle-controller.js --asset ../../dist/runtime/component/loading-controller.js --asset ../../dist/runtime/component/data-gate-controller.js --asset ../../dist/runtime/component/render-controller.js --asset ../../dist/runtime/component/state-controller.js --asset ../../dist/runtime/lifecycle.js --asset ../../dist/runtime/caches.js --asset ../../dist/runtime/template-cache.js --asset ../../dist/runtime/rendering.js --asset https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js --minify-js --base-url /examples/offline --out-dir examples/offline --namespace example --force",
+        "example:playground": "node ./bin/alpine-component-loader.mjs serve --root . examples/playground/serve.html",
+        "prestage": "npm run build && npm run playwright:install -- chromium",
+        "stage": "node scripts/stage-example.mjs",
+        "prestaging": "npm run build && npm run playwright:install -- chromium",
+        "staging": "node scripts/stage-example.mjs",
+        "example:feature-lab": "node ./bin/alpine-component-loader.mjs serve --root examples/feature-lab",
+        "example:feature-lab:ssr": "node examples/feature-lab-ssr/server.mjs",
+        "example:ssr": "node examples/ssr/server.mjs",
+        "serve": "node ./bin/alpine-component-loader.mjs serve",
+        "skeleton": "node ./bin/alpine-component-loader.mjs skeleton",
+        "build": "node scripts/generate-types.mjs && node scripts/build.mjs",
+        "build:types": "node scripts/generate-types.mjs",
+        "check:size": "node scripts/check-size.mjs",
+        "validate": "npm run check:format:js && npm run check:javascript-style && npm run build && npm run test:coverage && npm run test:types && npm run test:implementation-types && npm run check:size && npm run security:static && npm run security:audit && npm run test:other-browsers && npm run check:docs && npm run check:package && npm run check:reproducible"
+    },
+    "engines": {
+        "node": ">=22"
+    },
+    "browserslist": [
+        "Chrome >= 100",
+        "Firefox >= 100",
+        "Safari >= 15.4",
+        "Edge >= 100"
+    ],
+    "peerDependencies": {
+        "@playwright/test": ">=1.61 <2",
+        "alpinejs": ">=3.14 <4",
+        "playwright": ">=1.61 <2",
+        "vite": ">=5 <8"
+    },
+    "peerDependenciesMeta": {
+        "@playwright/test": {
+            "optional": true
+        },
+        "alpinejs": {
+            "optional": true
+        },
+        "playwright": {
+            "optional": true
+        },
+        "vite": {
+            "optional": true
+        }
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/LTDev-LLC/alpine-component-loader.git"
+    },
+    "keywords": [
+        "alpine",
+        "alpinejs",
+        "component",
+        "loader",
+        "reusable",
+        "reuse"
+    ],
+    "author": "LTDev LLC",
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/LTDev-LLC/alpine-component-loader/issues"
+    },
+    "homepage": "https://github.com/LTDev-LLC/alpine-component-loader#readme",
+    "devDependencies": {
+        "@alpinejs/csp": "3.15.12",
+        "@axe-core/playwright": "4.12.1",
+        "@playwright/test": "1.62.0",
+        "@types/node": "^26.1.1",
+        "alpinejs-314": "npm:alpinejs@3.14.0",
+        "alpinejs-315": "npm:alpinejs@3.15.12",
+        "fast-check": "4.9.0",
+        "playwright": "1.62.0",
+        "playwright-core": "1.62.0",
+        "prettier": "3.9.6",
+        "typescript": "7.0.2",
+        "vite": "8.1.5"
+    },
+    "optionalDependencies": {
+        "@swc/core": "^1.15.46",
+        "parse5": "^8.0.1"
+    }
+}

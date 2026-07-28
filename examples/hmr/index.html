@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="State-preserving template HMR example for AlpineComponentLoader">
+    <title>Alpine Component Loader HMR Example</title>
+    <link href="./styles.css" rel="stylesheet">
+    <script defer src="/__acl_hmr/alpine.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "alpine-component-loader": "/__acl_hmr/modules/index.min.js",
+                "alpine-component-loader/auto": "/__acl_hmr/modules/auto.min.js",
+                "alpine-component-loader/dev": "/__acl_hmr/modules/dev.min.js",
+                "alpine-component-loader/debugger": "/__acl_hmr/modules/debugger.min.js",
+                "alpine-component-loader/a11y": "/__acl_hmr/modules/a11y.min.js",
+                "alpine-component-loader/a11y-scanner": "/__acl_hmr/modules/a11y-scanner.min.js",
+                "alpine-component-loader/offline": "/__acl_hmr/modules/offline.min.js",
+                "alpine-component-loader/testing": "/__acl_hmr/modules/testing.min.js"
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <header id="top" class="site-header">
+        <div>
+            <h1>AlpineComponentLoader</h1>
+            <div class="subtitle">
+                A lightweight, build-free component loader for
+                <a href="https://alpinejs.dev/" target="_blank" rel="noreferrer">Alpine.js</a>
+            </div>
+            <a class="github-link" href="https://github.com/LTDev-LLC/alpine-component-loader" target="_blank"
+                rel="noreferrer">View on GitHub</a>
+        </div>
+    </header>
+
+    <main>
+        <section class="lab-overview" aria-labelledby="overview-heading">
+            <p class="eyebrow">Focused example</p>
+            <h2 id="overview-heading">State-preserving template HMR</h2>
+            <p>Run the reusable development server here, then edit <code>components/live-card.html</code>. The injected
+                SSE client reloads only this component while keeping its counter, draft value, focus, and selection.</p>
+            <div class="metrics" aria-label="HMR capabilities">
+                <div class="metric"><strong>SSE</strong><span>Transport</span></div>
+                <div class="metric"><strong>1</strong><span>Targeted template</span></div>
+                <div class="metric"><strong>Live</strong><span>State preserved</span></div>
+            </div>
+            <div class="toolbar">
+                <span id="connection-status" class="status" data-state="connecting">Connecting…</span>
+            </div>
+        </section>
+
+        <section class="example-section" aria-labelledby="live-template-heading">
+            <h2 id="live-template-heading">Live component</h2>
+            <hmr-demo-card count="1"></hmr-demo-card>
+            <h3>Reload event</h3>
+            <pre id="reload-log">Waiting for a template change…</pre>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="inner">
+                <div class="meta">
+                    <div><strong>AlpineComponentLoader</strong> - A lightweight, build-free component loader for
+                        Alpine.js.</div>
+                    <div>&copy; 2026 LTDev LLC · MIT License</div>
+                </div>
+                <nav aria-label="Footer">
+                    <a href="https://github.com/LTDev-LLC/alpine-component-loader" target="_blank"
+                        rel="noreferrer">GitHub</a>
+                    <a href="https://github.com/LTDev-LLC/alpine-component-loader/issues" target="_blank"
+                        rel="noreferrer">Issues</a>
+                    <a href="https://alpinejs.dev/" target="_blank" rel="noreferrer">Alpine.js</a>
+                    <a href="#top">Back to top</a>
+                </nav>
+            </div>
+        </div>
+    </footer>
+
+    <script type="module">
+        import AlpineComponentLoader from 'alpine-component-loader/auto';
+
+        const status = document.getElementById('connection-status');
+        const log = document.getElementById('reload-log');
+
+        AlpineComponentLoader.config({ autoStart: true });
+        AlpineComponentLoader.define(
+            'hmr-demo-card',
+            '/components/live-card.html',
+            { shadow: true, attributes: { count: Number } }
+        );
+
+        const bindInjectedConnection = () => {
+            const eventSource = window.__aclDevConnection?.eventSource;
+            if (!eventSource) {
+                requestAnimationFrame(bindInjectedConnection);
+                return;
+            }
+            const showConnected = () => {
+                status.dataset.state = 'connected';
+                status.textContent = 'HMR connected';
+            };
+            const showDisconnected = () => {
+                status.dataset.state = 'disconnected';
+                status.textContent = 'Reconnecting…';
+            };
+            eventSource.addEventListener('open', showConnected);
+            eventSource.addEventListener('error', showDisconnected);
+            if (eventSource.readyState === EventSource.OPEN)
+                showConnected();
+        };
+        bindInjectedConnection();
+
+        window.addEventListener('acl:dev-reload', event => {
+            window.__lastACLDevReload = event.detail;
+            log.textContent = JSON.stringify(event.detail, null, 2);
+        });
+        window.__aclHMRExample = { loader: AlpineComponentLoader };
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,203 @@
+{
+  "version": 1,
+  "namespace": "example",
+  "cacheName": "acl-offline-example-AGqboPrn80Y05f4i",
+  "groups": [
+    "offline-demo"
+  ],
+  "components": [
+    "offline-demo-status",
+    "offline-demo-shell"
+  ],
+  "config": {
+    "version": 1,
+    "activation": "immediate",
+    "navigation": {
+      "fallback": "/examples/offline/index.html",
+      "allow": [
+        "/examples/offline/"
+      ],
+      "strategy": "network-first"
+    },
+    "runtimeRoutes": [
+      {
+        "path": "/examples/offline/runtime-message.json",
+        "origin": null,
+        "strategy": "cache-first",
+        "cacheName": "example-runtime",
+        "maxEntries": 4,
+        "maxAgeSeconds": 86400
+      }
+    ]
+  },
+  "entries": [
+    {
+      "url": "/dist/acl-load-error.min.js",
+      "revision": "sha256-5prU7HH27vZCx1hBW91jjxZZ35TuN1JtO_U8qNKxBzg",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/index.min.js",
+      "revision": "sha256-g1crnqP6_YjraIHg22yBf9STe8wDFapf2XMvQF4UcM8",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/offline.min.js",
+      "revision": "sha256-LP9ttwBG5P9rFfAc-gpSBfRIOmnOmG8QEXU9r53lma8",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/caches.min.js",
+      "revision": "sha256-3OhmtVCEfAVYqhYjkCtalgDhltwPeleSgQJevXF8Z4g",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/component/data-gate-controller.min.js",
+      "revision": "sha256-3Qfu2bleHbrZRt_fRTn31A1rI9xknZZuoYcrfJynXi8",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/component/factory.min.js",
+      "revision": "sha256-_AvbY0J8u0dW3MAJor5IbTAAEe1F5dSyBizIDlbWrtQ",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/component/lifecycle-controller.min.js",
+      "revision": "sha256-7XT4LKu8J7cBs1rzbPlxXZ_5KDP1TL_PIckC32IqNZ8",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/component/loading-controller.min.js",
+      "revision": "sha256-db0VNDOywbqt5yUl2oMwK7-hRKdpCmjQIrvEQt1-E-Q",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/component/render-controller.min.js",
+      "revision": "sha256-pHdkE04ToU39epBBhKhK-qoZFD3RnpJBwSiyrDsGJZ8",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/component/state-controller.min.js",
+      "revision": "sha256-dWtHMDlR0SJBjIHEbvN0yOU46ZcZH981AeKgEBow3So",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/config.min.js",
+      "revision": "sha256-g1Cle9twD9y2ZX9WwNtOn3pucQOgrj6EDcn9qmxmc-k",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/contracts.min.js",
+      "revision": "sha256-VLT-WBhPq7hbQxodP0pQ62uKSaznvt0qDwZ9_8oqGbw",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/data-options.min.js",
+      "revision": "sha256-BHdJUL2-S5BDDcWvvb5jz95tRRZrecnw8ZuNX6PMufU",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/errors.min.js",
+      "revision": "sha256-PP6FMFk-pLx2bA_yUKPjQEa_Vu2XrVKfKiNe-o4csMA",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/lifecycle.min.js",
+      "revision": "sha256-OgZaAvOdU76yPnASFA4C0aAi5207QF2xtFU01w70c44",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/loader.min.js",
+      "revision": "sha256-9AMMUWrrn4LXEI2iu9588B1mjTfyqzvLLMpHAU5Gc6Q",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/props.min.js",
+      "revision": "sha256-wUVFVsywdL1lRvIaQBF2HvQDsg_2ee3BlbeNqXrAxlU",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/registry.min.js",
+      "revision": "sha256-yiCeQSo7kRL9SZvJXkNWxr8l4o0j51i05JotGUA_x94",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/rendering.min.js",
+      "revision": "sha256-070cb1tk7ylOsxXuV2mU0LfDFCZxtLkFYqFDNMlCw8g",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/template-cache.min.js",
+      "revision": "sha256-rvPJidKCdJSPkJj-6OoRXXpehTDj4JjD8NpwrbBDgac",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/values.min.js",
+      "revision": "sha256-KXtHzcub4nz9SeEhelJxQQv1uuizjHimyahI_G0rHBI",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/offline/acl-manifest.json",
+      "revision": "sha256-mVuN3K-mHzkN8r3o9Ty-nG6tKo7144raauY8Xn-jgW4",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/offline/app.min.js",
+      "revision": "sha256-AlE-7Y-ypdWbbCIn8jZZRp08GN97jXdTUr6BCqaTn0U",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/offline/components/offline-shell.html",
+      "revision": "sha256-djrB0zWcU_ObM53Vjztn_xm8OaOG69TZFcyE8iexflE",
+      "required": true,
+      "component": "offline-demo-shell"
+    },
+    {
+      "url": "/examples/offline/components/offline-status.html",
+      "revision": "sha256-xJZH5hK9h6AEmDxoi-qA965hzXfxayuHvOnJGvTC0qM",
+      "required": true,
+      "component": "offline-demo-status"
+    },
+    {
+      "url": "/examples/offline/index.html",
+      "revision": "sha256-hOrrKXsXrQ2vGhR2uchDn0scrXBZM2nrfEgOYlM5k88",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/offline/styles.css",
+      "revision": "sha256-klsxfdVhCYZrqbUoMCz9w0a-Jvj896uM_BZM7Eqhqo8",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js",
+      "revision": "url-gH7DmJ1G3P05LmDD7rzYgD5S9v88K8UB63dzCeNRvXw",
+      "required": false,
+      "component": null
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+<style>
+    :host {
+        display: block;
+        padding: 1rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+        transition: all 0.2s;
+    }
+
+    :host([active="true"]) {
+        border-color: #1d4ed8;
+        background: #eff6ff;
+        box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.1);
+    }
+</style>
+<div>
+    <strong x-text="$props.title"></strong>
+    <small style="display:block; color:#4b5563" x-text="$props.active ? 'Status: Active' : 'Status: Inactive'"></small>
+</div>

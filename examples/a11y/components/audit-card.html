@@ -1,0 +1,238 @@
+<style>
+    :host {
+        display: block;
+        margin-top: 1.25rem;
+    }
+
+    article {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 1rem 1.25rem;
+        padding: 1.25rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 1rem;
+        background: #f8fafc;
+        color: #172033;
+    }
+
+    .avatar {
+        width: 4.5rem;
+        height: 4.5rem;
+        border-radius: 50%;
+        background: #dbeafe;
+    }
+
+    .content {
+        min-width: 0;
+    }
+
+    h2,
+    h3,
+    h4,
+    p {
+        margin-top: 0;
+    }
+
+    form {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.75rem;
+        align-items: end;
+        margin-top: 1rem;
+    }
+
+    .field,
+    label {
+        display: grid;
+        gap: 0.35rem;
+    }
+
+    label {
+        font-weight: 700;
+    }
+
+    input,
+    button {
+        min-height: 2.65rem;
+        border-radius: 0.6rem;
+        font: inherit;
+    }
+
+    input {
+        border: 1px solid #94a3b8;
+        padding: 0.55rem 0.7rem;
+        background: white;
+    }
+
+    button {
+        border: 0;
+        padding: 0.6rem 0.9rem;
+        background: #1d4ed8;
+        color: white;
+        font-weight: 750;
+    }
+
+    .review-region {
+        grid-column: 1 / -1;
+        padding-top: 1rem;
+        border-top: 1px solid #dbe3ef;
+    }
+
+    .identity-markers {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        color: #475569;
+        font-size: 0.875rem;
+    }
+
+    .support-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+        margin-top: 1rem;
+    }
+
+    .support-card,
+    fieldset,
+    details,
+    table {
+        min-width: 0;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.65rem;
+        background: white;
+    }
+
+    .support-card,
+    fieldset,
+    details {
+        padding: 0.75rem;
+    }
+
+    .support-card p,
+    details p {
+        margin: 0.5rem 0 0;
+    }
+
+    fieldset label {
+        display: flex;
+        align-items: center;
+        font-weight: 500;
+    }
+
+    fieldset input {
+        min-height: auto;
+    }
+
+    summary,
+    a {
+        color: #1d4ed8;
+        font-weight: 700;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        overflow: hidden;
+    }
+
+    caption {
+        padding: 0.65rem;
+        font-weight: 800;
+        text-align: left;
+    }
+
+    th,
+    td {
+        padding: 0.65rem;
+        border-top: 1px solid #e2e8f0;
+        text-align: left;
+    }
+
+    .status-graphic {
+        width: 2.5rem;
+        height: 2.5rem;
+    }
+
+    @media (max-width: 560px) {
+        article,
+        form,
+        .support-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<article aria-labelledby="profile-heading">
+    <img class="avatar"
+        src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 72 72'%3E%3Crect width='72' height='72' rx='36' fill='%23dbeafe'/%3E%3Ctext x='36' y='45' text-anchor='middle' font-size='27' fill='%231d4ed8'%3EACL%3C/text%3E%3C/svg%3E"
+        alt="Alpine Component Loader profile">
+    <div class="content">
+        <h2 id="profile-heading">Accessible profile editor</h2>
+        <p>The example changes this rendered Shadow DOM, then audits it again without remounting the component.</p>
+
+        <form>
+            <div class="field">
+                <label data-email-label for="profile-email">Email address</label>
+                <input id="profile-email" name="email" type="email" value="ada@example.test">
+            </div>
+            <button data-save-action type="button">Save profile</button>
+        </form>
+    </div>
+
+    <section class="review-region" data-review-region data-owner="design-system" aria-label="Review metadata">
+        <h3 data-review-heading>Why the initial audit passes</h3>
+        <p>Images, controls, fields, headings, IDs, ARIA references, and application ownership are valid.</p>
+        <div class="identity-markers" aria-label="Unique identity markers">
+            <span id="identity-primary" data-identity="primary">Primary marker</span>
+            <span id="identity-secondary" data-identity="secondary">Secondary marker</span>
+            <span data-language lang="en-US">Language: English (US)</span>
+        </div>
+
+        <div class="support-grid">
+            <div class="support-card" data-focus-region>
+                <strong>Focus visibility</strong>
+                <p><button data-hidden-action type="button">Preview audit</button></p>
+            </div>
+
+            <div class="support-card" data-nesting-region>
+                <strong>Navigation</strong>
+                <p id="audit-guidance"><a data-help-link href="#audit-guidance">Read audit guidance</a></p>
+            </div>
+
+            <div class="support-card" data-demo-dialog role="dialog" aria-label="Audit details">
+                <strong>Named dialog region</strong>
+                <p>Its explicit name remains available to assistive technology.</p>
+            </div>
+
+            <fieldset data-preferences>
+                <legend data-preferences-legend>Audit notifications</legend>
+                <label><input type="checkbox" checked> Email summaries</label>
+            </fieldset>
+
+            <details data-audit-details>
+                <summary data-audit-summary>Semantic details control</summary>
+                <p>The summary is the first child.</p>
+            </details>
+
+            <table data-audit-table>
+                <caption data-table-caption>Latest audit status</caption>
+                <thead>
+                    <tr><th data-table-heading scope="col">Check</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Passing</td></tr>
+                </tbody>
+            </table>
+
+            <div class="support-card">
+                <svg class="status-graphic" data-status-graphic role="img" aria-label="Passing audit status"
+                    viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="24" cy="24" r="22" fill="#dcfce7"></circle>
+                    <path d="M14 24l7 7 14-15" fill="none" stroke="#166534" stroke-width="4"></path>
+                </svg>
+            </div>
+        </div>
+    </section>
+</article>

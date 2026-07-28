@@ -1,0 +1,40 @@
+<style>
+    :host {
+        display: block;
+    }
+
+    article {
+        height: 100%;
+        box-sizing: border-box;
+        padding: 1.15rem;
+        border: 1px solid #bae6fd;
+        border-radius: 1rem;
+        background: #f0f9ff;
+    }
+
+    h3 {
+        margin: 0 0 .65rem;
+        color: #0c4a6e;
+        font: 750 1rem system-ui, sans-serif;
+    }
+
+    p {
+        margin: 0;
+        color: #155e75;
+        font: .9rem/1.55 system-ui, sans-serif;
+    }
+
+    small {
+        display: block;
+        margin-top: .75rem;
+        color: #0369a1;
+        font: 700 .72rem system-ui, sans-serif;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+    }
+</style>
+<article x-data="ssrLabData">
+    <h3 x-text="heading">Hydration data</h3>
+    <p x-text="message">Server fallback: the activity endpoint has not run yet.</p>
+    <small x-text="state">Available without JavaScript</small>
+</article>

@@ -1,0 +1,21 @@
+<style>
+    :host {
+        display: inline-block;
+    }
+
+    button {
+        min-height: 2.5rem;
+        padding: 0.55rem 0.8rem;
+        border: 1px solid #1d4ed8;
+        border-radius: 0.5rem;
+        background: #2563eb;
+        color: white;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+    }
+</style>
+<button
+    onclick="this.dispatchEvent(new CustomEvent('internal-save', { bubbles: true, detail: { message: 'Received public-save from mapped event' } }))">
+    Dispatch internal-save
+</button>

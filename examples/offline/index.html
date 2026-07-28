@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Generated offline bundle example for AlpineComponentLoader">
+    <title>Alpine Component Loader Offline Example</title>
+    <link rel="stylesheet" href="./styles.css">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "alpine-component-loader": "/dist/index.min.js",
+                "alpine-component-loader/auto": "/dist/auto.min.js",
+                "alpine-component-loader/dev": "/dist/dev.min.js",
+                "alpine-component-loader/debugger": "/dist/debugger.min.js",
+                "alpine-component-loader/a11y": "/dist/a11y.min.js",
+                "alpine-component-loader/a11y-scanner": "/dist/a11y-scanner.min.js",
+                "alpine-component-loader/offline": "/dist/offline.min.js",
+                "alpine-component-loader/testing": "/dist/testing.min.js"
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <header id="top" class="site-header">
+        <div>
+            <h1>AlpineComponentLoader</h1>
+            <div class="subtitle">
+                A lightweight, build-free component loader for
+                <a href="https://alpinejs.dev/" target="_blank" rel="noreferrer">Alpine.js</a>
+            </div>
+            <a class="github-link" href="https://github.com/LTDev-LLC/alpine-component-loader" target="_blank"
+                rel="noreferrer">View on GitHub</a>
+        </div>
+    </header>
+
+    <main>
+        <section class="lab-overview" aria-labelledby="overview-heading">
+            <p class="eyebrow">Focused example</p>
+            <h2 id="overview-heading">Generated offline component bundle</h2>
+            <p>This page uses the <code>offline</code> command to precache one manifest group, its dependency graph,
+                and the static runtime needed for a complete offline reload. Its explicit policy also provides a
+                navigation fallback and a bounded runtime cache.</p>
+            <div class="metrics" aria-label="Offline example capabilities">
+                <div class="metric"><strong>1</strong><span>Manifest group</span></div>
+                <div class="metric"><strong>2</strong><span>Component templates</span></div>
+                <div class="metric"><strong>4</strong><span>Runtime entries</span></div>
+                <div class="metric"><strong>24h</strong><span>Route expiry</span></div>
+            </div>
+        </section>
+
+        <section class="example-section status-panel" aria-labelledby="readiness-heading">
+            <div>
+                <p class="eyebrow">Readiness</p>
+                <h2 id="readiness-heading">Service worker status</h2>
+            </div>
+            <div class="status-list" aria-live="polite">
+                <span id="network-status" class="status-pill" data-state="online">Checking network…</span>
+                <span id="service-worker-status" class="status-pill" data-state="installing">Installing offline
+                    worker…</span>
+            </div>
+            <p>Wait until the worker is ready, enable offline mode in DevTools, then reload this page. Registration
+                details include storage quota estimates and the runtime-routed message.</p>
+            <button id="refresh-status" type="button">Refresh worker status</button>
+            <details>
+                <summary>Registration details</summary>
+                <pre id="status-details">Checking…</pre>
+            </details>
+        </section>
+
+        <section id="demo-root" class="example-section" aria-label="Offline component demonstration">
+            <p class="loading">Loading the manifest component graph…</p>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="inner">
+                <div class="meta">
+                    <div><strong>AlpineComponentLoader</strong> - A lightweight, build-free component loader for
+                        Alpine.js.</div>
+                    <div>&copy; 2026 LTDev LLC · MIT License</div>
+                </div>
+                <nav aria-label="Footer">
+                    <a href="https://github.com/LTDev-LLC/alpine-component-loader" target="_blank"
+                        rel="noreferrer">GitHub</a>
+                    <a href="https://github.com/LTDev-LLC/alpine-component-loader/issues" target="_blank"
+                        rel="noreferrer">Issues</a>
+                    <a href="https://alpinejs.dev/" target="_blank" rel="noreferrer">Alpine.js</a>
+                    <a href="#top">Back to top</a>
+                </nav>
+            </div>
+        </div>
+    </footer>
+
+    <script type="module" src="./app.min.js"></script>
+</body>
+
+</html>

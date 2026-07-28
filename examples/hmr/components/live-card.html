@@ -1,0 +1,72 @@
+<style>
+    :host {
+        display: block;
+        margin: 1.25rem 0;
+    }
+
+    article {
+        padding: 1rem;
+        border: 2px solid #93c5fd;
+        border-radius: 10px;
+        background: #eff6ff;
+    }
+
+    h2 {
+        margin: 0 0 0.5rem;
+        color: #1d4ed8;
+    }
+
+    p {
+        margin: 0.4rem 0;
+    }
+
+    .state-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.75rem;
+        margin-top: 1rem;
+    }
+
+    label {
+        display: grid;
+        gap: 0.35rem;
+        color: #334155;
+        font-weight: 700;
+    }
+
+    input,
+    button {
+        min-height: 2.5rem;
+        border: 1px solid #93c5fd;
+        border-radius: 0.5rem;
+        font: inherit;
+    }
+
+    input {
+        padding: 0.55rem 0.7rem;
+    }
+
+    button {
+        align-self: end;
+        padding: 0.55rem 0.8rem;
+        background: #2563eb;
+        color: white;
+        cursor: pointer;
+    }
+
+    code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+</style>
+<article>
+    <h2>Live template</h2>
+    <p>Change the local state below, then edit this template. Only <code>&lt;hmr-demo-card&gt;</code> reloads.</p>
+    <p>Template marker: <strong data-template-marker>ready</strong></p>
+    <div class="state-grid">
+        <label>
+            Draft preserved by stable key
+            <input data-acl-preserve-key="draft" value="Select part of this text">
+        </label>
+        <button type="button" x-on:click="$props.count++">Count: <span x-text="$props.count">1</span></button>
+    </div>
+</article>

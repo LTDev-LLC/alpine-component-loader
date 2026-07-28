@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Interactive accessibility auditing example for AlpineComponentLoader">
+    <title>Alpine Component Loader Accessibility Example</title>
+    <link rel="stylesheet" href="./styles.css">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "alpine-component-loader": "/__acl_hmr/modules/index.min.js",
+                "alpine-component-loader/auto": "/__acl_hmr/modules/auto.min.js",
+                "alpine-component-loader/dev": "/__acl_hmr/modules/dev.min.js",
+                "alpine-component-loader/debugger": "/__acl_hmr/modules/debugger.min.js",
+                "alpine-component-loader/a11y": "/__acl_hmr/modules/a11y.min.js",
+                "alpine-component-loader/a11y-scanner": "/__acl_hmr/modules/a11y-scanner.min.js",
+                "alpine-component-loader/offline": "/__acl_hmr/modules/offline.min.js",
+                "alpine-component-loader/testing": "/__acl_hmr/modules/testing.min.js"
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <header id="top" class="site-header">
+        <div>
+            <h1>AlpineComponentLoader</h1>
+            <div class="subtitle">
+                A lightweight, build-free component loader for
+                <a href="https://alpinejs.dev/" target="_blank" rel="noreferrer">Alpine.js</a>
+            </div>
+            <a class="github-link" href="https://github.com/LTDev-LLC/alpine-component-loader" target="_blank"
+                rel="noreferrer">View on GitHub</a>
+        </div>
+    </header>
+
+    <main>
+        <section class="lab-overview" aria-labelledby="overview-heading">
+            <p class="eyebrow">Focused example</p>
+            <h2 id="overview-heading">Component accessibility audits</h2>
+            <p>Run dependency-free rules across an open Shadow Root, add an application policy, emit normalized
+                results, and inspect the same audit in the visual debugger.</p>
+            <div class="metrics" aria-label="Accessibility example capabilities">
+                <div class="metric"><strong>18</strong><span>Built-in rules</span></div>
+                <div class="metric"><strong>1</strong><span>Custom policy</span></div>
+                <div class="metric"><strong>Open</strong><span>Shadow Root</span></div>
+                <div class="metric"><strong>Live</strong><span>Audit events</span></div>
+            </div>
+        </section>
+
+        <section class="example-section workspace" aria-labelledby="demo-heading">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Live component</p>
+                    <h2 id="demo-heading">Start accessible, then exercise recovery</h2>
+                </div>
+                <span id="audit-status" class="status" data-state="pending" role="status">Preparing audit…</span>
+            </div>
+
+            <div class="toolbar" aria-label="Accessibility example controls">
+                <button id="audit-component" type="button">Run audit</button>
+                <button id="introduce-issues" class="danger" type="button">Introduce issues</button>
+                <button id="fix-issues" class="secondary" type="button">Fix issues</button>
+                <button id="open-debugger" class="secondary" type="button">Open debugger</button>
+            </div>
+
+            <a11y-demo-card></a11y-demo-card>
+        </section>
+
+        <section class="example-section" aria-labelledby="results-heading">
+            <h2 id="results-heading">Audit results</h2>
+            <div class="results-grid" aria-label="Accessibility audit results">
+                <article class="result-panel">
+                    <h3>Normalized violations</h3>
+                    <p id="audit-summary" aria-live="polite">Waiting for the component to load.</p>
+                    <ol id="audit-results" class="violations"></ol>
+                </article>
+
+                <article class="result-panel">
+                    <h3>Latest <code>acl:a11y</code> event</h3>
+                    <pre id="event-output" tabindex="0">Waiting for an audit event…</pre>
+                </article>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="inner">
+                <div class="meta">
+                    <div><strong>AlpineComponentLoader</strong> - A lightweight, build-free component loader for
+                        Alpine.js.</div>
+                    <div>&copy; 2026 LTDev LLC · MIT License</div>
+                </div>
+                <nav aria-label="Footer">
+                    <a href="https://github.com/LTDev-LLC/alpine-component-loader" target="_blank"
+                        rel="noreferrer">GitHub</a>
+                    <a href="https://github.com/LTDev-LLC/alpine-component-loader/issues" target="_blank"
+                        rel="noreferrer">Issues</a>
+                    <a href="https://alpinejs.dev/" target="_blank" rel="noreferrer">Alpine.js</a>
+                    <a href="#top">Back to top</a>
+                </nav>
+            </div>
+        </div>
+    </footer>
+
+    <script type="module" src="./app.js"></script>
+</body>
+
+</html>

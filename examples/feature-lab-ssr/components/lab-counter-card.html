@@ -1,0 +1,42 @@
+<style>
+    :host {
+        display: block;
+    }
+
+    article {
+        height: 100%;
+        box-sizing: border-box;
+        padding: 1.15rem;
+        border: 1px solid #c7d2fe;
+        border-radius: 1rem;
+        background: #eef2ff;
+    }
+
+    h3 {
+        margin: 0 0 .65rem;
+        color: #312e81;
+        font: 750 1rem system-ui, sans-serif;
+    }
+
+    p {
+        min-height: 2.6rem;
+        margin: 0 0 .85rem;
+        color: #4338ca;
+        font: .9rem/1.45 system-ui, sans-serif;
+    }
+
+    button {
+        padding: .6rem .85rem;
+        border: 0;
+        border-radius: .65rem;
+        color: white;
+        background: #4338ca;
+        font-weight: 700;
+        cursor: pointer;
+    }
+</style>
+<article x-data="ssrLabCounter">
+    <h3 x-text="label">Forwarded event</h3>
+    <p>Interaction starts only after hydration; the initial value is rendered by Node.</p>
+    <button type="button" @click="increment">Count <span x-text="count">2</span></button>
+</article>

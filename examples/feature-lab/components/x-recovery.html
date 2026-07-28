@@ -1,0 +1,45 @@
+<style>
+    :host {
+        display: block;
+        border: 1px solid #fed7aa;
+        border-radius: 9px;
+        padding: 1rem;
+        background: #fff7ed;
+    }
+
+    .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+
+    button {
+        min-height: 2.5rem;
+        padding: 0.55rem 0.8rem;
+        border: 1px solid #c2410c;
+        border-radius: 0.5rem;
+        background: #c2410c;
+        color: white;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+</style>
+<div x-data="{ status: 'Ready to test' }">
+    <strong>On-demand slow request</strong>
+    <p x-text="$props.$loading ? status : ($props.payload?.message || $props.$error || status)"></p>
+    <div class="actions">
+        <button :disabled="$props.$loading"
+            @click="status = 'Starting slow request…'; $el.getRootNode().host.setAttribute('data-src', '/demo-api/slow?delay=10000&amp;retry-delay=700&amp;run=' + Date.now())">Start</button>
+        <button :disabled="!$props.$loading"
+            @click="status = 'Canceled in feature lab'; $props.$cancel(status)">Cancel</button>
+        <button :disabled="$props.$loading || !$el.getRootNode().host.hasAttribute('data-src')"
+            @click="status = 'Retrying slow request…'; $props.$retry()">Retry</button>
+    </div>
+</div>

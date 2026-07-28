@@ -1,0 +1,9 @@
+<div x-data style="text-align: left;">
+    <button
+        @click="window.__aclConfettiClicks = (window.__aclConfettiClicks || 0) + 1; window.confetti && window.confetti({ particleCount: 90, spread: 70, origin: { y: 0.7 } })"
+        style="padding:10px 20px; cursor:pointer;">
+        Party Time
+    </button>
+    <small style="display:block; margin-top:6px; color:#4b5563">Confetti script loaded: <span
+            x-text="window.confetti ? 'yes' : 'pending'"></span></small>
+</div>

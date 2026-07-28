@@ -1,0 +1,57 @@
+<style>
+    :host {
+        display: block;
+    }
+
+    article {
+        overflow: hidden;
+        border: 1px solid #cbd5e1;
+        border-radius: 1rem;
+        background: #fff;
+    }
+
+    header,
+    footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: .9rem 1.1rem;
+        background: #f8fafc;
+    }
+
+    header {
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    footer {
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .content {
+        padding: 1.1rem;
+        color: #334155;
+        font: .95rem/1.6 system-ui, sans-serif;
+    }
+
+    ::slotted([slot="badge"]) {
+        padding: .25rem .55rem;
+        border-radius: 999px;
+        color: #166534;
+        background: #dcfce7;
+        font: 700 .72rem system-ui, sans-serif;
+    }
+</style>
+<article>
+    <header><strong>
+            <slot name="title">Named slots</slot>
+        </strong>
+        <slot name="badge"></slot>
+    </header>
+    <div class="content">
+        <slot></slot>
+    </div>
+    <footer>
+        <slot name="footer">Fallback footer</slot>
+    </footer>
+</article>

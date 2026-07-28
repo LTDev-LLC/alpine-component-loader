@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "basePath": "..",
+  "components": {
+    "profile-avatar": {
+      "source": "components/profile-avatar.html",
+      "dependencies": [],
+      "options": {
+        "shadow": true,
+        "attributes": {
+          "initials": {
+            "type": "String",
+            "required": true
+          }
+        },
+        "templateRevision": "sha256-pV-sW98ZtaeSaDULQZEf8ZhBNk6zub3gI_pHOjHu7AQ"
+      },
+      "metadata": {
+        "description": "Shadow DOM dependency inferred from the account dashboard template."
+      }
+    },
+    "account-dashboard": {
+      "source": "components/account-dashboard.html",
+      "dependencies": [
+        "profile-avatar"
+      ],
+      "options": {
+        "attributes": {
+          "accountId": {
+            "type": "String",
+            "required": true
+          },
+          "plan": {
+            "type": "String",
+            "default": "starter",
+            "options": [
+              "starter",
+              "pro"
+            ]
+          }
+        },
+        "templateRevision": "sha256-iNJQV62kQJW3tEIsoQWAe2Xrf6_jgkAXzi8EdGY0rRs"
+      },
+      "metadata": {
+        "description": "Account route demonstrating group roots, inferred dependencies, props, and events.",
+        "events": {
+          "plan-change": {
+            "description": "Emitted when the example plan changes.",
+            "detail": {
+              "type": "object",
+              "properties": {
+                "plan": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "plan"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "groups": {
+    "account": [
+      "account-dashboard"
+    ]
+  }
+}

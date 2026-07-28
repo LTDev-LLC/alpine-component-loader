@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ACL vanilla starter</title>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "alpine-component-loader": "https://cdn.jsdelivr.net/gh/LTDev-LLC/alpine-component-loader/dist/index.min.js",
+            "alpine-component-loader/auto": "https://cdn.jsdelivr.net/gh/LTDev-LLC/alpine-component-loader/dist/auto.min.js",
+            "alpine-component-loader/dev": "https://cdn.jsdelivr.net/gh/LTDev-LLC/alpine-component-loader/dist/dev.min.js",
+            "alpine-component-loader/debugger": "https://cdn.jsdelivr.net/gh/LTDev-LLC/alpine-component-loader/dist/debugger.min.js",
+            "alpine-component-loader/a11y": "https://cdn.jsdelivr.net/gh/LTDev-LLC/alpine-component-loader/dist/a11y.min.js",
+            "alpine-component-loader/a11y-scanner": "https://cdn.jsdelivr.net/gh/LTDev-LLC/alpine-component-loader/dist/a11y-scanner.min.js",
+            "alpine-component-loader/offline": "https://cdn.jsdelivr.net/gh/LTDev-LLC/alpine-component-loader/dist/offline.min.js",
+            "alpine-component-loader/observability-exporters": "https://cdn.jsdelivr.net/gh/LTDev-LLC/alpine-component-loader/dist/observability-exporters.min.js",
+            "alpine-component-loader/testing": "https://cdn.jsdelivr.net/gh/LTDev-LLC/alpine-component-loader/dist/testing.min.js"
+        }
+    }
+    </script>
+    <script type="module" src="./app.js"></script>
+</head>
+
+<body>
+    <acl-boundary>
+        <hello-card name="World">Loaded from a URL-relative manifest.</hello-card>
+        <p slot="fallback" role="alert">The greeting could not be loaded.</p>
+    </acl-boundary>
+</body>
+
+</html>

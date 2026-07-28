@@ -1,0 +1,12 @@
+{
+    "suppressions": [
+        {
+            "rule": "color-contrast",
+            "route": "/third-party",
+            "engine": "axe",
+            "selector": "#vendor-widget",
+            "reason": "Example of a narrowly scoped vendor exception; replace with an issue reference.",
+            "expires": "2099-01-01T00:00:00Z"
+        }
+    ]
+}

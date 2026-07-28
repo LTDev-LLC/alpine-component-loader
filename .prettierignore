@@ -1,0 +1,6 @@
+coverage/
+dist/
+node_modules/
+test-results/
+examples/acl-next/
+examples/offline/acl-sw.js

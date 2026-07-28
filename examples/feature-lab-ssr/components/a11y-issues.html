@@ -1,0 +1,84 @@
+<style>
+    :host {
+        display: block;
+    }
+
+    .card {
+        padding: 1rem;
+        border: 2px solid #d97706;
+        border-radius: 0.75rem;
+        color: #451a03;
+        background: #fffbeb;
+        font-family: system-ui, sans-serif;
+    }
+
+    h3,
+    p {
+        margin: 0 0 0.75rem;
+    }
+
+    .profile-row,
+    .actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .avatar {
+        width: 3rem;
+        height: 3rem;
+        border-radius: 999px;
+    }
+
+    input {
+        min-height: 2.5rem;
+        flex: 1 1 12rem;
+        padding: 0.55rem 0.7rem;
+        border: 1px solid #92400e;
+        border-radius: 0.5rem;
+        box-sizing: border-box;
+        font: inherit;
+    }
+
+    .actions {
+        margin-top: 0.75rem;
+    }
+
+    button,
+    a {
+        min-height: 2.5rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.55rem 0.8rem;
+        border: 1px solid #92400e;
+        border-radius: 0.5rem;
+        color: white;
+        background: #92400e;
+        font: inherit;
+        font-weight: 700;
+    }
+
+    .icon-button {
+        width: 2.5rem;
+        padding: 0;
+    }
+
+    .icon-button::before {
+        content: "?";
+    }
+</style>
+<div class="card">
+    <h3>Intentionally inaccessible profile card</h3>
+    <p>This component deliberately contains common mistakes for the development scanner to report.</p>
+    <div class="profile-row">
+        <img class="avatar" src="/avatar.svg">
+        <input type="text" placeholder="Display name">
+    </div>
+    <div class="actions">
+        <button class="icon-button" type="button"></button>
+        <button type="button" tabindex="2">Save draft</button>
+        <span aria-hidden="true"><a href="#developer-tools">Discard draft</a></span>
+    </div>
+</div>
