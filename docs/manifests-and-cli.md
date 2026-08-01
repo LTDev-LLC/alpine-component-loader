@@ -527,6 +527,8 @@ await AlpineComponentLoader.start();
 
 Use `--route` repeatedly to capture more pages and `--include` or `--exclude` to select component tags. The generator protects non-generated files unless `--force` is supplied.
 
+See [Skeleton loading UI](skeletons.md) for the complete capture and integration workflow.
+
 ## CLI option reference
 
 Run `npx alpine-component-loader --help` for the installed version's command summary. Options accept `--name value` or `--name=value` where a value is required.

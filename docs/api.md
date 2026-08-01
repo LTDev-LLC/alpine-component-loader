@@ -361,7 +361,7 @@ Definitions with authored `loadingTemplate` or `loadingHtml` keep their authored
 npx alpine-component-loader skeleton ./index.html --mode manifest --out-dir skeletons
 ```
 
-See [Components, props, slots, and rendering](components.md) for the generated CSS and import order.
+See [Skeleton loading UI](skeletons.md) for generation, the CSS and manifest delivery choices, import order, and troubleshooting.
 
 ## Cache APIs
 

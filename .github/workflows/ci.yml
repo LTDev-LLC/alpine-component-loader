@@ -1,5 +1,7 @@
 name: CI
 
+# An exceptional direct push to main can bypass push-triggered runs by including
+# [skip actions] in its commit message. GitHub handles the marker before dispatch.
 on:
   pull_request:
   push:

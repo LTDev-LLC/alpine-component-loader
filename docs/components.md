@@ -395,6 +395,8 @@ The generator visits every selected route at configurable mobile and desktop vie
 
 Generated masks/fragments contain anonymous rectangles only; they do not copy text, form values, URLs, IDs, event attributes, or application DOM structure. Dimensions still reflect the fixture data, so capture representative states. Generated files replace only other recognized generated files unless `--force` is supplied. Registering a manifest after a definition affects eligible future loads but does not interrupt a generation already in progress.
 
+See [Skeleton loading UI](skeletons.md) for setup, route and component selection, responsive capture, output modes, regeneration, and troubleshooting.
+
 Customize the standalone colors with:
 
 ```css

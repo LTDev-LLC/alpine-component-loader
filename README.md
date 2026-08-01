@@ -295,7 +295,7 @@ Development uses native ACL modules, targeted template HMR, and a generated rout
 
 ## Features
 
-- [Template sources, inline discovery, declarative registration, props, helpers, Alpine stores, slots, Shadow/Light DOM, styles, assets, loading, and fallback UI](docs/components.md).
+- [Template sources, inline discovery, declarative registration, props, helpers, Alpine stores, slots, Shadow/Light DOM, styles, assets, loading, and fallback UI](docs/components.md), including [generated responsive skeletons](docs/skeletons.md).
 - [Data fetching, URL/body handling, response parsing, cancellation, retries, polling, template/data caches, persistence adapters, migrations, and storage helpers](docs/data.md).
 - [Lifecycle hooks, progressive hydration, error boundaries, form association, cleanup, events, state-preserving reloads, targeted HMR, dynamic components, transitions, and keep-alive](docs/lifecycle.md).
 - [Recursive sanitization, custom URL policy, Trusted Types, CSP operation, and browser/server rendering parity](docs/security.md).
@@ -492,6 +492,7 @@ See the [complete example catalog](examples/README.md), including the runnable f
 - [Security and Trusted Types](docs/security.md)
 - [SSR and hydration](docs/ssr.md)
 - [Testing utilities](docs/testing.md)
+- [Skeleton loading UI](docs/skeletons.md)
 - [Runtime efficiency and distribution size](docs/performance.md)
 - [Observability](docs/observability.md)
 - [Adaptive prefetch](docs/prefetch.md)
@@ -512,6 +513,15 @@ npm run test:cross-browser
 npm run security:static
 npm run check:reproducible
 ```
+
+For an exceptional direct push to `main` that has already been validated locally, include GitHub's native `[skip actions]` marker in the commit message:
+
+```bash
+git commit -m "chore: update repository metadata [skip actions]"
+git push origin main
+```
+
+The marker prevents workflows triggered by that push from starting. Do not use it on the HEAD commit of a pull request: skipped required checks can remain pending and block the pull request. See [GitHub's workflow-skipping reference](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/skip-workflow-runs).
 
 ## License
 
