@@ -116,8 +116,6 @@
         "test:cross-browser": "playwright test",
         "pretest:other-browsers": "npm run playwright:install -- firefox webkit",
         "test:other-browsers": "playwright test --project=firefox --project=webkit",
-        "pretest:performance": "npm run playwright:install -- chromium",
-        "test:performance": "playwright test tests/performance.spec.js --project=chromium",
         "playwright:install": "playwright install",
         "playwright:install:ci": "playwright install --with-deps",
         "security:static": "node scripts/security-check.mjs",

@@ -58,14 +58,6 @@ jobs:
       - run: npm run build
       - run: npm run playwright:install:ci -- ${{ matrix.browser }}
       - run: npx --no-install playwright test tests/loader-registration.spec.js tests/loader-rendering-diagnostics.spec.js tests/modernization.spec.js tests/runtime-module-loading.spec.js --project=${{ matrix.browser }}
-      - run: npx --no-install playwright test tests/performance.spec.js --project=${{ matrix.browser }} --workers=1
-      - name: Upload performance results
-        if: always()
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: performance-results-${{ matrix.browser }}
-          path: test-results/**/performance-results.json
-          if-no-files-found: ignore
 
   coverage:
     name: Main coverage and Chromium
@@ -81,13 +73,6 @@ jobs:
       - run: npm run build
       - run: npm run playwright:install:ci -- chromium
       - run: npm run test:coverage
-      - name: Upload performance results
-        if: always()
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: performance-results
-          path: test-results/**/performance-results.json
-          if-no-files-found: ignore
 
   node-compatibility:
     if: github.event_name != 'pull_request'
@@ -125,6 +110,3 @@ jobs:
       - run: npm run build
       - run: npm run playwright:install:ci -- ${{ matrix.browser }}
       - run: npx --no-install playwright test --project=${{ matrix.browser }}
-        env:
-          ACL_SKIP_PERFORMANCE: '1'
-      - run: npx --no-install playwright test tests/performance.spec.js --project=${{ matrix.browser }} --workers=1

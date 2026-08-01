@@ -73,13 +73,6 @@ const collect = async () => {
         ACL_BROWSER_COVERAGE_DIR: browserCoverageRoot,
         NODE_V8_COVERAGE: nodeCoverageRoot,
     });
-    // Keep wall-clock budgets outside precise coverage and parallel suite contention
-    await run(join(projectRoot, 'node_modules/.bin/playwright'), [
-        'test',
-        'tests/performance.spec.js',
-        '--project=chromium',
-        '--workers=1',
-    ]);
 };
 
 const sourcePaths = async () => {

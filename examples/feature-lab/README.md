@@ -63,4 +63,4 @@ window.addEventListener('pagehide', () => connection.flush(), { once: true });
 
 OpenTelemetry and Sentry adapters accept caller-owned clients; ACL does not install or import either SDK.
 
-For runner-owned cleanup, the repository's [`tests/testing-integrations.spec.js`](../../tests/testing-integrations.spec.js) executes the packaged Playwright fixture. The [performance guide](../../docs/performance.md) explains the cold/warm, p95, retention, quota, and historical regression diagnostics exercised in CI.
+For runner-owned cleanup, the repository's [`tests/testing-integrations.spec.js`](../../tests/testing-integrations.spec.js) executes the packaged Playwright fixture. The [runtime efficiency guide](../../docs/performance.md) describes parsed-template caching and distribution-size gates.

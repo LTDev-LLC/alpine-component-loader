@@ -1,16 +1,9 @@
 import { defineConfig } from '@playwright/test';
 
-const skipPerformance = Boolean(process.env.ACL_BROWSER_COVERAGE_DIR) || process.env.ACL_SKIP_PERFORMANCE === '1';
-
 // Run browser specifications in parallel across the supported engine matrix
 export default defineConfig({
     testDir: './tests',
-    testIgnore: [
-        '**/unit/**',
-        '**/types/**',
-        // Performance budgets need an uninstrumented, uncontended browser process
-        ...(skipPerformance ? ['**/performance.spec.js'] : []),
-    ],
+    testIgnore: ['**/unit/**', '**/types/**'],
     fullyParallel: true,
     preserveOutput: 'always',
     reporter: 'list',

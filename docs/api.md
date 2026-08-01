@@ -599,7 +599,7 @@ npx alpine-component-loader validate .
 
 Commands include `create`, `serve`, `skeleton`, `audit`, `init`, `validate`, `manifest`, `routes`, `watch`, `offline`, `types`, and `schema`. Project commands read `acl.config.mjs` by default and accept `--config`; the offline command uses `--project-config` because `--config` remains its offline-policy flag. Tooling commands protect existing files unless their documented `--force` option is supplied.
 
-The [CLI guide](manifests-and-cli.md#cli-option-reference) lists safe manifest update/prune behavior, sidecar and offline schema kinds, starter templates, offline policy input, and audit report formats. Repository maintainers can inspect cross-browser timing and retention output in [Performance diagnostics and regression gates](performance.md).
+The [CLI guide](manifests-and-cli.md#cli-option-reference) lists safe manifest update/prune behavior, sidecar and offline schema kinds, starter templates, offline policy input, and audit report formats. Repository maintainers can inspect runtime caching and distribution-size guidance in [Runtime efficiency and distribution size](performance.md).
 
 ## Additional entry points and exports
 

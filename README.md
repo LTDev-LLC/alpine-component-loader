@@ -301,7 +301,7 @@ Development uses native ACL modules, targeted template HMR, and a generated rout
 - [Recursive sanitization, custom URL policy, Trusted Types, CSP operation, and browser/server rendering parity](docs/security.md).
 - [Version-one manifests, conservative inference, route shards, shared configuration, watch mode, Vite delivery, component sidecars, generated TypeScript declarations, JSON Schema, and Custom Elements metadata](docs/manifests-and-cli.md).
 - [Adaptive prefetch](docs/prefetch.md), [bounded offline navigation/runtime policies](docs/offline.md), and [static Node SSR with initial data plus Shadow or opt-in Light DOM hydration](docs/ssr.md).
-- [Structured local observability](docs/observability.md), [isolated loaders and Playwright/Vitest fixtures](docs/testing.md), optional [debugger and accessibility tools](docs/accessibility-and-debugging.md), and [cross-browser performance diagnostics](docs/performance.md).
+- [Structured local observability](docs/observability.md), [isolated loaders and Playwright/Vitest fixtures](docs/testing.md), optional [debugger and accessibility tools](docs/accessibility-and-debugging.md), and [runtime efficiency and distribution-size gates](docs/performance.md).
 - [Runtime security boundaries](docs/security.md), [the vulnerability disclosure policy](SECURITY.md), and automated static, dependency, CodeQL, and sanitizer-parity checks.
 - [Complete public API, option, helper, attribute, entry-point, and TypeScript references](docs/api.md).
 
@@ -492,7 +492,7 @@ See the [complete example catalog](examples/README.md), including the runnable f
 - [Security and Trusted Types](docs/security.md)
 - [SSR and hydration](docs/ssr.md)
 - [Testing utilities](docs/testing.md)
-- [Performance diagnostics and regression gates](docs/performance.md)
+- [Runtime efficiency and distribution size](docs/performance.md)
 - [Observability](docs/observability.md)
 - [Adaptive prefetch](docs/prefetch.md)
 - [Manifests, generated contracts, and CLI tooling](docs/manifests-and-cli.md)
@@ -509,7 +509,6 @@ npm ci
 npm run playwright:install -- chromium firefox webkit
 npm run validate
 npm run test:cross-browser
-npm run test:performance
 npm run security:static
 npm run check:reproducible
 ```
