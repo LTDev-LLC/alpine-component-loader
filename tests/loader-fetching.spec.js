@@ -40,10 +40,12 @@ test('reload during an active load cancels stale work and performs one fresh win
     `,
     });
 
-    await page.waitForFunction(
-        // Wait until the initial request is active before replacing it
-        () => window.el?.$props.$loading,
-    );
+    await expect
+        .poll(
+            // Wait for the server to observe the initial request before replacing it
+            () => counts.get('slow-reload-race') || 0,
+        )
+        .toBe(1);
     await page.evaluate(() => {
         // Exercise consecutive reload requests against active work
         void window.el.reload();

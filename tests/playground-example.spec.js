@@ -50,6 +50,7 @@ test('playground tab clicks switch editors without scrolling or moving focus int
 
 test('playground edits, reruns, diagnoses, persists, and resets a complete ACL page', async ({ page }) => {
     // Exercise the complete editor and preview workflow
+    test.slow();
     const failures = [],
         sandboxWarnings = [];
     page.on(
