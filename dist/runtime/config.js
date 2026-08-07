@@ -3,7 +3,7 @@
 // Licensed under the MIT license in the repository root
 
 // The build replaces this identifier from package.json; raw source uses an isolated development namespace
-export const ACL_VERSION = typeof "1.0.1" === 'undefined' ? 'development' : "1.0.1";
+export const ACL_VERSION = typeof "1.0.2" === 'undefined' ? 'development' : "1.0.2";
 export const VALID_CACHE_STRATEGIES = new Set([
     'cache-first',
     'network-first',

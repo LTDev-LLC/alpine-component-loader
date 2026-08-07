@@ -1,7 +1,7 @@
 {
   "version": 1,
   "namespace": "example",
-  "cacheName": "acl-offline-example-KSUv6yjDjrGd9d6F",
+  "cacheName": "acl-offline-example-CyntyDe7qbjP9ArV",
   "groups": [
     "offline-demo"
   ],
@@ -39,7 +39,7 @@
     },
     {
       "url": "/dist/index.min.js",
-      "revision": "sha256-yIh25LGdBKqv6j66BpRV2fPEvUXciiyazegSbWcKsVE",
+      "revision": "sha256-d_Y17C8TWf3a-zsVvdVsMzsUcW5YOQYTM2CdbydwtDQ",
       "required": true,
       "component": null
     },
@@ -93,7 +93,7 @@
     },
     {
       "url": "/dist/runtime/config.min.js",
-      "revision": "sha256-vEIQ1T3DyocBKkGXAmvm9BpCqe62rmJIszU_hedmmVo",
+      "revision": "sha256-UUn8grYtERWwLq1LfJIhr9aNQJ2ey6XMkH8kGOJQw9I",
       "required": true,
       "component": null
     },
