@@ -29,20 +29,21 @@ import {
 } from '../../src/observability-exporters.js';
 import { registerManifestFrom, registerRouteManifest } from '../../src/runtime/manifest-loader.js';
 
-const manifest = // Run this operation
-    (source = 'components/example-card.html') => ({
-        version: 1,
-        components: {
-            'base-card': { source: 'components/base-card.html' },
-            'example-card': {
-                source,
-                dependencies: ['base-card'],
+const packageVersion = JSON.parse(await readFile(new URL('../../package.json', import.meta.url), 'utf8')).version,
+    manifest = // Run this operation
+        (source = 'components/example-card.html') => ({
+            version: 1,
+            components: {
+                'base-card': { source: 'components/base-card.html' },
+                'example-card': {
+                    source,
+                    dependencies: ['base-card'],
+                },
             },
-        },
-        groups: {
-            page: ['example-card'],
-        },
-    });
+            groups: {
+                page: ['example-card'],
+            },
+        });
 
 test('project configuration rejects unknown keys and resolves paths from the config file', async () => {
     // Run this operation
@@ -509,7 +510,7 @@ test('Vite plugin injects base-aware maps, external delivery, virtual routes, an
         build: { outDir: 'build' },
     });
     const copiedHtml = copied.transformIndexHtml('<html><head></head></html>', {});
-    assert.match(copiedHtml, /\/nested\/assets\/alpine-component-loader\/1\.0\.0\/index\.js/);
+    assert.ok(copiedHtml.includes(`/nested/assets/alpine-component-loader/${packageVersion}/index.js`));
     copied.configResolved({
         // Verify the common root-base path never becomes a protocol-relative URL
         root,
@@ -518,10 +519,16 @@ test('Vite plugin injects base-aware maps, external delivery, virtual routes, an
         build: { outDir: 'build' },
     });
     const rootBaseHtml = copied.transformIndexHtml('<html><head></head></html>', {});
-    assert.match(rootBaseHtml, /"alpine-component-loader": "\/assets\/alpine-component-loader\/1\.0\.0\/index\.js"/);
+    assert.ok(
+        rootBaseHtml.includes(
+            `"alpine-component-loader": "/assets/alpine-component-loader/${packageVersion}/index.js"`,
+        ),
+    );
     assert.doesNotMatch(rootBaseHtml, /"alpine-component-loader": "\/\/assets\//);
     await copied.writeBundle();
-    assert.ok((await stat(join(root, 'build', 'assets', 'alpine-component-loader', '1.0.0', 'index.js'))).isFile());
+    assert.ok(
+        (await stat(join(root, 'build', 'assets', 'alpine-component-loader', packageVersion, 'index.js'))).isFile(),
+    );
 });
 
 test('Vite hooks serve native files, emit targeted HMR, validate delivery, and copy routes', async () => {
@@ -695,10 +702,12 @@ test('Vite development and production integration preserve native external modul
         build: { outDir: 'production' },
     });
     const productionHtml = await readFile(join(root, 'production', 'index.html'), 'utf8');
-    assert.match(productionHtml, /\/nested\/assets\/alpine-component-loader\/1\.0\.0\/index\.js/);
+    assert.ok(productionHtml.includes(`/nested/assets/alpine-component-loader/${packageVersion}/index.js`));
     assert.ok(
         (
-            await stat(join(root, 'production', 'assets', 'alpine-component-loader', '1.0.0', 'runtime', 'loader.js'))
+            await stat(
+                join(root, 'production', 'assets', 'alpine-component-loader', packageVersion, 'runtime', 'loader.js'),
+            )
         ).isFile(),
     );
 });

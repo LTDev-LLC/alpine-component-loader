@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 
 const execute = promisify(execFile),
     packageRoot = resolve('.'),
+    packageVersion = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8')).version,
     temporaryRoot = await mkdtemp(join(tmpdir(), 'acl-lean-install-')),
     packageDirectory = join(temporaryRoot, 'package'),
     applicationRoot = join(temporaryRoot, 'application');
@@ -77,5 +78,6 @@ if (
     throw new Error('Lean-install parser guidance was not actionable.');
 
 const installedPackage = JSON.parse(await readFile(join(packagePath, 'package.json'), 'utf8'));
-if (installedPackage.version !== '1.0.0') throw new Error(`Unexpected packed version: ${installedPackage.version}`);
+if (installedPackage.version !== packageVersion)
+    throw new Error(`Unexpected packed version: expected ${packageVersion}, received ${installedPackage.version}`);
 process.stdout.write('Lean optional-dependency installation smoke test passed.\n');

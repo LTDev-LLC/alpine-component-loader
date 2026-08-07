@@ -2,7 +2,7 @@
 
 A dependency-free browser runtime for loading reusable HTML components with Alpine.js. The package also includes isolated loader instances, progressive SSR hydration, form-associated components, nearest error boundaries, opt-in development and accessibility tools, route shards, Vite integration, ready-made test fixtures, bounded offline policies, and static Node SSR.
 
-This documentation targets package version `1.0.0`. ACL-owned public document
+This documentation targets package version `1.x`. ACL-owned public document
 formats and diagnostic snapshots use schema version `1`; externally governed
 Custom Elements Manifest, SARIF, and JSON Schema dialect identifiers retain
 their standards-defined versions. See
@@ -37,6 +37,18 @@ Add this to the document `<head>`:
     }
 </script>
 ```
+Optionally, you may pin a tagged version such as `v1.0.1`:
+```html
+<script type="importmap">
+    {
+        "imports": {
+            "alpine-component-loader": "https://cdn.jsdelivr.net/gh/LTDev-LLC/alpine-component-loader@1.0.1/dist/index.min.js",
+            <!-- Other import paths... -->
+        }
+    }
+</script>
+```
+
 
 Declaring these browser entries in the import map does not download them. The
 browser fetches an entry only when application code imports its specifier.
