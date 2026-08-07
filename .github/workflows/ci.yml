@@ -112,3 +112,78 @@ jobs:
       - run: npm run build
       - run: npm run playwright:install:ci -- ${{ matrix.browser }}
       - run: npx --no-install playwright test --project=${{ matrix.browser }}
+
+  release:
+    name: Release changed package version
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - static
+      - coverage
+      - node-compatibility
+      - browsers
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 22
+
+      - name: Detect package version change
+        id: version_change
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.before }}
+        run: |
+          CHANGED="$(node scripts/version-changed.mjs "$BASE_SHA")"
+          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
+
+      - name: Read and validate ACL version
+        if: steps.version_change.outputs.changed == 'true'
+        id: version
+        shell: bash
+        run: |
+          VERSION="$(node --input-type=module -e "
+            const { readFile } = await import('node:fs/promises');
+            const { readPackageVersion } = await import('./scripts/version-changed.mjs');
+            process.stdout.write(readPackageVersion(await readFile('./package.json', 'utf8')));
+          ")"
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check release tag
+        if: steps.version_change.outputs.changed == 'true'
+        id: existing_tag
+        shell: bash
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if git show-ref --verify --quiet "refs/tags/$TAG"; then
+            TAG_SHA="$(git rev-list -n 1 "$TAG")"
+            if [ "$TAG_SHA" != "$RELEASE_SHA" ]; then
+              echo "::error::$TAG already exists at $TAG_SHA instead of tested commit $RELEASE_SHA."
+              exit 1
+            fi
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "$TAG already points to the tested commit."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create and push release tag
+        if: steps.version_change.outputs.changed == 'true' && steps.existing_tag.outputs.exists == 'false'
+        shell: bash
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag --annotate "$TAG" --message "Release $TAG" "$RELEASE_SHA"
+          git push origin "refs/tags/$TAG"
