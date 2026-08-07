@@ -20,10 +20,10 @@ jobs:
         if: vars.ACL_CODEQL_UPLOAD_ENABLED != 'true'
         run: echo "CodeQL results will be retained as an artifact. Set ACL_CODEQL_UPLOAD_ENABLED=true after enabling GitHub Advanced Security."
       - uses: actions/checkout@v7.0.1
-      - uses: github/codeql-action/init@v4.37.4
+      - uses: github/codeql-action/init@v4.37.6
         with:
           languages: javascript-typescript
-      - uses: github/codeql-action/analyze@v4.37.4
+      - uses: github/codeql-action/analyze@v4.37.6
         with:
           output: codeql-results
           upload: ${{ vars.ACL_CODEQL_UPLOAD_ENABLED == 'true' && 'always' || 'never' }}
