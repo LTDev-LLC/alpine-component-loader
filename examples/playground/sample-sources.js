@@ -229,7 +229,6 @@ demo-activity-feed, demo-activity-item, demo-task-control, demo-profile-card { d
   color-scheme: light;
   color: var(--text);
   background: var(--page);
-  transition: color .2s ease, background-color .2s ease;
 }
 
 .demo-app[data-theme="dark"] {
@@ -361,8 +360,6 @@ demo-activity-feed, demo-activity-item, demo-task-control, demo-profile-card { d
   .project-card { grid-template-columns: 1fr; }
   .dashboard-footer { flex-direction: column; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .demo-app { transition: none; }
 }`,
     javascript: String.raw`const existingTheme = Alpine.store('theme');
 if (!existingTheme) {
