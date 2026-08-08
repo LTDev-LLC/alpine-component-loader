@@ -19,6 +19,39 @@ test.beforeAll(async ({ loaderServer }) => {
 
 test('reload during an active load cancels stale work and performs one fresh winning request', async ({ page }) => {
     // Exercise the test scenario
+    let requestCount = 0,
+        releaseInitialResponse,
+        finishInitialResponse;
+    const initialResponseGate = new Promise(
+            // Hold the first response until the replacement request has won
+            (resolveGate) => {
+                releaseInitialResponse = resolveGate;
+            },
+        ),
+        initialResponseFinished = new Promise(
+            // Track the intercepted request through cleanup
+            (resolveFinished) => {
+                finishInitialResponse = resolveFinished;
+            },
+        );
+    page.once('close', releaseInitialResponse);
+    await page.route('**/api/reload-race', async (route) => {
+        // Control completion order without relying on browser or runner timing
+        const count = ++requestCount;
+        if (count === 1) await initialResponseGate;
+        // Fulfill the current response or tolerate the expected initial abort
+        try {
+            await route.fulfill({
+                contentType: 'application/json',
+                body: JSON.stringify({ count }),
+            });
+        } catch (error) {
+            // The initial route is expected to be unavailable after its fetch is aborted
+            if (count !== 1) throw error;
+        } finally {
+            if (count === 1) finishInitialResponse();
+        }
+    });
     await preparePage(page);
     await page.addScriptTag({
         type: 'module',
@@ -29,7 +62,7 @@ test('reload during an active load cancels stale work and performs one fresh win
         window.seenCounts = [];
         await Loader.define('reload-race-card', '${baseUrl}/templates/slow-template.html', {
             data: {
-                src: '${baseUrl}/api/slow?delay=120&name=reload-race',
+                src: '${baseUrl}/api/reload-race',
                 target: 'payload'
             },
             hooks: { afterFetch(data) { window.seenCounts.push(data.count); return data; } }
@@ -42,8 +75,8 @@ test('reload during an active load cancels stale work and performs one fresh win
 
     await expect
         .poll(
-            // Wait for the server to observe the initial request before replacing it
-            () => counts.get('slow-reload-race') || 0,
+            // Wait for the held initial request before replacing it
+            () => requestCount,
         )
         .toBe(1);
     await page.evaluate(() => {
@@ -68,6 +101,26 @@ test('reload during an active load cancels stale work and performs one fresh win
     expect(state.seenCounts).toEqual([2]);
     expect(state.loading).toBe(false);
     expect(state.error).toBeNull();
+    expect(requestCount).toBe(2);
+    releaseInitialResponse();
+    await initialResponseFinished;
+    await page.unrouteAll({ behavior: 'wait' });
+    await expect
+        .poll(
+            // Confirm the aborted response cannot overwrite the winning state
+            () =>
+                page.evaluate(
+                    // Read the final browser state after releasing stale work
+                    () => ({
+                        count: window.el.$props.payload.count,
+                        seenCounts: window.seenCounts,
+                    }),
+                ),
+        )
+        .toEqual({
+            count: 2,
+            seenCounts: [2],
+        });
 });
 
 test('template cache expiry deletes the request key', async ({ page }) => {

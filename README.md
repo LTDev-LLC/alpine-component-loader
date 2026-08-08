@@ -37,12 +37,12 @@ Add this to the document `<head>`:
     }
 </script>
 ```
-Optionally, you may pin a tagged version such as `v1.0.1`:
+Optionally, you may pin a tagged version such as `v1.0.2`:
 ```html
 <script type="importmap">
     {
         "imports": {
-            "alpine-component-loader": "https://cdn.jsdelivr.net/gh/LTDev-LLC/alpine-component-loader@1.0.1/dist/index.min.js",
+            "alpine-component-loader": "https://cdn.jsdelivr.net/gh/LTDev-LLC/alpine-component-loader@1.0.2/dist/index.min.js",
             <!-- Other import paths... -->
         }
     }

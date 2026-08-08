@@ -31,9 +31,10 @@ jobs:
       - run: npm run test:implementation-types
       - run: npm run check:size
       - run: npm run security:static
+      - run: npm run security:audit
       - run: npm run check:docs
       - run: npm run check:package
-      - run: node scripts/check-lean-install.mjs
+      - run: npm run check:lean-install
       - run: npm run check:reproducible
       - run: git diff --check
       - name: Upload built distribution
@@ -42,28 +43,8 @@ jobs:
           name: dist
           path: dist
 
-  browser-pr:
-    name: Browser PR coverage (${{ matrix.browser }})
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        browser: [chromium, firefox, webkit]
-    steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: actions/setup-node@v7.0.0
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      - run: npm run playwright:install:ci -- ${{ matrix.browser }}
-      - run: npx --no-install playwright test tests/loader-registration.spec.js tests/loader-rendering-diagnostics.spec.js tests/modernization.spec.js tests/runtime-module-loading.spec.js --project=${{ matrix.browser }}
-
   coverage:
     name: Main coverage and Chromium
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
@@ -96,7 +77,6 @@ jobs:
       - run: npm run test:types
 
   browsers:
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
