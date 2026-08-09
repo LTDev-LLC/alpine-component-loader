@@ -1,7 +1,7 @@
 {
   "version": 1,
   "namespace": "example",
-  "cacheName": "acl-offline-example-CyntyDe7qbjP9ArV",
+  "cacheName": "acl-offline-example-1ZN6RfYGNRzepQrl",
   "groups": [
     "offline-demo"
   ],
@@ -39,7 +39,13 @@
     },
     {
       "url": "/dist/index.min.js",
-      "revision": "sha256-d_Y17C8TWf3a-zsVvdVsMzsUcW5YOQYTM2CdbydwtDQ",
+      "revision": "sha256-J8eP7bcutkZDEhyLVo5o2aQfdQRU5is3sw6GJHE3A_o",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/inline-templates.min.js",
+      "revision": "sha256-Sv2A1QgKJa4A5Cx2O_Ed7iBmrM9om0Vc_7vQMvuSpz8",
       "required": true,
       "component": null
     },
@@ -93,7 +99,7 @@
     },
     {
       "url": "/dist/runtime/config.min.js",
-      "revision": "sha256-UUn8grYtERWwLq1LfJIhr9aNQJ2ey6XMkH8kGOJQw9I",
+      "revision": "sha256-A7jRPxUyBCF3r2N2jX_ed1vxgWUs96TiLtDDhQD5Hkw",
       "required": true,
       "component": null
     },
@@ -123,7 +129,7 @@
     },
     {
       "url": "/dist/runtime/loader.min.js",
-      "revision": "sha256-b-zBMSMlrY_PUy4qlkp_eyu2a_WOiTfd07L5iadOAlQ",
+      "revision": "sha256-ZUKSSZT_weWwjNmFzZJPS5NaAhTK_mY6Xo6e6sm6vgM",
       "required": true,
       "component": null
     },

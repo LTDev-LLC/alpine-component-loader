@@ -42,6 +42,33 @@ The root package is side-effect free. Call `start()` after configuration and reg
 - An `HTMLTemplateElement`.
 - An application-specific string alias rewritten by `sourceResolver`.
 
+`define(tagName, definition)` additionally accepts an inline definition object:
+
+```js
+AlpineComponentLoader.define('inline-message', {
+    template: `
+        <article x-data="{ open: false }">
+            <button @click="open = !open" x-text="$props.label"></button>
+            <p x-show="open"><slot></slot></p>
+        </article>
+    `,
+    shadow: true,
+    attributes: { label: String },
+});
+```
+
+The required `template` is a non-empty HTML string. All other keys are ordinary
+component options and a separate third argument is rejected. The inline source
+does not fetch or enter the persistent URL template cache. Use a DOM selector
+when multiple definitions should intentionally share one authored template;
+use a URL when templates should deploy independently from JavaScript.
+
+JavaScript inline objects, selector-backed templates, and `x-acl` declarations
+are browser-runtime authoring paths. Static SSR and generated offline precache
+graphs require URL-backed component sources in a manifest. A browser-only
+inline component can still use data requests, persistence, props, slots,
+assets, sanitization, and the ordinary component lifecycle.
+
 For an inline definition:
 
 ```html
@@ -84,11 +111,12 @@ A falsy resolver result keeps the original source. `basePath` prefixes only rela
 
 ### Discover inline definitions
 
-`start()` scans existing `<template acl-component>` definitions:
+`start()` scans existing `template[x-acl]` and
+`template[acl-component]` definitions:
 
 ```html
 <template
-    acl-component="inline-counter"
+    x-acl="inline-counter"
     acl-props='{ "count": { "type": "Number", "default": 0 } }'
 >
     <button @click="$props.count++" x-text="$props.count"></button>
@@ -98,6 +126,25 @@ A falsy resolver result keeps the original source. `basePath` prefixes only rela
 ```
 
 Scan a specific subtree with `registerTemplates(root)`. If an application inserts definitions later, use `observeTemplates({ root, subtree })`; it registers future matching templates and returns a cleanup function. Only one loader-owned template observer is active, so a later observation replaces the previous one.
+
+Both marker spellings support `acl-props` and every serializable data control
+listed in the data guide. The marker attributes are definition metadata and do
+not render inside the custom element. Both markers may be present only when
+they name the same component. Existing hosts upgrade when registration
+completes; future hosts upgrade through the browser custom-element registry.
+
+The ordinary entry keeps late discovery opt-in. The `/auto` entry observes late
+templates by default. Set its global opt-out before importing the entry:
+
+```html
+<script>
+    window.AlpineComponentLoaderConfig = { observeTemplates: false };
+</script>
+```
+
+That opt-out still permits the initial startup scan. `autoStart: false` disables
+both. Call `stopObservingTemplates()` to stop an active observer. Use paired
+custom-element tags in HTML rather than self-closing syntax.
 
 ## Register components from a manifest
 

@@ -21,12 +21,13 @@ const currentModuleUrl = new URL(import.meta.url), moduleSuffix = currentModuleU
     });
     runtimeModulePromises.set(specifier, loading);
     return loading;
-}, [{ ACL_VERSION, VALID_CACHE_STRATEGIES, VALID_HYDRATION_MODES, VALID_LOADING_MODES, HTMLElementBase, getTemplateCacheNames, hasOwn, resolveComponentSource, setBoundedMapEntry, validateCustomElementName }, { ACLLoadError }, { cloneDefinitionValue, getTemplateLoadKey, normalizeForwardEvents, parseListAttribute }, { parsePropDefinitions }, { DEFAULT_DATA_OPTIONS, INTERNAL_COMPONENT_ATTRIBUTES, resolveDataOptionSettings, validateDataOptionSettings }] = await Promise.all([
+}, [{ ACL_VERSION, VALID_CACHE_STRATEGIES, VALID_HYDRATION_MODES, VALID_LOADING_MODES, HTMLElementBase, getTemplateCacheNames, hasOwn, resolveComponentSource, setBoundedMapEntry, validateCustomElementName }, { ACLLoadError }, { cloneDefinitionValue, getTemplateLoadKey, normalizeForwardEvents, parseListAttribute }, { parsePropDefinitions }, { DEFAULT_DATA_OPTIONS, INTERNAL_COMPONENT_ATTRIBUTES, readDeclarativeOptionSettings, resolveDataOptionSettings, validateDataOptionSettings }, { collectInlineComponentTemplates, getInlineComponentName }] = await Promise.all([
     importLocalModule('./config.js'),
     importLocalModule('./errors.js'),
     importLocalModule('./values.js'),
     importLocalModule('./props.js'),
-    importLocalModule('./data-options.js')
+    importLocalModule('./data-options.js'),
+    importLocalModule('../inline-templates.js')
 ]);
 let templateMapsPromise = null, templateCacheRuntimePromise = null, componentRuntimePromise = null, templateLoadCache = null, templateLoadMetaCache = null;
 // Load optional cache and observability helpers only after their first use
@@ -202,6 +203,7 @@ export default class AlpineComponentLoader {
     static globalConfig = {
         debug: false,
         autoStart: true,
+        observeTemplates: true,
         basePath: '',
         sourceResolver: null,
         errorCss: {},
@@ -717,29 +719,24 @@ export default class AlpineComponentLoader {
     }
     static async registerTemplates(root = document) {
         // Register inline component definitions found below a DOM root
-        const templates = [];
-        if (root?.matches?.('template[acl-component]')) templates.push(root);
-        root?.querySelectorAll?.('template[acl-component]').forEach(// Process the current value
-        (template)=>templates.push(template));
-        const constructors = await Promise.all(templates.map(async (tpl)=>{
+        const templates = collectInlineComponentTemplates(root), constructors = await Promise.all(templates.map(async (tpl)=>{
             // Process the current item
-            const tagName = tpl.getAttribute('acl-component');
+            const tagName = getInlineComponentName(tpl);
             if (!tagName) return null;
             // Parse template-level prop definitions into component attributes
-            let config;
+            const config = readDeclarativeOptionSettings(tpl, AlpineComponentLoader.globalConfig);
             // Guard the register templates operation against runtime failures
             try {
-                config = {
-                    attributes: parsePropDefinitions(tpl.getAttribute('acl-props') || '{}')
-                };
+                config.attributes = parsePropDefinitions(tpl.getAttribute('acl-props') || '{}');
             } catch (e) {
                 AlpineComponentLoader._report('warn', `[ACL] Invalid JSON in acl-props for <${tagName}>`, e, {
                     tagName,
                     phase: 'props'
                 });
+                config.attributes = {};
             }
             // Bind the template content to the declared custom element
-            return await AlpineComponentLoader.define(tagName, tpl, config || {});
+            return await AlpineComponentLoader.define(tagName, tpl, config);
         }));
         return constructors.filter(Boolean);
     }
@@ -768,8 +765,10 @@ export default class AlpineComponentLoader {
         });
         AlpineComponentLoader._templateObserver = observer;
         return ()=>{
-            // Stop template observation for this caller
-            AlpineComponentLoader.stopObservingTemplates();
+            // Stop only the observer installed for this caller
+            if (AlpineComponentLoader._templateObserver !== observer) return;
+            observer.disconnect();
+            AlpineComponentLoader._templateObserver = null;
         };
     }
     static stopObservingTemplates() {
@@ -1063,10 +1062,21 @@ export default class AlpineComponentLoader {
         }
     }
     // Run this operation
-    static async define(tagName, source, config = {}) {
+    static async define(tagName, source, config) {
         AlpineComponentLoader._assertActive();
         // Register a component definition and install it after startup
         tagName = validateCustomElementName(tagName);
+        const inlineDefinition = source && typeof source === 'object' && !Array.isArray(source) && !(source instanceof HTMLTemplateElement);
+        let inlineTemplateHtml = null;
+        if (inlineDefinition) {
+            if (arguments.length > 2) throw new TypeError(`[ACL] Inline definition options for <${tagName}> must be supplied with template.`);
+            const { template, ...inlineConfig } = source;
+            if (typeof template !== 'string' || !template.trim()) throw new TypeError(`[ACL] Inline definition for <${tagName}> requires a non-empty template string.`);
+            inlineTemplateHtml = template;
+            source = template;
+            config = inlineConfig;
+        }
+        if (config === undefined) config = {};
         if (!(typeof source === 'string' && source.trim()) && !(source instanceof HTMLTemplateElement)) throw new TypeError(`[ACL] <${tagName}> requires a non-empty source URL, selector, or template.`);
         if (!config || typeof config !== 'object' || Array.isArray(config)) throw new TypeError(`[ACL] Configuration for <${tagName}> must be an object.`);
         const globalConfig = AlpineComponentLoader.globalConfig, dataSettings = resolveDataOptionSettings(config, globalConfig), generatedSkeletonHtml = AlpineComponentLoader._skeletonRegistry.get(tagName) || null, hasAuthoredLoadingUI = config.loadingHtml != null || config.loadingTemplate != null || globalConfig.loadingHtml != null || globalConfig.loadingTemplate != null;
@@ -1117,6 +1127,11 @@ export default class AlpineComponentLoader {
             // Process the current item
             if (!Number.isFinite(Number(settings[key])) || Number(settings[key]) < 0) throw new TypeError(`[ACL] ${key} must be a non-negative finite number for <${tagName}>.`);
         });
+        if (inlineTemplateHtml !== null) {
+            const { htmlToFragment } = await loadRuntimeModule('./rendering.js'), inlineTemplate = document.createElement('template');
+            inlineTemplate.content.appendChild(htmlToFragment(inlineTemplateHtml, settings));
+            source = inlineTemplate;
+        }
         const internalObservedAttrs = settings.form ? new Set([
             ...INTERNAL_COMPONENT_ATTRIBUTES,
             'name',
@@ -1137,7 +1152,7 @@ export default class AlpineComponentLoader {
             globalConfig,
             loader: AlpineComponentLoader._publicFacade || AlpineComponentLoader
         }), resolveSource = (candidate)=>resolveComponentSource(candidate, settings, sourceResolutionContext);
-        let contentSource = resolveSource(source);
+        let contentSource = inlineTemplateHtml === null ? resolveSource(source) : source;
         const existingElement = customElements.get(tagName);
         if (existingElement) {
             if (AlpineComponentLoader._isolated && existingElement.__aclLoaderInstance !== AlpineComponentLoader._instanceId) throw new ACLLoadError(`<${tagName}> is owned by another AlpineComponentLoader instance.`, {

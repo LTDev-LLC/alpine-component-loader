@@ -12,6 +12,26 @@ idle → deferred/loading → ready → deactivated → destroyed
 
 `loading="lazy"` defers work until intersection, while `loading="idle"` schedules it for idle time. Loading and deferred hosts expose `aria-busy="true"`; ready, deactivated, and destroyed hosts do not.
 
+## Inline-template discovery lifecycle
+
+`start()` scans existing `template[x-acl]` and
+`template[acl-component]` declarations before completing registration. The
+ordinary entry does not retain a mutation observer; call `observeTemplates()`
+when definitions may arrive later.
+
+The `/auto` entry installs observation before its asynchronous startup scan so
+a template inserted during startup cannot fall into a discovery gap. Automatic
+observation is enabled by default and can be disabled with
+`window.AlpineComponentLoaderConfig.observeTemplates = false`. The opt-out
+keeps initial discovery; `autoStart: false` disables both startup and
+observation.
+
+Only one loader-owned template observer is active. Re-observing replaces it,
+and each returned cleanup can release only the observer it created.
+`stopObservingTemplates()` stops the active observer regardless of whether it
+was installed manually or by `/auto`. Registration failures are reported with
+the `template-observer` phase and do not create unhandled promise rejections.
+
 ## Progressive SSR hydration
 
 Progressive hydration applies only when the host contains valid server-rendered markup and its `data-acl-revision` exactly matches the registered definition. Client-only components and stale SSR hosts continue through the ordinary `loading` pipeline.

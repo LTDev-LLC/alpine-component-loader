@@ -140,6 +140,38 @@ test('inline template inspection isolates content-only edits conservatively', ()
     );
 });
 
+test('inline template inspection treats x-acl as a component identity', () => {
+    // Exercise concise component markers and conservative contract changes
+    const first = `<!doctype html><html><body>
+        <template x-acl="profile-template" data-src="/api/profile"><p>first</p></template>
+        <profile-template></profile-template>
+    </body></html>`,
+        second = first.replace('<p>first</p>', '<p>second</p>'),
+        inspected = inspectInlineTemplates(first);
+    assert.equal(inspected.errors.length, 0);
+    assert.deepEqual([...inspected.templates.keys()], ['component:profile-template']);
+    assert.deepEqual(diffInlineTemplates(first, second), {
+        mode: 'inline',
+        templates: [
+            {
+                html: '<p>second</p>',
+                kind: 'component',
+                name: 'profile-template',
+            },
+        ],
+    });
+    assert.equal(
+        diffInlineTemplates(first, second.replace('data-src=', 'data-target="profile" data-src=')).mode,
+        'reload',
+    );
+    const conflicting = first.replace(
+        'x-acl="profile-template"',
+        'acl-component="legacy-profile" x-acl="profile-template"',
+    );
+    assert.ok(inspectInlineTemplates(conflicting).errors.length > 0);
+    assert.equal(diffInlineTemplates(first, conflicting).mode, 'reload');
+});
+
 test('CLI parser uses the invocation directory and validates its command shape', () => {
     // Exercise the test scenario
     const invocationDirectory = resolve('/tmp/acl-invocation');
@@ -615,6 +647,7 @@ test('checked-in offline example matches deterministic command output', async ()
                 'styles.css',
                 'acl-manifest.json',
                 '../../dist/index.js',
+                '../../dist/inline-templates.js',
                 '../../dist/acl-load-error.js',
                 '../../dist/offline.js',
                 '../../dist/runtime/loader.js',

@@ -6,7 +6,10 @@
 const isMinifiedModule = new URL(import.meta.url).pathname.endsWith('.min.js'),
     resolveLocalModule = (specifier) => (isMinifiedModule ? specifier.replace(/\.js$/, '.min.js') : specifier),
     importLocalModule = (specifier) => import(/* @vite-ignore */ resolveLocalModule(specifier)),
-    { default: AlpineComponentLoader } = await importLocalModule('./index.js');
+    [{ default: AlpineComponentLoader }, { getInlineComponentName }] = await Promise.all([
+        importLocalModule('./index.js'),
+        importLocalModule('./inline-templates.js'),
+    ]);
 
 // Resolve fetchable template sources to absolute URLs while preserving inline selectors
 const normalizeSource = (source) => {
@@ -119,7 +122,9 @@ const prepareInlineTemplateUpdates = (templates, loader) => {
         const matches = Array.from(document.querySelectorAll('template')).filter(
             // Locate the exact live template identity
             (template) =>
-                kind === 'component' ? template.getAttribute('acl-component') === name : template.id === name,
+                kind === 'component'
+                    ? getInlineComponentName(template)?.toLowerCase() === name.toLowerCase()
+                    : template.id === name,
         );
         if (matches.length !== 1)
             throw new TypeError(`[ACL Dev] Inline template "${name}" is not unique in the active page.`);

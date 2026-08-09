@@ -2,6 +2,7 @@ import AlpineComponentLoader, {
     ACLLoadError,
     createIndexedDBPersistenceAdapter,
     type ACLComponentOptions,
+    type ACLInlineComponentDefinition,
     type ACLManifest,
     type ACLSkeletonManifest,
     type ACLProps,
@@ -54,10 +55,15 @@ AlpineComponentLoader.config({
     adaptivePrefetch: { triggers: ['hover', 'focus', 'visible'], concurrency: 2 },
 });
 AlpineComponentLoader.define('typed-card', '/components/card.html', options);
+const inlineDefinition: ACLInlineComponentDefinition<CardProps> = {
+    ...options,
+    template: '<p x-text="$props.label"></p>',
+};
+AlpineComponentLoader.define('typed-inline-card', inlineDefinition);
 void AlpineComponentLoader.start();
 const version: string = AlpineComponentLoader.version;
 const autoVersion: string = AutoAlpineComponentLoader.version;
-window.AlpineComponentLoaderConfig = { autoStart: false, cacheNamespace: 'typed-auto' };
+window.AlpineComponentLoaderConfig = { autoStart: false, observeTemplates: false, cacheNamespace: 'typed-auto' };
 void startAutoLoader();
 
 const manifest: ACLManifest = {

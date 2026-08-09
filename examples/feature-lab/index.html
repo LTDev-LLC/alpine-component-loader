@@ -452,6 +452,21 @@
             shadow: true
         });
 
+        AlpineComponentLoader.define('inline-object-demo', {
+            template: `
+                <style>
+                    :host { display: block; padding: 1rem; border: 1px solid #c4b5fd; border-radius: 8px; }
+                    strong { color: #5b21b6; }
+                </style>
+                <article>
+                    <strong x-text="$props.message"></strong>
+                    <div><slot name="action"></slot></div>
+                </article>
+            `,
+            shadow: true,
+            attributes: { message: String }
+        });
+
         AlpineComponentLoader.define('external-deps-demo', 'external-deps.html', {
             shadow: true,
             externalCss: [{
@@ -1542,10 +1557,18 @@ AlpineComponentLoader.define('store-display', 'store-display.html', {
         </section>
 
         <section>
-            <h2>14. Emits Helper <span class="badge">$emit</span></h2>
-            <p>Components can use <code>$props.$emit('name', detail)</code> to dispatch events easily.</p>
+            <h2>14. Emits Helper and Inline Definitions <span class="badge">x-acl</span></h2>
+            <p>Definition objects carry inline JavaScript templates and options together. Authored
+                <code>template[x-acl]</code> declarations register from HTML, and components can use
+                <code>$props.$emit('name', detail)</code> to dispatch events.</p>
 
-            <template acl-component="emit-demo">
+            <div class="demo-panel">
+                <inline-object-demo message="Defined from a JavaScript template string">
+                    <span slot="action">Named slot projected successfully.</span>
+                </inline-object-demo>
+            </div>
+
+            <template x-acl="emit-demo">
                 <style>
                     button {
                         background: #6d28d9;
@@ -1571,7 +1594,13 @@ AlpineComponentLoader.define('store-display', 'store-display.html', {
 
             <details>
                 <summary>Example usage</summary>
-                <pre>&lt;template acl-component="emit-demo"&gt;
+                <pre>AlpineComponentLoader.define('inline-object-demo', {
+  template: '&lt;strong x-text="$props.message"&gt;&lt;/strong&gt;&lt;slot name="action"&gt;&lt;/slot&gt;',
+  shadow: true,
+  attributes: { message: String }
+});
+
+&lt;template x-acl="emit-demo"&gt;
   &lt;div&gt;
     &lt;button @click="$props.$emit('custom-alert', { message: 'Hello from Shadow DOM!' })"&gt;
       Emit Event

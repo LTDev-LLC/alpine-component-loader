@@ -38,7 +38,41 @@ Inside the template, the parsed response is available at the configured target:
 
 ## Declarative request settings
 
-Most common settings can be supplied on the component host:
+Serializable settings can be supplied on a component host or on an inline
+definition template. Definition-level values become defaults for every
+instance; host attributes override them for that instance:
+
+```html
+<template
+    x-acl="profile-card"
+    acl-props='{ "userId": "String" }'
+    data-src="/api/profile"
+    data-fetch-params='{ "expand": "teams" }'
+    data-response-type="json"
+    data-target="$data"
+    data-fetch-timeout="5000"
+    data-retries="2"
+    data-retry-delay="250"
+    data-cache-strategy="network-first"
+    data-fetch-cache-ttl="60000"
+    data-fetch-cache-max="100"
+    pause-polling-when-hidden="true"
+>
+    <h2 x-text="$props.$data?.name"></h2>
+</template>
+
+<profile-card user-id="user-1"></profile-card>
+<profile-card user-id="user-2" data-retries="0"></profile-card>
+```
+
+The same attributes work on `template[acl-component]`. Template declarations
+also accept `data-fetch-keys`, `data-fetch-poll`, `data-fetch-options`,
+`data-method`, `data-body`, `data-cache-key`, `data-retry-max-delay`,
+`data-retry-jitter`, `data-retry-unsafe-methods`,
+`pause-polling-when-offline`, and `pause-polling-when-offscreen` according to
+the table below.
+
+Most common settings can also be supplied on the component host:
 
 ```html
 <profile-card
@@ -61,14 +95,17 @@ Changing request-related attributes cancels stale work and starts a request with
 
 ## Data option reference
 
-Programmatic settings live under `data`. Serializable controls can also be placed on a registered component host; `data-fetch-options` is read only by the declarative `<acl-component>` proxy.
+Programmatic settings live under `data`. Serializable controls can also be
+placed on an inline definition template or registered component host;
+`data-fetch-options` is definition-only on `template[x-acl]`,
+`template[acl-component]`, and the declarative `<acl-component>` proxy.
 
 | JavaScript option | Declarative attribute | Default | Validation and behavior |
 | --- | --- | --- | --- |
 | `data.src` | `data-src` | `null` | Request URL; no request runs when absent. |
 | `data.keys` | `data-fetch-keys` | `null` | Object/async function replacing every matching `:name` segment; attribute is strict JSON. |
 | `data.params` | `data-fetch-params` | `null` | Object/async function appended as query parameters; attribute is strict JSON. |
-| `data.options` | `data-fetch-options` on `<acl-component>` | `null` | Base `RequestInit`; programmatic headers merge case-insensitively. |
+| `data.options` | `data-fetch-options` on definition templates and `<acl-component>` | `null` | Base `RequestInit`; it is definition-only and is not read from registered component hosts. Programmatic headers merge case-insensitively. |
 | `data.method` | `data-method` | `null` | HTTP method; effective default is `GET`. |
 | `data.body` | `data-body` | `null` | Body value; object/array bodies are JSON encoded. |
 | `data.target` | `data-target` | `$data` | Direct `$props` key receiving the parsed response. |
@@ -115,6 +152,12 @@ AlpineComponentLoader.define('profile-card', '/components/profile-card.html', {
 ```
 
 The default target is `$data`. Any other target is assigned as a direct key on `$props`, so `target: 'profile'` becomes `$props.profile`; target strings are not evaluated as JavaScript or expanded as dotted paths. A target changes where the response is assigned but does not change the underlying cache identity.
+
+The same rule applies to authored templates: `data-target="$data"` exposes
+`$props.$data`, while `data-target="profile"` exposes `$props.profile`. Object
+responses are never spread across `$props`. Changing an instance's request
+attribute cancels stale work without changing the definition inherited by
+other instances.
 
 Response modes are `json`, `text`, `blob`, `arrayBuffer`, `stream`, and `auto`. A custom parser receives the `Response` and component context:
 

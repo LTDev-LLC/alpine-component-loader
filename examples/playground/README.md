@@ -18,7 +18,11 @@ Edits run automatically after a short delay. Select **Run preview** or press `Ct
 - CSS replaces the preview's stable stylesheet.
 - JavaScript disposes the previous authored module and updates the existing Alpine application.
 
-Page HTML takes precedence when several sources are pending. Component identities and contracts remain fixed during HMR. Adding or removing templates, changing `acl-component`, `id`, `acl-props`, or another template attribute, or adding non-template markup keeps the last good preview and requests a Page HTML run.
+Page HTML takes precedence when several sources are pending. Component
+identities and contracts remain fixed during HMR. Adding or removing templates,
+changing `x-acl`, `acl-component`, `id`, `acl-props`, or another template
+attribute, or adding non-template markup keeps the last good preview and
+requests a Page HTML run.
 
 Authored JavaScript receives `Alpine`, `AlpineComponentLoader`, `createLoader`, and the playground-only `playgroundHot` context. Use `playgroundHot.signal` for signal-bound listeners or `playgroundHot.dispose(callback)` for synchronous or asynchronous cleanup. Cleanup runs in reverse registration order before the next JavaScript execution.
 

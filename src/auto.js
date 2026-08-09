@@ -12,22 +12,30 @@ const min = new URL(import.meta.url).pathname.endsWith('.min.js'),
         createIndexedDBPersistenceAdapter,
     } = await importLocalModule('./index.js');
 
-// Apply browser configuration and register the built-in elements when auto-start is enabled
+let stopAutoTemplateObserver = null;
+
+// Apply browser auto configuration
 const boot = async () => {
     if (typeof document === 'undefined') return;
 
-    // Guard the boot operation against runtime failures
+    // Guard auto startup
     try {
         if (globalThis.AlpineComponentLoaderConfig)
             AlpineComponentLoader.config(globalThis.AlpineComponentLoaderConfig);
+        stopAutoTemplateObserver?.();
+        stopAutoTemplateObserver = null;
         if (AlpineComponentLoader.globalConfig.autoStart === false) return;
+        if (AlpineComponentLoader.globalConfig.observeTemplates !== false)
+            stopAutoTemplateObserver = AlpineComponentLoader.observeTemplates();
         await AlpineComponentLoader.start();
     } catch (error) {
+        stopAutoTemplateObserver?.();
+        stopAutoTemplateObserver = null;
         console.warn('[ACL] Failed to auto-register components.', error);
     }
 };
 
-// Defer boot until parsing finishes so declarative templates are available to registration
+// Defer boot until parsing finishes
 if (typeof document !== 'undefined' && document.readyState === 'loading')
     window.addEventListener(
         'DOMContentLoaded',

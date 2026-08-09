@@ -56,6 +56,8 @@
         <section class="example-section" aria-labelledby="live-template-heading">
             <h2 id="live-template-heading">Live component</h2>
             <hmr-demo-card count="1"></hmr-demo-card>
+            <h3>Auto-observed inline definition</h3>
+            <auto-observed-note></auto-observed-note>
             <h3>Reload event</h3>
             <pre id="reload-log">Waiting for a template change…</pre>
         </section>
@@ -82,7 +84,7 @@
     </footer>
 
     <script type="module">
-        import AlpineComponentLoader from 'alpine-component-loader/auto';
+        import AlpineComponentLoader, { startAutoLoader } from 'alpine-component-loader/auto';
 
         const status = document.getElementById('connection-status');
         const log = document.getElementById('reload-log');
@@ -93,6 +95,12 @@
             '/components/live-card.html',
             { shadow: true, attributes: { count: Number } }
         );
+        await startAutoLoader();
+
+        const observedTemplate = document.createElement('template');
+        observedTemplate.setAttribute('x-acl', 'auto-observed-note');
+        observedTemplate.innerHTML = '<p>Registered after startup by the auto entry observer.</p>';
+        document.body.appendChild(observedTemplate);
 
         const bindInjectedConnection = () => {
             const eventSource = window.__aclDevConnection?.eventSource;

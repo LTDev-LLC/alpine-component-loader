@@ -2,6 +2,13 @@
 
 ACL keeps repeated component work bounded through parsed-template reuse, lazy capability loading, and explicit distribution-size gates.
 
+JavaScript `{ template }` definitions, selector-backed templates, and
+`template[x-acl]` declarations avoid a component-template request and do not
+create persistent URL-template cache entries. They still use the normal
+per-definition render path, including cloning parsed content and running the
+configured sanitizer for each instance. Data requests and external assets
+declared by such a component remain independent network operations.
+
 ## Runtime hot-path behavior
 
 For each normalized component definition, the renderer retains the two most

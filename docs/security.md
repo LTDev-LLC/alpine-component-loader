@@ -2,6 +2,20 @@
 
 Component templates cross a rendering boundary and must be treated as content, not trusted executable code. Sanitization is enabled by default in both the browser and static SSR renderer.
 
+This boundary applies equally to fetched URLs, selector-backed DOM templates,
+`template[x-acl]`/`template[acl-component]` declarations, and JavaScript inline
+definitions:
+
+```js
+AlpineComponentLoader.define('safe-inline-card', {
+    template: '<article><h2>Hello</h2><slot></slot></article>',
+});
+```
+
+The JavaScript string is parsed into inert detached content using the effective
+Trusted Types policy. Avoiding a network request does not make it trusted; the
+normal sanitizer and `executeScripts` policy still run when an instance renders.
+
 ## Default sanitization
 
 The built-in browser sanitizer walks ordinary descendants and nested `<template>` content. It removes:

@@ -12,7 +12,10 @@ const currentModuleUrl = new URL(import.meta.url),
     },
     importLocalModule = (specifier) => import(/* @vite-ignore */ resolveLocalModule(specifier)),
     importDeferredLocalModule = (specifier) => import(/* @vite-ignore */ resolveLocalModule(specifier)),
-    { ACLLoadError } = await importLocalModule('./acl-load-error.js'),
+    [{ ACLLoadError }, { containsInlineComponentTemplate }] = await Promise.all([
+        importLocalModule('./acl-load-error.js'),
+        importLocalModule('./inline-templates.js'),
+    ]),
     ACL_FACADE_VERSION = typeof __ACL_BUILD_VERSION__ === 'undefined' ? 'development' : __ACL_BUILD_VERSION__,
     pendingDefinitions = new Set(),
     pendingDefinitionsByTag = new Map(),
@@ -67,6 +70,7 @@ const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {},
     defaultConfig = {
         debug: false,
         autoStart: true,
+        observeTemplates: true,
         basePath: '',
         sourceResolver: null,
         errorCss: {},
@@ -401,7 +405,7 @@ export default class AlpineComponentLoader {
             await Promise.all(builtInRegistrations);
             await drainPendingDefinitions();
             const root = AlpineComponentLoader.root || document,
-                hasTemplates = Boolean(root.querySelector?.('template[acl-component]'));
+                hasTemplates = containsInlineComponentTemplate(root);
             if (implementationClass || hasTemplates) {
                 const Implementation = await loadImplementation();
                 if (hasTemplates) await Implementation.registerTemplates(root);
@@ -437,16 +441,19 @@ export default class AlpineComponentLoader {
     }
 
     // Queue a component definition while activating the runtime
-    static define(tagName, source, config = {}) {
+    static define(tagName, source, config) {
         AlpineComponentLoader._assertActive();
-        const definitionKey = String(tagName || '')
-            .trim()
-            .toLowerCase();
+        const hasSeparateConfig = arguments.length > 2,
+            definitionKey = String(tagName || '')
+                .trim()
+                .toLowerCase();
         if (pendingDefinitionsByTag.has(definitionKey)) return pendingDefinitionsByTag.get(definitionKey);
         pendingDefinitionFailuresByTag.delete(definitionKey);
         const operation = loadImplementation().then((Implementation) => {
             // Forward the definition after runtime activation
-            return Implementation.define(tagName, source, config);
+            return hasSeparateConfig
+                ? Implementation.define(tagName, source, config)
+                : Implementation.define(tagName, source);
         });
         pendingDefinitions.add(operation);
         pendingDefinitionsByTag.set(definitionKey, operation);
@@ -515,10 +522,7 @@ export default class AlpineComponentLoader {
                 // Process each added element independently
                 record.addedNodes.forEach((node) => {
                     // Register only subtrees that contain an inline ACL template
-                    if (
-                        node.nodeType === Node.ELEMENT_NODE &&
-                        (node.matches?.('template[acl-component]') || node.querySelector?.('template[acl-component]'))
-                    )
+                    if (node.nodeType === Node.ELEMENT_NODE && containsInlineComponentTemplate(node))
                         void AlpineComponentLoader.registerTemplates(node).catch(
                             // Report observed registration failures without rejecting the mutation callback
                             (error) =>
@@ -536,9 +540,12 @@ export default class AlpineComponentLoader {
             childList: true,
             subtree,
         });
+        const installedObserver = facadeTemplateObserver;
         return () => {
-            // Stop the installed facade observer
-            AlpineComponentLoader.stopObservingTemplates();
+            // Stop only the observer installed for this caller
+            if (facadeTemplateObserver !== installedObserver) return;
+            installedObserver.disconnect();
+            facadeTemplateObserver = null;
         };
     }
 

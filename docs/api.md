@@ -39,6 +39,7 @@ The auto entry waits for DOM parsing, applies `window.AlpineComponentLoaderConfi
 <script>
     window.AlpineComponentLoaderConfig = {
         autoStart: true,
+        observeTemplates: true,
         basePath: '/components/',
         cacheNamespace: 'profile-app',
     };
@@ -74,7 +75,11 @@ retain the same Cache API namespace. Browser custom-element names remain
 global; another isolated loader attempting to own the same tag receives
 `ACL_TAG_OWNERSHIP_CONFLICT`.
 
-Its named `startAutoLoader()` export repeats the same guarded configuration/start transaction when an application deliberately needs to invoke it.
+Before starting, the auto entry installs inline-template observation unless
+`observeTemplates` is `false`. This closes the gap between its startup scan and
+templates inserted while startup is pending. `autoStart: false` disables both
+startup and automatic observation. Its named `startAutoLoader()` export repeats
+the same guarded transaction without creating duplicate observers.
 
 All other public entries are safe to import without browser globals, although their browser-only operations still require DOM or Service Worker APIs.
 
@@ -93,6 +98,7 @@ If a capability import fails, the activating operation rejects with an `ACLLoadE
 | `attributes` | `{}` | Typed prop constructor/descriptor map. |
 | `debug` | `false` | Loader debugger state after debugger injection. |
 | `autoStart` | `true` | Global-only gate used by the `/auto` entry. |
+| `observeTemplates` | `true` | Global-only `/auto` control for observing inline declarations inserted after startup. |
 | `basePath` | empty | Prefix for relative component sources. |
 | `sourceResolver` | `null` | Synchronously rewrite a source before `basePath`. |
 | `errorCss` | accessible built-in styles | Style record merged into the no-fallback error block. |
@@ -152,6 +158,7 @@ Unknown option keys have no defined behavior. See [Components](components.md) fo
 | `config(options)` | Merge and validate global settings. |
 | `start()` | Drain queued definitions, discover inline definitions and built-in tags, and activate configured capabilities; returns `Promise<void>`. |
 | `define(tagName, source, options)` | Register/queue a definition; returns `Promise<CustomElementConstructor>`. |
+| `define(tagName, definition)` | Register an inline `{ template, ...options }` definition; returns `Promise<CustomElementConstructor>`. |
 | `registerComponent(name)` | Load and register the declarative proxy; returns `Promise<CustomElementConstructor>`. |
 | `registerDynamicLoader(name)` | Load and register the dynamic switcher; returns `Promise<CustomElementConstructor>`. |
 | `registerErrorBoundary(name)` | Load and register the nearest-descendant error boundary; returns `Promise<CustomElementConstructor>`. |
@@ -199,20 +206,48 @@ const StatusBadge = await AlpineComponentLoader.define('status-badge', '#status-
 });
 ```
 
+The two-argument definition-object form keeps a non-empty inline HTML string
+beside its component options:
+
+```js
+const GreetingCard = await AlpineComponentLoader.define('greeting-card', {
+    template: '<h3 x-text="$props.message"></h3>',
+    shadow: true,
+    attributes: { message: String },
+});
+```
+
+This form is typed as `ACLInlineComponentDefinition<TProps>`. It accepts no
+separate third options argument. The string becomes an inert detached template,
+uses the effective Trusted Types policy, and is sanitized during rendering. It
+does not run the URL source resolver, issue a template request, or create a
+persistent template-cache entry. Existing URL, selector, and
+`HTMLTemplateElement` definitions retain their current behavior.
+
 Register authored inline templates in a DOM subtree:
 
 ```html
 <template
-    acl-component="status-badge"
+    x-acl="status-badge"
     acl-props='{ "label": "String", "tone": "String" }'
+    data-src="/api/status"
 >
-    <span :data-tone="$props.tone" x-text="$props.label"></span>
+    <span :data-tone="$props.tone" x-text="$props.$data?.label || $props.label"></span>
 </template>
+
+<status-badge></status-badge>
 ```
 
 ```js
 const constructors = await AlpineComponentLoader.registerTemplates(document);
 ```
+
+`template[x-acl]` and the established `template[acl-component]` spelling are
+aliases and use the same prop/data parser. If both attributes occur on one
+template, their case-normalized names must match. Configuration attributes stay
+on the inert definition template and are not copied into rendered component
+markup. Invalid names reject through ordinary custom-element validation; a
+duplicate tag retains the loader's already registered definition.
 
 When templates can be inserted later, observe additions and retain the returned cleanup:
 
@@ -225,6 +260,25 @@ const stop = AlpineComponentLoader.observeTemplates({
 // Later:
 stop();
 ```
+
+The ordinary entry scans existing declarations in `start()` and leaves later
+observation opt-in. The auto entry differs only for late declarations:
+
+| Entry/configuration | Existing declarations | Later declarations |
+| --- | --- | --- |
+| Ordinary `start()` | scanned | require `observeTemplates()` |
+| `/auto` default | scanned | observed automatically |
+| `/auto`, `observeTemplates: false` | scanned | ignored |
+| `/auto`, `autoStart: false` | not scanned | not observed |
+
+`registerTemplates(root)` accepts a document, element, template, or open Shadow
+Root and includes a directly supplied matching template. `observeTemplates()`
+accepts `root` and `subtree`, ignores unrelated mutations without loading the
+component runtime, and returns an ownership-safe disposer. A later observer
+replaces the prior loader-owned observer; an older disposer cannot disconnect
+its replacement. `stopObservingTemplates()` stops the active manual or
+auto-installed observer. Calling `startAutoLoader()` again reinstalls automatic
+observation when it remains enabled.
 
 `start()` discovers existing and newly inserted `<acl-component>`, `<acl-dynamic>`, and `<acl-boundary>` tags. It loads and registers only the implementation whose tag appears. Because discovery upgrades inserted tags asynchronously, explicitly register a built-in when it must be defined before insertion:
 

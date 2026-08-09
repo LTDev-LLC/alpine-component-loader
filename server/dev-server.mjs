@@ -151,11 +151,23 @@ export const inspectInlineTemplates = (source) => {
                         (attribute) => [attribute.name, attribute.value],
                     ),
                 ),
-                componentName = attributes.get('acl-component')?.trim(),
+                legacyComponentName = attributes.get('acl-component')?.trim() || '',
+                conciseComponentName = attributes.get('x-acl')?.trim() || '',
+                componentName = (conciseComponentName || legacyComponentName).toLowerCase(),
                 templateId = attributes.get('id')?.trim(),
                 kind = componentName ? 'component' : templateId ? 'id' : null,
                 name = componentName || templateId,
                 location = node.sourceCodeLocation;
+            if (
+                legacyComponentName &&
+                conciseComponentName &&
+                legacyComponentName.toLowerCase() !== conciseComponentName.toLowerCase()
+            )
+                errors.push(
+                    new Error(
+                        `Conflicting inline template identity: acl-component="${legacyComponentName}" and x-acl="${conciseComponentName}"`,
+                    ),
+                );
             if (
                 kind &&
                 location?.startTag?.endOffset != null &&

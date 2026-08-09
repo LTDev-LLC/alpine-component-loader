@@ -8,10 +8,10 @@ npm run build
 
 | Example                                      | Run                                        | What it demonstrates                                                                                                              |
 | -------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| [Feature lab](feature-lab/README.md)         | `npm run example:feature-lab`              | Complete browser runtime, manifests, persistence, bounded observability/exporter wiring, security, testing helpers, and tooling.  |
+| [Feature lab](feature-lab/README.md)         | `npm run example:feature-lab`              | Complete browser runtime, JavaScript inline definitions, `x-acl` discovery, manifests, persistence, observability, security, and tooling. |
 | [SSR example](ssr/README.md)                 | `npm run example:ssr`                      | Declarative Shadow DOM, `dataResolver`/`dataPolicy`, progressive hydration modes, slots, and revision fallback.                   |
 | [SSR feature lab](feature-lab-ssr/README.md) | `npm run example:feature-lab:ssr`          | Larger SSR gallery, batch rendering, events, sanitizer parity, debugging, and accessibility.                                      |
-| [HMR](hmr/README.md)                         | `npm run example:hmr`                      | Injected SSE development client and state-preserving targeted reloads.                                                            |
+| [HMR](hmr/README.md)                         | `npm run example:hmr`                      | Injected SSE development client, `/auto` late-template observation, and state-preserving targeted reloads.                        |
 | [Offline](offline/README.md)                 | `npm run example:offline`                  | Generated precache graph, navigation policy, bounded runtime caching, storage diagnostics, and offline reload.                    |
 | [Accessibility](a11y/README.md)              | `npm run example:a11y`                     | In-page audits, scanner UI, debugger integration, headless audit baselines, and expiring suppressions.                            |
 | [Playground](playground/README.md)           | `npm run example:playground` or open Pages | ACL-powered four-source editor, themed dashboard, incremental HMR, unified accessibility auditing, diagnostics, and local drafts. |

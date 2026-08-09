@@ -3,7 +3,10 @@
 // Licensed under the MIT license in the repository root
 
 // Propagate jsDelivr's generated minified entry suffix to package-owned dependencies
-const isMinifiedModule = new URL(import.meta.url).pathname.endsWith('.min.js'), resolveLocalModule = (specifier)=>isMinifiedModule ? specifier.replace(/\.js$/, '.min.js') : specifier, importLocalModule = (specifier)=>import(/* @vite-ignore */ resolveLocalModule(specifier)), { default: AlpineComponentLoader } = await importLocalModule('./index.js');
+const isMinifiedModule = new URL(import.meta.url).pathname.endsWith('.min.js'), resolveLocalModule = (specifier)=>isMinifiedModule ? specifier.replace(/\.js$/, '.min.js') : specifier, importLocalModule = (specifier)=>import(/* @vite-ignore */ resolveLocalModule(specifier)), [{ default: AlpineComponentLoader }, { getInlineComponentName }] = await Promise.all([
+    importLocalModule('./index.js'),
+    importLocalModule('./inline-templates.js')
+]);
 // Resolve fetchable template sources to absolute URLs while preserving inline selectors
 const normalizeSource = (source)=>{
     if (typeof source !== 'string' || source.startsWith('#')) return source;
@@ -84,7 +87,7 @@ const prepareInlineTemplateUpdates = (templates, loader)=>{
         ].includes(kind) || !name || typeof update.html !== 'string' || seen.has(key)) throw new TypeError('[ACL Dev] Received an invalid inline template update.');
         seen.add(key);
         const matches = Array.from(document.querySelectorAll('template')).filter(// Locate the exact live template identity
-        (template)=>kind === 'component' ? template.getAttribute('acl-component') === name : template.id === name);
+        (template)=>kind === 'component' ? getInlineComponentName(template)?.toLowerCase() === name.toLowerCase() : template.id === name);
         if (matches.length !== 1) throw new TypeError(`[ACL Dev] Inline template "${name}" is not unique in the active page.`);
         const template = matches[0], definitions = loader.getRegisteredTags().map(// Resolve each registered definition once
         (tagName)=>loader.getDefinition(tagName)).filter(// Require the template to back an active loader definition

@@ -1,6 +1,12 @@
 # Feature lab
 
-This page exercises the loader's complete browser-facing feature set, including lifecycle cleanup, revision-aware template caching, manifest dependency graphs and metadata, adaptive prefetch, localStorage, sessionStorage, IndexedDB and custom persistence adapters, structured observability, Trusted Types and URL policies, browser testing helpers, diagnostics, accessibility auditing, and optional development/offline entry points.
+This page exercises the loader's complete browser-facing feature set, including
+JavaScript inline definition objects, concise `template[x-acl]` discovery,
+lifecycle cleanup, revision-aware template caching, manifest dependency graphs
+and metadata, adaptive prefetch, localStorage, sessionStorage, IndexedDB and
+custom persistence adapters, structured observability, Trusted Types and URL
+policies, browser testing helpers, diagnostics, accessibility auditing, and
+optional development/offline entry points.
 
 Build the package, then serve the feature-lab directory as static files:
 

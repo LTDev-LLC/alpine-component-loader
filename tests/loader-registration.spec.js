@@ -107,6 +107,146 @@ test('core entry queues component definitions and registers them only after expl
     });
 });
 
+test('definition objects render inline template strings through the normal component pipeline', async ({ page }) => {
+    // Exercise an inline definition carrying both template content and component options
+    await preparePage(
+        page,
+        '<inline-object-card label="Hello"><button slot="action" id="inline-action">Edit</button></inline-object-card>',
+    );
+    const state = await page.evaluate(
+        // Define and inspect a request-free inline component
+        async (baseUrl) => {
+            const { default: Loader } = await import(`${baseUrl}/src/index.js`),
+                Constructor = await Loader.define('inline-object-card', {
+                    template:
+                        '<article><h3>Hello, world!</h3><slot name="action"></slot><button id="unsafe-inline" onclick="window.__unsafeInline = true">Unsafe</button><script>window.__inlineScript = true</script></article>',
+                    shadow: true,
+                    attributes: { label: String },
+                    sourceResolver() {
+                        // Inline definitions do not enter URL source resolution
+                        window.__inlineSourceResolverCalls = (window.__inlineSourceResolverCalls || 0) + 1;
+                        return '/templates/simple.html';
+                    },
+                    security: {
+                        trustedTypesPolicy: {
+                            createHTML(html) {
+                                // Track security-aware parsing without changing the trusted value
+                                window.__inlineTrustedTypesCalls = (window.__inlineTrustedTypesCalls || 0) + 1;
+                                return html;
+                            },
+                        },
+                    },
+                });
+            await Loader.start();
+            const element = document.querySelector('inline-object-card');
+            // Wait for the inline host to finish its first render
+            while (element?._state !== 'ready')
+                await new Promise(
+                    // Yield one browser task while component work settles
+                    (resolve) => setTimeout(resolve, 0),
+                );
+            let thirdArgumentError = '',
+                missingTemplateError = '';
+            // Guard the unsupported third-argument form
+            try {
+                await Loader.define('inline-third-argument', { template: '<p>invalid</p>' }, { shadow: true });
+            } catch (error) {
+                thirdArgumentError = error.message;
+            }
+            // Guard a definition object without inline markup
+            try {
+                await Loader.define('inline-missing-template', { shadow: true });
+            } catch (error) {
+                missingTemplateError = error.message;
+            }
+            const definition = Loader.getDefinition('inline-object-card'),
+                unsafe = element.shadowRoot.querySelector('#unsafe-inline'),
+                actionSlot = element.shadowRoot.querySelector('slot[name="action"]');
+            return {
+                constructorMatches: customElements.get('inline-object-card') === Constructor,
+                heading: element.shadowRoot.querySelector('h3')?.textContent,
+                projectedAction: actionSlot?.assignedElements()[0]?.textContent,
+                sourceIsTemplate: definition.source instanceof HTMLTemplateElement,
+                hasLabelProp: Boolean(definition.settings.attributes.label),
+                unsafeHandler: unsafe?.getAttribute('onclick') || null,
+                hasScript: Boolean(element.shadowRoot.querySelector('script')),
+                sourceResolverCalls: window.__inlineSourceResolverCalls || 0,
+                trustedTypesCalls: window.__inlineTrustedTypesCalls || 0,
+                thirdArgumentError,
+                missingTemplateError,
+            };
+        },
+        baseUrl,
+    );
+    expect(state).toEqual({
+        constructorMatches: true,
+        heading: 'Hello, world!',
+        projectedAction: 'Edit',
+        sourceIsTemplate: true,
+        hasLabelProp: true,
+        unsafeHandler: null,
+        hasScript: false,
+        sourceResolverCalls: 0,
+        trustedTypesCalls: 1,
+        thirdArgumentError: expect.stringContaining('must be supplied with template'),
+        missingTemplateError: expect.stringContaining('requires a non-empty template string'),
+    });
+});
+
+test('startup discovers x-acl templates with props, data settings, and named slots', async ({ page }) => {
+    // Exercise concise authored registration and its descriptor-backed request settings
+    await preparePage(
+        page,
+        `
+        <template
+            x-acl="profile-template"
+            acl-props='{ "label": "String" }'
+            data-src="${baseUrl}/api/count"
+            data-fetch-params='{ "name": "x-acl-profile" }'
+        >
+            <article>
+                <h2 id="profile-count" x-text="$props.$data?.count"></h2>
+                <span id="profile-label" x-text="$props.label"></span>
+                <slot name="action"></slot>
+            </article>
+        </template>
+        <profile-template label="Profile"><button id="profile-action" slot="action">Edit</button></profile-template>
+    `,
+    );
+    await page.addScriptTag({
+        type: 'module',
+        content: `
+        import Loader from '${baseUrl}/src/index.js';
+        Loader.config({ autoStart: false });
+        await Loader.start();
+        window.Loader = Loader;
+    `,
+    });
+    await page.waitForFunction(
+        // Wait for registration, data, projection, and Alpine initialization
+        () => document.querySelector('profile-template')?._state === 'ready',
+    );
+    const state = await page.evaluate(() => {
+        // Read the concise component and its normalized definition
+        const element = document.querySelector('profile-template'),
+            definition = window.Loader.getDefinition('profile-template');
+        return {
+            count: element.querySelector('#profile-count')?.textContent,
+            label: element.querySelector('#profile-label')?.textContent,
+            action: element.querySelector('#profile-action')?.textContent,
+            dataSource: definition.settings.data.src,
+            dataParams: definition.settings.data.params,
+        };
+    });
+    expect(state).toEqual({
+        count: '1',
+        label: 'Profile',
+        action: 'Edit',
+        dataSource: `${baseUrl}/api/count`,
+        dataParams: { name: 'x-acl-profile' },
+    });
+});
+
 test('start surfaces settled queued definition failures and permits a corrected retry', async ({ page }) => {
     // Exercise startup after a queued definition has already rejected
     await preparePage(page);
@@ -205,6 +345,120 @@ test('auto entry registers built-in elements present in browser environments', a
             () => window.Loader.globalConfig.autoStart,
         ),
     ).toBe(true);
+});
+
+test('auto entry observes late inline templates by default', async ({ page }) => {
+    // Exercise automatic observation after the auto startup transaction
+    await preparePage(page);
+    await page.addScriptTag({
+        type: 'module',
+        content: `
+        import Loader, { startAutoLoader } from '${baseUrl}/src/auto.js';
+        await startAutoLoader();
+        const template = document.createElement('template');
+        template.setAttribute('x-acl', 'auto-observed-card');
+        template.innerHTML = '<span id="auto-observed-content">observed</span>';
+        document.body.appendChild(template);
+        const host = document.createElement('auto-observed-card');
+        document.body.appendChild(host);
+        window.Loader = Loader;
+    `,
+    });
+    await page.waitForFunction(
+        // Wait for the observer-driven definition and host upgrade
+        () => document.querySelector('auto-observed-card')?._state === 'ready',
+    );
+    expect(
+        await page.evaluate(
+            // Read the automatically observed registration
+            () => ({
+                registered: window.Loader.has('auto-observed-card'),
+                text: document.querySelector('#auto-observed-content')?.textContent,
+            }),
+        ),
+    ).toEqual({
+        registered: true,
+        text: 'observed',
+    });
+});
+
+test('auto observation can be disabled without disabling the startup scan', async ({ page }) => {
+    // Exercise the auto-only observation opt-out
+    await preparePage(
+        page,
+        '<template x-acl="auto-initial-card"><span>initial</span></template><auto-initial-card></auto-initial-card>',
+    );
+    await page.evaluate(
+        // Disable only automatic late-template observation
+        () => {
+            window.AlpineComponentLoaderConfig = { observeTemplates: false };
+        },
+    );
+    await page.addScriptTag({
+        type: 'module',
+        content: `
+        import Loader, { startAutoLoader } from '${baseUrl}/src/auto.js';
+        await startAutoLoader();
+        const template = document.createElement('template');
+        template.setAttribute('x-acl', 'auto-ignored-card');
+        template.innerHTML = '<span>ignored</span>';
+        document.body.appendChild(template);
+        window.Loader = Loader;
+    `,
+    });
+    await page.waitForFunction(
+        // Confirm the initial declaration completed before checking the late declaration
+        () => document.querySelector('auto-initial-card')?._state === 'ready',
+    );
+    await page.waitForTimeout(30);
+    expect(
+        await page.evaluate(
+            // Compare startup scanning with disabled late observation
+            () => ({
+                initial: window.Loader.has('auto-initial-card'),
+                ignored: window.Loader.has('auto-ignored-card'),
+            }),
+        ),
+    ).toEqual({
+        initial: true,
+        ignored: false,
+    });
+});
+
+test('autoStart false disables both automatic scanning and observation', async ({ page }) => {
+    // Exercise the complete auto-entry startup gate
+    await preparePage(page, '<template x-acl="auto-disabled-initial"><span>initial</span></template>');
+    await page.evaluate(
+        // Disable the complete automatic startup transaction
+        () => {
+            window.AlpineComponentLoaderConfig = { autoStart: false };
+        },
+    );
+    await page.addScriptTag({
+        type: 'module',
+        content: `
+        import Loader, { startAutoLoader } from '${baseUrl}/src/auto.js';
+        await startAutoLoader();
+        const template = document.createElement('template');
+        template.setAttribute('x-acl', 'auto-disabled-late');
+        template.innerHTML = '<span>late</span>';
+        document.body.appendChild(template);
+        window.Loader = Loader;
+    `,
+    });
+    await page.waitForTimeout(30);
+    expect(
+        await page.evaluate(
+            // Confirm neither discovery path activated
+            () => ({
+                initial: window.Loader.has('auto-disabled-initial'),
+                late: window.Loader.has('auto-disabled-late'),
+            }),
+        ),
+    ).toEqual({
+        initial: false,
+        late: false,
+    });
 });
 
 test('declarative loader parses props, options, lists, hooks, and forwarded events', async ({ page }) => {
@@ -684,6 +938,47 @@ test('template observation registers templates added after startup and can be st
             () => window.Loader.has('ignored-card'),
         ),
     ).toBe(false);
+});
+
+test('template observation recognizes x-acl and rejects conflicting declaration markers', async ({ page }) => {
+    // Exercise concise dynamic registration and dual-marker validation
+    await preparePage(page);
+    const state = await page.evaluate(
+        // Register one observed template and one conflicting direct template
+        async (baseUrl) => {
+            const { default: Loader } = await import(`${baseUrl}/src/index.js`);
+            Loader.config({ autoStart: false });
+            await Loader.start();
+            const staleStop = Loader.observeTemplates(),
+                stop = Loader.observeTemplates(),
+                observed = document.createElement('template');
+            staleStop();
+            observed.setAttribute('x-acl', 'observed-x-card');
+            observed.innerHTML = '<span>x-acl</span>';
+            document.body.appendChild(observed);
+            await customElements.whenDefined('observed-x-card');
+            stop();
+            const conflict = document.createElement('template');
+            conflict.setAttribute('acl-component', 'first-card');
+            conflict.setAttribute('x-acl', 'second-card');
+            let conflictError = '';
+            // Guard contradictory component identities
+            try {
+                await Loader.registerTemplates(conflict);
+            } catch (error) {
+                conflictError = error.message;
+            }
+            return {
+                observed: Loader.has('observed-x-card'),
+                conflictError,
+            };
+        },
+        baseUrl,
+    );
+    expect(state).toEqual({
+        observed: true,
+        conflictError: expect.stringContaining('markers conflict'),
+    });
 });
 
 test('development client invalidates and reloads only components using changed templates', async ({ page }) => {

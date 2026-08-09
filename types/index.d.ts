@@ -304,6 +304,7 @@ export interface ACLComponentOptions<TProps extends ACLProps = ACLProps> {
     attributes?: Record<string, ACLPropDefinition>;
     debug?: boolean;
     autoStart?: boolean;
+    observeTemplates?: boolean;
     basePath?: string;
     sourceResolver?: (
         source: string | HTMLTemplateElement,
@@ -364,6 +365,10 @@ export interface ACLComponentOptions<TProps extends ACLProps = ACLProps> {
               disabled?: string | null;
           };
 }
+
+export type ACLInlineComponentDefinition<TProps extends ACLProps = ACLProps> = ACLComponentOptions<TProps> & {
+    template: string;
+};
 
 export interface ACLDefinition {
     tagName: string;
@@ -503,6 +508,10 @@ export default class AlpineComponentLoader {
         tagName: string,
         source: string | HTMLTemplateElement,
         config?: ACLComponentOptions<TProps>,
+    ): Promise<CustomElementConstructor>;
+    static define<TProps extends ACLProps = ACLProps>(
+        tagName: string,
+        definition: ACLInlineComponentDefinition<TProps>,
     ): Promise<CustomElementConstructor>;
     static has(tagName: string): boolean;
     static getDefinition(tagName: string): ACLDefinition | null;

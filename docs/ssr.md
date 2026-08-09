@@ -2,6 +2,13 @@
 
 The Node-only `alpine-component-loader/ssr` entry renders manifest-defined components with parse5. It does not execute Alpine, launch a browser, or serialize application stores. Shadow components are emitted as Declarative Shadow DOM and can hydrate in place in the browser. An application may opt into bounded initial data with either `dataResolver` or an explicit `dataPolicy`, and may opt Light DOM definitions into structural server rendering.
 
+Static SSR consumes URL-backed definitions from a component manifest.
+Browser-only JavaScript `{ template }` definitions, selector-backed templates,
+and `template[x-acl]`/`template[acl-component]` declarations are registered by
+the browser loader and are not inputs to the Node renderer or generated
+precache graph. Move a template to a URL-backed manifest source when the same
+component must be server-rendered or precached for offline startup.
+
 `parse5` is an optional dependency that npm installs by default. A lean
 `npm install --omit=optional` must install it before using SSR:
 

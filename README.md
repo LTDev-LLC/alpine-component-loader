@@ -1,6 +1,12 @@
 # AlpineComponentLoader
 
-A dependency-free browser runtime for loading reusable HTML components with Alpine.js. The package also includes isolated loader instances, progressive SSR hydration, form-associated components, nearest error boundaries, opt-in development and accessibility tools, route shards, Vite integration, ready-made test fixtures, bounded offline policies, and static Node SSR.
+A dependency-free browser runtime for loading reusable HTML components with
+Alpine.js from URLs, existing DOM templates, JavaScript inline strings, or
+declarative `template[x-acl]` definitions. The package also includes isolated
+loader instances, progressive SSR hydration, form-associated components,
+nearest error boundaries, opt-in development and accessibility tools, route
+shards, Vite integration, ready-made test fixtures, bounded offline policies,
+and static Node SSR.
 
 This documentation targets package version `1.x`. ACL-owned public document
 formats and diagnostic snapshots use schema version `1`; externally governed
@@ -197,7 +203,19 @@ await AlpineComponentLoader.start();
 </profile-card>
 ```
 
-An inline template works without a request:
+JavaScript can carry an inline template and its options in one definition. The
+string is parsed through the same Trusted Types and sanitizer pipeline as a
+fetched template, but it performs no template request or persistent template
+cache work:
+
+```js
+await AlpineComponentLoader.define('inline-greeting', {
+    template: '<h3>Hello, world!</h3>',
+    shadow: true,
+});
+```
+
+An existing DOM template also works without a request:
 
 ```html
 <template id="profile-template">
@@ -211,6 +229,46 @@ An inline template works without a request:
 ```js
 await AlpineComponentLoader.define('profile-card', '#profile-template', { shadow: true });
 ```
+
+For a definition authored entirely in HTML, `x-acl` names the custom element.
+`acl-props` and the documented declarative data attributes belong to the
+definition; individual component instances may override data attributes:
+
+```html
+<template
+    x-acl="profile-template"
+    acl-props='{ "name": "String" }'
+    data-src="/api/profile"
+>
+    <article x-data="{ open: false }">
+        <h2 x-text="$props.$data?.name"></h2>
+        <slot name="action"></slot>
+    </article>
+</template>
+
+<profile-template>
+    <button slot="action">Follow</button>
+</profile-template>
+```
+
+`start()` scans existing `template[x-acl]` and
+`template[acl-component]` declarations. With the ordinary package entry,
+call `observeTemplates()` to register declarations inserted later. The
+`alpine-component-loader/auto` entry installs that observer by default; opt out
+without disabling the initial scan by setting the global configuration before
+importing `/auto`:
+
+```html
+<script>
+    window.AlpineComponentLoaderConfig = {
+        observeTemplates: false,
+    };
+</script>
+```
+
+Custom elements must use explicit closing tags in HTML, such as
+`<profile-template></profile-template>`; do not rely on XML-style self-closing
+syntax.
 
 The declarative proxy provides the same registration path from HTML:
 
@@ -229,7 +287,10 @@ The declarative proxy provides the same registration path from HTML:
 
 `start()` discovers existing and newly inserted `<acl-component>`, `<acl-dynamic>`, and `<acl-boundary>` tags, then loads only the implementation that appeared. To guarantee registration before inserting a tag, explicitly await `registerComponent()`, `registerDynamicLoader()`, or `registerErrorBoundary()`.
 
-Use `alpine-component-loader/auto` only when import-side-effect startup is desired. All other public entries are safe to import without browser globals; browser-only operations still require a DOM.
+Use `alpine-component-loader/auto` only when import-side-effect startup and
+default late-template observation are desired. All other public entries are
+safe to import without browser globals; browser-only operations still require
+a DOM.
 
 ## Integrated project workflow
 
@@ -307,7 +368,7 @@ Development uses native ACL modules, targeted template HMR, and a generated rout
 
 ## Features
 
-- [Template sources, inline discovery, declarative registration, props, helpers, Alpine stores, slots, Shadow/Light DOM, styles, assets, loading, and fallback UI](docs/components.md), including [generated responsive skeletons](docs/skeletons.md).
+- [URL, DOM, and JavaScript inline template sources; `x-acl` discovery; declarative registration; props; helpers; Alpine stores; slots; Shadow/Light DOM; styles; assets; loading; and fallback UI](docs/components.md), including [generated responsive skeletons](docs/skeletons.md).
 - [Data fetching, URL/body handling, response parsing, cancellation, retries, polling, template/data caches, persistence adapters, migrations, and storage helpers](docs/data.md).
 - [Lifecycle hooks, progressive hydration, error boundaries, form association, cleanup, events, state-preserving reloads, targeted HMR, dynamic components, transitions, and keep-alive](docs/lifecycle.md).
 - [Recursive sanitization, custom URL policy, Trusted Types, CSP operation, and browser/server rendering parity](docs/security.md).
