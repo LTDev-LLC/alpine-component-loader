@@ -194,21 +194,21 @@
     },
     "homepage": "https://github.com/LTDev-LLC/alpine-component-loader#readme",
     "devDependencies": {
-        "@alpinejs/csp": "3.15.12",
-        "@axe-core/playwright": "4.12.1",
-        "@playwright/test": "1.62.1",
-        "@types/node": "^26.2.0",
+        "@alpinejs/csp": "3.17.3",
+        "@axe-core/playwright": "4.13.0",
+        "@playwright/test": "1.63.0",
+        "@types/node": "^26.6.1",
         "alpinejs-314": "npm:alpinejs@3.14.0",
         "alpinejs-315": "npm:alpinejs@3.15.12",
-        "fast-check": "4.9.0",
-        "playwright": "1.62.1",
-        "playwright-core": "1.62.1",
-        "prettier": "3.9.6",
+        "fast-check": "4.10.1",
+        "playwright": "1.63.0",
+        "playwright-core": "1.63.0",
+        "prettier": "3.9.8",
         "typescript": "7.0.2",
-        "vite": "8.2.1"
+        "vite": "8.3.0"
     },
     "optionalDependencies": {
-        "@swc/core": "^1.15.47",
+        "@swc/core": "^1.16.2",
         "parse5": "^8.0.1"
     }
 }
