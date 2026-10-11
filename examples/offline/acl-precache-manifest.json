@@ -1,7 +1,7 @@
 {
   "version": 1,
   "namespace": "example",
-  "cacheName": "acl-offline-example-1ZN6RfYGNRzepQrl",
+  "cacheName": "acl-offline-example-_AtGXy7UT2AFYHEq",
   "groups": [
     "offline-demo"
   ],
@@ -33,175 +33,349 @@
   "entries": [
     {
       "url": "/dist/acl-load-error.min.js",
-      "revision": "sha256-5prU7HH27vZCx1hBW91jjxZZ35TuN1JtO_U8qNKxBzg",
+      "revision": "sha256-anVBB1m1u1vTfswhcSrCp5efP6WQyejPogjegJxINRw",
       "required": true,
       "component": null
     },
     {
       "url": "/dist/index.min.js",
-      "revision": "sha256-J8eP7bcutkZDEhyLVo5o2aQfdQRU5is3sw6GJHE3A_o",
+      "revision": "sha256-SAm8etRtoire0u6jkDXz_mChIFltPtuEW-K5rgUYts8",
       "required": true,
       "component": null
     },
     {
       "url": "/dist/inline-templates.min.js",
-      "revision": "sha256-Sv2A1QgKJa4A5Cx2O_Ed7iBmrM9om0Vc_7vQMvuSpz8",
+      "revision": "sha256---7hp-qvVeJe-a7GHGiSML016fwmCluwErwWQX6DuJ8",
       "required": true,
       "component": null
     },
     {
       "url": "/dist/offline.min.js",
-      "revision": "sha256-LP9ttwBG5P9rFfAc-gpSBfRIOmnOmG8QEXU9r53lma8",
+      "revision": "sha256-I7c401Ip_b9PLoKDfAw7hKzsHDcoMZI-xpkZvG2jfsA",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/polyfills.min.js",
+      "revision": "sha256-3cP4uVLqR8hIkuVRkYFoT5H8SzelO-9DJDcbfZl5LbU",
       "required": true,
       "component": null
     },
     {
       "url": "/dist/runtime/caches.min.js",
-      "revision": "sha256-3OhmtVCEfAVYqhYjkCtalgDhltwPeleSgQJevXF8Z4g",
+      "revision": "sha256-5VUSuXE6Ga4eu5RdZ7nhQ_VFiPSNoHW_jwrY4uj_B1g",
       "required": true,
       "component": null
     },
     {
-      "url": "/dist/runtime/component/data-gate-controller.min.js",
-      "revision": "sha256-3Qfu2bleHbrZRt_fRTn31A1rI9xknZZuoYcrfJynXi8",
+      "url": "/dist/runtime/component/data-controller.min.js",
+      "revision": "sha256-SYw6IV5LM10Nh1Vsdjk9v0s_Cu6X1Dp45997AUwVeQc",
       "required": true,
       "component": null
     },
     {
-      "url": "/dist/runtime/component/factory.min.js",
-      "revision": "sha256-_AvbY0J8u0dW3MAJor5IbTAAEe1F5dSyBizIDlbWrtQ",
+      "url": "/dist/runtime/component/hydration.min.js",
+      "revision": "sha256-h5dodw4c80KreiHxPYeLy3FIDCzJ1g4SaVfQfeaqcA0",
       "required": true,
       "component": null
     },
     {
       "url": "/dist/runtime/component/lifecycle-controller.min.js",
-      "revision": "sha256-7XT4LKu8J7cBs1rzbPlxXZ_5KDP1TL_PIckC32IqNZ8",
+      "revision": "sha256-Q07aYnhiE6PzQWbs7F5065Gm6bhzgFWuCvJK5EHJ9b8",
       "required": true,
       "component": null
     },
     {
-      "url": "/dist/runtime/component/loading-controller.min.js",
-      "revision": "sha256-db0VNDOywbqt5yUl2oMwK7-hRKdpCmjQIrvEQt1-E-Q",
+      "url": "/dist/runtime/component/scripts.min.js",
+      "revision": "sha256-q_hmaftrWy02BYDLHzPfkYtEn8U8ThrdaPWZePC_sKg",
       "required": true,
       "component": null
     },
     {
-      "url": "/dist/runtime/component/render-controller.min.js",
-      "revision": "sha256-pHdkE04ToU39epBBhKhK-qoZFD3RnpJBwSiyrDsGJZ8",
+      "url": "/dist/runtime/component/slots.min.js",
+      "revision": "sha256-GNrZkNCutyb_pxCGR66YdOIVi38UzqA7icG8MTNyl3Q",
       "required": true,
       "component": null
     },
     {
-      "url": "/dist/runtime/component/state-controller.min.js",
-      "revision": "sha256-dWtHMDlR0SJBjIHEbvN0yOU46ZcZH981AeKgEBow3So",
+      "url": "/dist/runtime/component/styles.min.js",
+      "revision": "sha256-0-B8bJZYyUa4r0SLk2kJZ3tT0hBAc-o0PzDKXJp1YQg",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/component/triggers.min.js",
+      "revision": "sha256-9XMhWT_NHv03iWgbN4sFdNR83ueFuPQglGYUOAXw7q4",
       "required": true,
       "component": null
     },
     {
       "url": "/dist/runtime/config.min.js",
-      "revision": "sha256-A7jRPxUyBCF3r2N2jX_ed1vxgWUs96TiLtDDhQD5Hkw",
+      "revision": "sha256-UAlM784gFyK_asI7Clw0yK-rryFgIViawpkTFqE4mWk",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/context.min.js",
+      "revision": "sha256-Bfxx6B437uJDt43QMJFH5hrpuDlwgylQcMz94ytNAU8",
       "required": true,
       "component": null
     },
     {
       "url": "/dist/runtime/contracts.min.js",
-      "revision": "sha256-VLT-WBhPq7hbQxodP0pQ62uKSaznvt0qDwZ9_8oqGbw",
+      "revision": "sha256-m3uJdAJ7qCvIT9GDLGA4WqIoP3SFcaTdUUCvSFg1GTc",
       "required": true,
       "component": null
     },
     {
-      "url": "/dist/runtime/data-options.min.js",
-      "revision": "sha256-BHdJUL2-S5BDDcWvvb5jz95tRRZrecnw8ZuNX6PMufU",
+      "url": "/dist/runtime/environment.min.js",
+      "revision": "sha256--_xbV5-wIhXmII95wxE7j0rdy0l8XZQTU5n7h3ogiMk",
       "required": true,
       "component": null
     },
     {
       "url": "/dist/runtime/errors.min.js",
-      "revision": "sha256-PP6FMFk-pLx2bA_yUKPjQEa_Vu2XrVKfKiNe-o4csMA",
+      "revision": "sha256-vUEDRt8BSxvLV3pq8li4Plpxopj1xZSgakEHf5a6EZc",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/fetch-cache.min.js",
+      "revision": "sha256-KJnGQ4zFCaql7mRzy4rj4KrA1q6IVXBuJ2jnzuFns44",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/initialization-scheduler.min.js",
+      "revision": "sha256-PB6AISG23ieNGZrbfOYJ4NhAh17DSal08_c3JoIv1io",
       "required": true,
       "component": null
     },
     {
       "url": "/dist/runtime/lifecycle.min.js",
-      "revision": "sha256-OgZaAvOdU76yPnASFA4C0aAi5207QF2xtFU01w70c44",
+      "revision": "sha256-Rt-dB09_g6w_ayGxAHfFnMtQLYLP7PB69nfb719fqTE",
       "required": true,
       "component": null
     },
     {
       "url": "/dist/runtime/loader.min.js",
-      "revision": "sha256-ZUKSSZT_weWwjNmFzZJPS5NaAhTK_mY6Xo6e6sm6vgM",
+      "revision": "sha256-B70skdc7lG12-oEgWVbEnrpn6CSTbG4SlOatoO2TBgw",
       "required": true,
       "component": null
     },
     {
       "url": "/dist/runtime/props.min.js",
-      "revision": "sha256-wUVFVsywdL1lRvIaQBF2HvQDsg_2ee3BlbeNqXrAxlU",
+      "revision": "sha256-yi0dbsxiPQEMqMNsC8RzLEQNzgOHrLDYUYZHE6WBgpg",
       "required": true,
       "component": null
     },
     {
       "url": "/dist/runtime/registry.min.js",
-      "revision": "sha256-yiCeQSo7kRL9SZvJXkNWxr8l4o0j51i05JotGUA_x94",
+      "revision": "sha256-PGuPAnQWAWhaFRq9YQTMQQJ0O0edMZrZGDmM0ZcnkSc",
       "required": true,
       "component": null
     },
     {
       "url": "/dist/runtime/rendering.min.js",
-      "revision": "sha256-070cb1tk7ylOsxXuV2mU0LfDFCZxtLkFYqFDNMlCw8g",
+      "revision": "sha256-3CXoGyMwKlEwov_8mlRiJConZo5cjrLSPV5TwCagtm4",
       "required": true,
       "component": null
     },
     {
       "url": "/dist/runtime/template-cache.min.js",
-      "revision": "sha256-rvPJidKCdJSPkJj-6OoRXXpehTDj4JjD8NpwrbBDgac",
+      "revision": "sha256-mg1nKgW0qRmIUTEryFedgCUGzSYVS2AIZbpnXBi0wi8",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/template-loader.min.js",
+      "revision": "sha256-FpVDicPnfXrAU7ek2LCOqHCZmsVEwdZPMK0PyrsdtVY",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/dist/runtime/template-requests.min.js",
+      "revision": "sha256-L-_W5CJa-zCV6lQJHbJjUp-eBAR5XecOq37MccObGSo",
       "required": true,
       "component": null
     },
     {
       "url": "/dist/runtime/values.min.js",
-      "revision": "sha256-KXtHzcub4nz9SeEhelJxQQv1uuizjHimyahI_G0rHBI",
+      "revision": "sha256-YgfRClonaslthA91zBNBWHpth15Ed0EeDxuBe4iLbtw",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/feature-lab/demos/bootstrap.js",
+      "revision": "sha256-Wf5uavSinoMRe7QKAO1Txck_gUOZCYzQfKcEy-LS54I",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/feature-lab/demos/frame.css",
+      "revision": "sha256-SpkXcqMDdmOzeJswb57Z98BL3OSzkzy515cL46RP2bQ",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/feature-lab/demos/frame.html",
+      "revision": "sha256-jJJ5OuCYyRk8VTII6X1KSUzLk9-aWnYehjK1AIxWE34",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/feature-lab/demos/frame.js",
+      "revision": "sha256--A_3hFOZOSio1afl5cv14ArrwT1f0GXFi3igUhS7gIY",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/feature-lab/demos/launcher.js",
+      "revision": "sha256-CVPJq5XYtQ03xz7ER_RVoUmr7NbKbTTlqG-sl4bEems",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/feature-lab/demos/preloads.json",
+      "revision": "sha256-kE_ALJEKtm0TH9TAhswafGIyRm0_0l_6k6R3BygI14g",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/feature-lab/demos/vendor/webcomponents/bundles/webcomponents-ce.js",
+      "revision": "sha256-WG_I5ssyuZMD2FfEnCNEP6hC_kQbKlu3r16aHNejnqw",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/feature-lab/demos/vendor/webcomponents/bundles/webcomponents-ce.js.map",
+      "revision": "sha256-M_urpSlSZ7U2HRRwhx7h7C3aKYnCBqj1TEA11p8gRPA",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/feature-lab/demos/vendor/webcomponents/bundles/webcomponents-pf_dom.js",
+      "revision": "sha256-ewpZVgRNK9qKcbE8teUYidEzQRT2pQurfcbQ9mvSc1M",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/feature-lab/demos/vendor/webcomponents/bundles/webcomponents-pf_dom.js.map",
+      "revision": "sha256-D6bA9-pjQkAnEvLJlgAnvUtyBA75Nk2BzLUyK7DQbaA",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/feature-lab/demos/vendor/webcomponents/bundles/webcomponents-pf_js.js",
+      "revision": "sha256-_OzXp835cNo-aUjiMdWf-jJiXubxGuptAmPmeM5KZ8I",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/feature-lab/demos/vendor/webcomponents/bundles/webcomponents-pf_js.js.map",
+      "revision": "sha256-y73NwgY_iZnx5q_2T2BwPGl3wkulzKY5qrjjQcI-me4",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/feature-lab/demos/vendor/webcomponents/bundles/webcomponents-sd-ce-pf.js",
+      "revision": "sha256-jaJBvETJiLXsH6iRTNSG1xKOsXGKsdRWaLLyI9YuY5c",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/feature-lab/demos/vendor/webcomponents/bundles/webcomponents-sd-ce-pf.js.map",
+      "revision": "sha256-YiYjWU8qOCY9x778BaqmpT2m2QwTydfsg1RLb0hpSRU",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/feature-lab/demos/vendor/webcomponents/bundles/webcomponents-sd-ce.js",
+      "revision": "sha256-eBqZHXZDv3_wlDZjFCrGzAPlexF2tO77jEli5_pkeEU",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/feature-lab/demos/vendor/webcomponents/bundles/webcomponents-sd-ce.js.map",
+      "revision": "sha256-VGJ6YuVXf4vXGAnLpvB4JYWfM6vbg5QQ9MgrJ5cwBr0",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/feature-lab/demos/vendor/webcomponents/bundles/webcomponents-sd.js",
+      "revision": "sha256-Xe6LHFx6kIVuOA3TlhmSyEoje8LnR1T_r_J5E3qiHqM",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/feature-lab/demos/vendor/webcomponents/bundles/webcomponents-sd.js.map",
+      "revision": "sha256-SYOL0VbhZT3CdSJXWaxJla8JmMj38t67OKe1DWvEDxg",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/feature-lab/demos/vendor/webcomponents/LICENSE.md",
+      "revision": "sha256-EK6CtaNJwawVAV0sUOWtr2QTU49pvpYc8BQM_BUrl-M",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/feature-lab/demos/vendor/webcomponents/webcomponents-bundle.js",
+      "revision": "sha256-f54Ho9PYikszjtXmjveDpRaBMIBI01qBowmOKwEdfqQ",
+      "required": true,
+      "component": null
+    },
+    {
+      "url": "/examples/feature-lab/demos/vendor/webcomponents/webcomponents-loader.js",
+      "revision": "sha256-LNiPVL60ysbwFyMI-qJFDiiQPCnN9lkjD78LK3mKd-U",
       "required": true,
       "component": null
     },
     {
       "url": "/examples/offline/acl-manifest.json",
-      "revision": "sha256-mVuN3K-mHzkN8r3o9Ty-nG6tKo7144raauY8Xn-jgW4",
+      "revision": "sha256-Asw_DIj7ruiDreoJQuImTxYOAhLcIdZKRyfR5O0tvCo",
       "required": true,
       "component": null
     },
     {
       "url": "/examples/offline/app.min.js",
-      "revision": "sha256-AlE-7Y-ypdWbbCIn8jZZRp08GN97jXdTUr6BCqaTn0U",
+      "revision": "sha256-egjrqsWqMnjzvGFjoJi7jN5ls1PiYWPO3qjSUsqVdYM",
       "required": true,
       "component": null
     },
     {
       "url": "/examples/offline/components/offline-shell.html",
-      "revision": "sha256-djrB0zWcU_ObM53Vjztn_xm8OaOG69TZFcyE8iexflE",
+      "revision": "sha256-tko3Ni4aAiH1SSgREptCGe5ozTpTr4AVoURMYpE1Auc",
       "required": true,
       "component": "offline-demo-shell"
     },
     {
       "url": "/examples/offline/components/offline-status.html",
-      "revision": "sha256-xJZH5hK9h6AEmDxoi-qA965hzXfxayuHvOnJGvTC0qM",
+      "revision": "sha256-iT4WQBElOpJByG6LH1WaHyVdDPkE7mVE9wD6ygMqW1g",
       "required": true,
       "component": "offline-demo-status"
     },
     {
+      "url": "/examples/offline/demo.html",
+      "revision": "sha256-OPP3TN_ZgmnKHBFHgjZcCtRIMt1jQaiusoWjrt-6hj8",
+      "required": true,
+      "component": null
+    },
+    {
       "url": "/examples/offline/index.html",
-      "revision": "sha256-hOrrKXsXrQ2vGhR2uchDn0scrXBZM2nrfEgOYlM5k88",
+      "revision": "sha256-2ThTBNj5_RQoly3gJ2RLV73Nlo4dDxMm9kvFUuLDppk",
       "required": true,
       "component": null
     },
     {
       "url": "/examples/offline/styles.css",
-      "revision": "sha256-klsxfdVhCYZrqbUoMCz9w0a-Jvj896uM_BZM7Eqhqo8",
+      "revision": "sha256-8IbXfkGuR1wFvoJYXi2gjU0QTbf8E1dTahisInzNgGY",
       "required": true,
       "component": null
     },
     {
-      "url": "https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js",
-      "revision": "url-gH7DmJ1G3P05LmDD7rzYgD5S9v88K8UB63dzCeNRvXw",
+      "url": "https://cdn.jsdelivr.net/npm/alpinejs@3.17.4/dist/cdn.min.js",
+      "revision": "url-QFQBU5o5uj4EaVsfbh5KIneFFat-uq5RT-DECGuMpAw",
       "required": false,
       "component": null
     }

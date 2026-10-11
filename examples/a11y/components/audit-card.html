@@ -165,9 +165,11 @@
 </style>
 
 <article aria-labelledby="profile-heading">
-    <img class="avatar"
+    <img
+        class="avatar"
         src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 72 72'%3E%3Crect width='72' height='72' rx='36' fill='%23dbeafe'/%3E%3Ctext x='36' y='45' text-anchor='middle' font-size='27' fill='%231d4ed8'%3EACL%3C/text%3E%3C/svg%3E"
-        alt="Alpine Component Loader profile">
+        alt="Alpine Component Loader profile"
+    />
     <div class="content">
         <h2 id="profile-heading">Accessible profile editor</h2>
         <p>The example changes this rendered Shadow DOM, then audits it again without remounting the component.</p>
@@ -175,7 +177,7 @@
         <form>
             <div class="field">
                 <label data-email-label for="profile-email">Email address</label>
-                <input id="profile-email" name="email" type="email" value="ada@example.test">
+                <input id="profile-email" name="email" type="email" value="ada@example.test" />
             </div>
             <button data-save-action type="button">Save profile</button>
         </form>
@@ -208,7 +210,7 @@
 
             <fieldset data-preferences>
                 <legend data-preferences-legend>Audit notifications</legend>
-                <label><input type="checkbox" checked> Email summaries</label>
+                <label><input type="checkbox" checked /> Email summaries</label>
             </fieldset>
 
             <details data-audit-details>
@@ -217,18 +219,30 @@
             </details>
 
             <table data-audit-table>
-                <caption data-table-caption>Latest audit status</caption>
+                <caption data-table-caption>
+                    Latest audit status
+                </caption>
                 <thead>
-                    <tr><th data-table-heading scope="col">Check</th></tr>
+                    <tr>
+                        <th data-table-heading scope="col">Check</th>
+                    </tr>
                 </thead>
                 <tbody>
-                    <tr><td>Passing</td></tr>
+                    <tr>
+                        <td>Passing</td>
+                    </tr>
                 </tbody>
             </table>
 
             <div class="support-card">
-                <svg class="status-graphic" data-status-graphic role="img" aria-label="Passing audit status"
-                    viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                <svg
+                    class="status-graphic"
+                    data-status-graphic
+                    role="img"
+                    aria-label="Passing audit status"
+                    viewBox="0 0 48 48"
+                    xmlns="http://www.w3.org/2000/svg"
+                >
                     <circle cx="24" cy="24" r="22" fill="#dcfce7"></circle>
                     <path d="M14 24l7 7 14-15" fill="none" stroke="#166534" stroke-width="4"></path>
                 </svg>

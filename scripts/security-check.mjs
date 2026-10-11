@@ -65,7 +65,12 @@ for (const root of roots) {
 
 // Require production-safe defaults in the primary loader entry point
 const core = await readFile(resolve('src/index.js'), 'utf8');
-if (!/executeScripts:\s*false/.test(core) || !/sanitize:\s*true/.test(core)) {
+if (
+    !/executeScripts:\s*false/.test(core) ||
+    !/sanitize:\s*true/.test(core) ||
+    !/BEGIN GENERATED OPTIONS/.test(core) ||
+    /generated-options\.js/.test(core)
+) {
     process.stderr.write('src/index.js: production-safe defaults are missing.\n');
     failed = true;
 }

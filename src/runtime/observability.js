@@ -1,5 +1,5 @@
 // @license AlpineComponentLoader
-// Copyright (c) LTDev LLC
+// Copyright (c) LouisT
 // Licensed under the MIT license in the repository root
 
 const SENSITIVE_KEY = /(?:authorization|cookie|password|passwd|secret|token|api[-_]?key|body|payload|props|persist)/i;

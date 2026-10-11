@@ -28,9 +28,14 @@ const walk = async (directory) => {
     // Visit every authored file below the current directory
     for (const entry of await readdir(directory, { withFileTypes: true })) {
         const path = join(directory, entry.name);
-        if (path === 'examples/acl-next') continue;
+        if (path === 'examples/acl-next' || path.endsWith('/vendor')) continue;
         if (entry.isDirectory()) await walk(path);
-        else if (['.js', '.mjs'].includes(extname(path)) && path !== 'examples/offline/acl-sw.js') files.push(path);
+        else if (
+            ['.js', '.mjs'].includes(extname(path)) &&
+            !/^examples\/offline\/acl-sw(?:-core)?\.js$/.test(path) &&
+            !path.endsWith('.min.js')
+        )
+            files.push(path);
     }
 };
 

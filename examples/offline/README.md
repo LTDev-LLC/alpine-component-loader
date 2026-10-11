@@ -1,64 +1,48 @@
 # Offline command example
 
-This example uses a version-one manifest dependency group and `acl-offline.json` policy to generate a narrowly scoped service worker. The resulting app shell, component templates, Alpine.js runtime, loader modules, allowed navigation fallback, and one bounded runtime response continue working after the browser goes offline.
+Generates a scoped service worker from a v1 manifest group and `acl-offline.json`. It keeps the app shell, templates,
+runtimes, navigation fallback, and a bounded runtime response available offline.
 
-From the repository root, build and generate the offline artifacts:
+Build and generate from the repository root:
 
 ```bash
 npm run build
 npm run example:offline:generate
 ```
 
-The generation shortcut runs the public `offline` command with these inputs:
+The shortcut generates root/core workers using the `alpinejs-pinned` pin in `package.json`. These are equivalent inputs
+for the root worker through the public CLI:
 
 ```bash
 node ./bin/alpine-component-loader.mjs offline examples/offline/acl-manifest.json \
   --group offline-demo \
   --config examples/offline/acl-offline.json \
   --asset index.html \
-  --asset app.js \
+  --asset app.min.js \
+  --asset demo.html \
+  --asset ../feature-lab/demos \
   --asset styles.css \
   --asset acl-manifest.json \
-  --asset ../../dist/index.js \
-  --asset ../../dist/acl-load-error.js \
-  --asset ../../dist/offline.js \
-  --asset ../../dist/runtime/loader.js \
-  --asset ../../dist/runtime/config.js \
-  --asset ../../dist/runtime/errors.js \
-  --asset ../../dist/runtime/values.js \
-  --asset ../../dist/runtime/props.js \
-  --asset ../../dist/runtime/data-options.js \
-  --asset ../../dist/runtime/registry.js \
-  --asset ../../dist/runtime/contracts.js \
-  --asset ../../dist/runtime/component/factory.js \
-  --asset ../../dist/runtime/component/lifecycle-controller.js \
-  --asset ../../dist/runtime/component/loading-controller.js \
-  --asset ../../dist/runtime/component/data-gate-controller.js \
-  --asset ../../dist/runtime/component/render-controller.js \
-  --asset ../../dist/runtime/component/state-controller.js \
-  --asset ../../dist/runtime/lifecycle.js \
-  --asset ../../dist/runtime/caches.js \
-  --asset ../../dist/runtime/template-cache.js \
-  --asset ../../dist/runtime/rendering.js \
-  --asset https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js \
-  --minify-js \
+  --asset https://cdn.jsdelivr.net/npm/alpinejs@3.17.4/dist/cdn.min.js \
+  --runtime-entry /dist/index.min.js \
+  --runtime-feature offline --runtime-feature polyfills --runtime-feature data \
+  --runtime-feature hydration --runtime-feature triggers --runtime-feature styles \
+  --runtime-feature slots --runtime-feature scripts --runtime-feature environment \
+  --runtime-feature scheduler \
   --base-url /examples/offline \
   --out-dir examples/offline \
   --namespace example \
   --force
 ```
 
-`--minify-js` hashes the actual minified output and publishes each explicit
-local JavaScript asset under its virtual `.min.js` URL. The explicit runtime
-list is the graph this example exercises, so optional capabilities are not
-downloaded during service-worker installation. The manifest group automatically
-includes both component templates in dependency-first order.
+`--runtime-entry` expands ACL modules from the graph; local main/loading/fallback templates infer styles and slots. The
+build minifies `app.js`, preserves vendor filenames, and orders component dependencies.
 
-Alpine is an optional remote precache entry. A first visit needs network access
-to jsDelivr; after the service worker successfully caches the pinned response,
-the same runtime is available to an offline reload.
+First installation needs the pinned Alpine jsDelivr response; successful caching makes it available offline.
 
-The policy keeps immediate activation for a zero-click demo, limits navigation fallback to `/examples/offline/`, and defines a cache-first rule for `runtime-message.json` with `maxEntries: 4` and a one-day expiry. The JSON response is deliberately not a precache asset: the controlled page requests it once so the runtime route stores and reuses it. Change `activation` to `prompt` in an application that should ask before promoting an update, then call `activateOfflineWorker(registration)` after user approval.
+The demo activates immediately, limits navigation fallback to `/examples/offline/`, and caches `runtime-message.json` on
+first use with `maxEntries: 4` and one-day expiry. For approved updates, set `activation: 'prompt'` and call
+`activateOfflineWorker(registration)` after confirmation.
 
 Start the repository development server:
 
@@ -66,33 +50,43 @@ Start the repository development server:
 npm run example:offline
 ```
 
-Open <http://127.0.0.1:4173/examples/offline/index.html>. Wait for “Ready for offline reload,” verify that registration details contain the runtime-route message and storage quota fields, switch the browser to offline mode in DevTools, and reload. The page, nested components, styles, Alpine counter, navigation fallback, and previously stored runtime response remain available.
+Open <http://127.0.0.1:4173/examples/offline/index.html>, wait for **Ready for offline reload**, check runtime/quota
+details, then disable networking and reload.
 
-The generated files are checked in so the example works immediately:
+Checked-in artifacts:
 
-- `acl-precache-manifest.json` describes the exact URLs and revisions.
-- `acl-offline.json` declares activation, navigation, expiry, and runtime-cache limits.
-- `acl-sw.js` precaches selected URLs, applies only the declared routes, recovers from quota pressure, and removes older `acl-offline-example-*` caches.
+- `acl-precache-manifest.json`: URLs and revisions.
+- `acl-offline.json`: activation, navigation, expiry, and cache limits.
+- `acl-sw.js`: precaching, declared routes, quota recovery, and old-cache cleanup.
 
-Run `npm run example:offline:generate` whenever the manifest, policy, templates, page assets, Alpine version, or built loader changes.
+Regenerate after changing manifests, policy, templates, assets, Alpine, or ACL.
 
-To build the current runtime and create a deployable static copy without
-changing the checked-in generated files, run:
+Create a static copy without changing checked-in artifacts:
 
 ```bash
 npm run stage -- offline
 ```
 
-The stager writes `_site/examples/offline/app.min.js`, regenerates the service
-worker and precache manifest against the staged files, maps the application’s
-bare ACL imports to `/dist/*.min.js`, captures responsive component skeletons,
-links `./skeletons/acl-skeletons.css` from the staged page head, and creates the
-root redirect. The final page and skeleton stylesheet are included in the
-generated precache. When Offline is selected with other static examples, the
-same route-scoped files are generated beneath `/examples/offline/` and the root
-becomes the shared example catalog.
+Staging regenerates worker assets, direct minified imports, and responsive skeletons under `_site/examples/offline/`.
+The final page and skeleton CSS are precached. Multiple selections create a shared catalog.
 
-Unlike the other static examples’ authored development maps, this page also
-uses `/dist/*.min.js` in the repository. Those are the stable URLs stored by its
-checked-in service worker, so the development-server example can reload while
-offline without depending on `/__acl_hmr/`.
+Repository imports also use `/dist/*.min.js`, matching worker URLs without depending on dev-only `/__acl_hmr/` paths.
+
+## Startup entry and fallback APIs
+
+Default startup uses `index.min.js`; `?entry=core` uses core and the matching `acl-sw-core.js`. Both register the
+manifest explicitly. Generation produces both workers. See [core startup](../../docs/core.md).
+
+`?polyfills=1` gates Alpine/application imports with precached self-hosted scripts. The default CDN URL is not
+redirected. See [offline polyfill delivery](../../docs/polyfills.md).
+
+## Late capability activation and core worker
+
+After installation, disable networking and open capability, pooling, scheduling, or polyfill experiments. Fresh
+documents activate modules absent from the initial shell using explicit precache dependencies.
+
+Combine core and polyfills with `?entry=core&polyfills=1`; add `&fallback=1` for forced ShadyDOM. Vendor filenames
+remain intact and ACL stays in one minified family.
+
+`demo.html` is inside the worker scope. Its precached shared assets may live outside that scope because requests
+originate from a controlled document.

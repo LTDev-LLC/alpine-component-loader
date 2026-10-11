@@ -1,6 +1,7 @@
 # Components, props, slots, and rendering
 
-AlpineComponentLoader turns an HTML template into a custom element. A definition supplies a tag, a template source, and optional rendering, prop, data, asset, lifecycle, and persistence settings.
+ACL turns an HTML template into a custom element. Definitions specify a tag, source, and optional props, rendering,
+data, assets, lifecycle, or persistence settings.
 
 ## Quick start
 
@@ -31,7 +32,11 @@ await AlpineComponentLoader.start();
 <profile-card name="Ada">Maintainer</profile-card>
 ```
 
-The root package is side-effect free. Call `start()` after configuration and registration, or deliberately use the browser-only `alpine-component-loader/auto` entry when import-time startup is wanted. Definitions added after startup register immediately.
+Call root-entry `start()` after configuration/registration. `/auto` starts on import. Definitions added after startup
+register immediately.
+
+[Core](core.md) keeps the same component features with explicit registration. Await optional [polyfills](polyfills.md)
+before importing applications that need fallback APIs.
 
 ## Template sources and registration
 
@@ -57,17 +62,11 @@ AlpineComponentLoader.define('inline-message', {
 });
 ```
 
-The required `template` is a non-empty HTML string. All other keys are ordinary
-component options and a separate third argument is rejected. The inline source
-does not fetch or enter the persistent URL template cache. Use a DOM selector
-when multiple definitions should intentionally share one authored template;
-use a URL when templates should deploy independently from JavaScript.
+`template` must be a non-empty HTML string; other fields are component options. Inline objects reject a third argument
+and skip fetching/persistent URL caching. Use selectors to share authored templates or URLs for independent deployment.
 
-JavaScript inline objects, selector-backed templates, and `x-acl` declarations
-are browser-runtime authoring paths. Static SSR and generated offline precache
-graphs require URL-backed component sources in a manifest. A browser-only
-inline component can still use data requests, persistence, props, slots,
-assets, sanitization, and the ordinary component lifecycle.
+Inline objects, selectors, and `x-acl` are browser authoring paths with normal component features. SSR and generated
+offline graphs require manifest URL sources.
 
 For an inline definition:
 
@@ -83,13 +82,13 @@ AlpineComponentLoader.define('status-badge', '#status-badge-template', {
 });
 ```
 
-Custom-element names must contain a hyphen. Use `has()`, `getDefinition()`, and `getRegisteredTags()` to inspect definitions without touching internal registries.
+Custom-element names must contain a hyphen. Use `has()`, `getDefinition()`, and `getRegisteredTags()` to inspect
+definitions without touching internal registries.
 
 ### Resolve application-specific sources
 
-`sourceResolver` runs before `basePath`. It receives the original source and a
-frozen context containing `tagName`, the local `config`, current
-`globalConfig`, and the owning `loader` class:
+Synchronous `sourceResolver` runs before `basePath`, with the source and frozen `tagName`, `config`, `globalConfig`, and
+`loader` context:
 
 ```js
 AlpineComponentLoader.config({
@@ -107,34 +106,28 @@ AlpineComponentLoader.define('notice-card', 'design:notice');
 // Fetches /components/design-system/notice.html
 ```
 
-A falsy resolver result keeps the original source. `basePath` prefixes only relative string sources after resolution; absolute URLs, protocol-relative URLs, root-relative paths, `#template` selectors, and `HTMLTemplateElement` objects are left unchanged. The resolver is synchronous and should return a string or template element, not fetch the template itself.
+Return a string/template element, or a falsy value to keep the source. `basePath` prefixes relative strings only;
+absolute/root/protocol-relative URLs, selectors, and template elements remain unchanged.
 
 ### Discover inline definitions
 
-`start()` scans existing `template[x-acl]` and
-`template[acl-component]` definitions:
+The root entry's `start()` scans existing `template[x-acl]` and `template[acl-component]` definitions:
 
 ```html
-<template
-    x-acl="inline-counter"
-    acl-props='{ "count": { "type": "Number", "default": 0 } }'
->
+<template x-acl="inline-counter" acl-props='{ "count": { "type": "Number", "default": 0 } }'>
     <button @click="$props.count++" x-text="$props.count"></button>
 </template>
 
 <inline-counter count="5"></inline-counter>
 ```
 
-Scan a specific subtree with `registerTemplates(root)`. If an application inserts definitions later, use `observeTemplates({ root, subtree })`; it registers future matching templates and returns a cleanup function. Only one loader-owned template observer is active, so a later observation replaces the previous one.
+`registerTemplates(root)` scans a subtree. `observeTemplates({ root, subtree })` registers future declarations and
+returns cleanup. Each loader has one observer; re-observing replaces it.
 
-Both marker spellings support `acl-props` and every serializable data control
-listed in the data guide. The marker attributes are definition metadata and do
-not render inside the custom element. Both markers may be present only when
-they name the same component. Existing hosts upgrade when registration
-completes; future hosts upgrade through the browser custom-element registry.
+Both markers accept `acl-props` and serializable data controls. They are consumed definition metadata and may coexist
+only with the same name. Registration upgrades existing and future hosts.
 
-The ordinary entry keeps late discovery opt-in. The `/auto` entry observes late
-templates by default. Set its global opt-out before importing the entry:
+Late observation is opt-in on root and default on `/auto`. Configure before auto import:
 
 ```html
 <script>
@@ -142,13 +135,12 @@ templates by default. Set its global opt-out before importing the entry:
 </script>
 ```
 
-That opt-out still permits the initial startup scan. `autoStart: false` disables
-both. Call `stopObservingTemplates()` to stop an active observer. Use paired
-custom-element tags in HTML rather than self-closing syntax.
+`observeTemplates: false` retains the initial scan; `autoStart: false` disables both. `stopObservingTemplates()` stops
+observation. HTML custom elements need paired tags.
 
 ## Register components from a manifest
 
-For applications with SSR, offline bundles, generated types, or dependency prefetch, generate and enrich a shared component manifest:
+Use a shared manifest for SSR, offline, generated types, or dependency prefetch:
 
 ```bash
 npx alpine-component-loader manifest components --out acl-manifest.json
@@ -169,7 +161,8 @@ await AlpineComponentLoader.registerManifest(manifest, {
 await AlpineComponentLoader.start();
 ```
 
-`registerManifest()` accepts an object, not a URL. The generator supplies sources, inferred dependencies, and template revisions; add Shadow DOM, prop contracts, groups, and metadata manually. See [Manifests, generated contracts, and CLI tooling](manifests-and-cli.md).
+`registerManifest()` accepts objects. Generation supplies sources, dependencies, and revisions; authored
+options/metadata remain yours. See [manifest tooling](manifests-and-cli.md).
 
 ## Declarative proxy
 
@@ -193,33 +186,37 @@ await AlpineComponentLoader.start();
 </acl-component>
 ```
 
-`src` is required. When `tag` is absent, the proxy derives it from the source filename; the result must still be a valid, hyphenated custom-element name. If the tag is not already registered, undeclared public attributes are inferred as String, Number, Boolean, Array, or Object props. If it is already registered, the existing definition wins.
+`src` is required; omitted `tag` derives from its filename and must be a valid hyphenated name. New tags infer public
+attributes as primitive/array/object props. Existing definitions win.
 
-| Proxy attribute | Purpose |
-| --- | --- |
-| `src` | Required template source. |
-| `tag` | Target custom-element name. |
-| `shadow` | Enable Shadow DOM; the literal value `false` disables it. |
-| `loading` | `eager`, `lazy`, or `idle`. |
-| `acl-props` | Strict-JSON prop definitions using serialized constructor names. |
-| `data-fetch-options` | Strict-JSON base `RequestInit`; other request controls use the data attributes documented below. |
-| `external-css` / `external-scripts` | Strict-JSON arrays of asset strings or descriptors. |
-| `forward-events` | Strict-JSON event-name or mapping array. |
-| `hooks` | Safe dotted path to an existing hook object on `window`. |
-| `template-cache-strategy` | Template cache policy for this definition. |
-| `loading-template` / `loading-html` | Temporary loading UI. |
-| `sanitize` | Enable or disable sanitization for this definition. |
-| `bind-store` | Existing Alpine store name. |
-| `fallback` | Template source used after an initial failure. |
-| Data and persistence attributes | The controls listed in [Data, caching, polling, and persistence](data.md). |
+| Proxy attribute                     | Purpose                                                                                          |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `src`                               | Required template source.                                                                        |
+| `tag`                               | Target custom-element name.                                                                      |
+| `shadow`                            | Enable Shadow DOM; the literal value `false` disables it.                                        |
+| `loading`                           | `eager`, `lazy`, or `idle`.                                                                      |
+| `acl-props`                         | Strict-JSON prop definitions using serialized constructor names.                                 |
+| `data-fetch-options`                | Strict-JSON base `RequestInit`; other request controls use the data attributes documented below. |
+| `external-css` / `external-scripts` | Strict-JSON arrays of asset strings or descriptors.                                              |
+| `forward-events`                    | Strict-JSON event-name or mapping array.                                                         |
+| `hooks`                             | Safe dotted path to an existing hook object on `window`.                                         |
+| `template-cache-strategy`           | Template cache policy for this definition.                                                       |
+| `loading-template` / `loading-html` | Temporary loading UI.                                                                            |
+| `sanitize`                          | Enable or disable sanitization for this definition.                                              |
+| `bind-store`                        | Existing Alpine store name.                                                                      |
+| `fallback`                          | Template source used after an initial failure.                                                   |
+| Data and persistence attributes     | The controls listed in [Data, caching, polling, and persistence](data.md).                       |
 
-Declarative values never evaluate JavaScript. Object keys and strings require double quotes; `acl-props`, fetch settings, arrays, asset descriptors, and forwarding rules must be valid JSON. Functions such as a custom parser, validator, coercer, sanitizer, storage adapter, migration, or dynamic request builder belong in JavaScript configuration.
+Declarative settings use strict JSON, with quoted keys/strings. Parsers, validators, coercers, sanitizers, adapters,
+migrations, and dynamic request builders belong in JavaScript.
 
-The `hooks` path accepts identifiers separated by dots and blocks prototype traversal. For example, `hooks="ACLHooks.profile"` resolves `window.ACLHooks.profile`. Loader-only definition attributes are consumed; public props, runtime control attributes, classes, styles, IDs, and child nodes move to the real component without cloning their state.
+`hooks="ACLHooks.profile"` resolves a dotted identifier on `window`, blocking prototype traversal. Definition controls
+are consumed; public/runtime attributes and child nodes move to the real host with their state.
 
 ## Props, reactive state, and built-in helpers
 
-Supported prop constructors are `String`, `Number`, `Boolean`, `Array`, and `Object`. A descriptor may add a default, required/nullability rules, reflection, an allowed-options list, nested object validation, a validator, or a coercer:
+Props support `String`, `Number`, `Boolean`, `Array`, and `Object`, with defaults, required/nullability rules,
+reflection, allowed values, nested validation, validators, and coercers:
 
 ```js
 AlpineComponentLoader.define('profile-card', '/components/profile-card.html', {
@@ -242,17 +239,17 @@ AlpineComponentLoader.define('profile-card', '/components/profile-card.html', {
 });
 ```
 
-| Descriptor field | Purpose |
-| --- | --- |
-| `type` | `String`, `Number`, `Boolean`, `Array`, or `Object`. |
-| `default` | Stable value or factory used when input is absent or invalid. |
-| `required` | Report a missing input. |
-| `nullable` | Permit `null`, including the literal `null` for an attribute. |
-| `reflect` | Reflect host property assignments back to the corresponding attribute. |
-| `options` | Restrict values to an allowed list. |
-| `schema` | Recursively validate fields in an Object prop. |
-| `validator` | Apply additional application validation. |
-| `coerce` | Convert an attribute string with `{ el, props, name, definition }` context. |
+| Descriptor field | Purpose                                                                     |
+| ---------------- | --------------------------------------------------------------------------- |
+| `type`           | `String`, `Number`, `Boolean`, `Array`, or `Object`.                        |
+| `default`        | Stable value or factory used when input is absent or invalid.               |
+| `required`       | Report a missing input.                                                     |
+| `nullable`       | Permit `null`, including the literal `null` for an attribute.               |
+| `reflect`        | Reflect host property assignments back to the corresponding attribute.      |
+| `options`        | Restrict values to an allowed list.                                         |
+| `schema`         | Recursively validate fields in an Object prop.                              |
+| `validator`      | Apply additional application validation.                                    |
+| `coerce`         | Convert an attribute string with `{ el, props, name, definition }` context. |
 
 Declarative arrays and objects must be strict JSON:
 
@@ -266,12 +263,9 @@ Declarative arrays and objects must be strict JSON:
 ></profile-card>
 ```
 
-Props are available as element properties, through the component host's `$props`, and as the
-component-scoped Alpine value `$props`. The scoped value is the same reactive object, so templates
-can read it directly without declaring `x-data`. Existing templates that capture it with
-`x-data="{ props: $el.$props }"` remain supported. Mutable defaults are cloned for every element.
-With `strictProps: false`, invalid values are reported and replaced with safe defaults;
-`strictProps: true` turns them into load errors.
+The same reactive `$props` object is available on the host, Alpine scope, and hook contexts. Templates need no `x-data`;
+existing capture patterns still work. Mutable defaults are cloned. Invalid values use safe defaults unless
+`strictProps: true` makes them load errors.
 
 ```js
 const card = document.querySelector('profile-card');
@@ -279,12 +273,11 @@ card.count = 4;
 console.log(card.$props.name);
 ```
 
-The same object is exposed through `$el.$props`, the host's `$props`, lifecycle/fetch contexts, and the component-scoped Alpine `$props` magic. Declared names also receive host property accessors. When `reflect` is enabled, assigning the property updates its attribute; attribute changes update reactive state. Mutable defaults and shared fetched values are cloned at consumer boundaries.
+Declared properties update reactive state. With `reflect`, property assignments update attributes and attribute changes
+update props. Shared fetched values are cloned per consumer.
 
-Declared accessors are inherited from the generated custom-element prototype,
-not installed as own properties on every instance. Their descriptors remain
-enumerable and configurable, and reads, writes, coercion, validation, and
-reflection are unchanged:
+Property accessors are enumerable/configurable on the generated prototype. Reads, writes, coercion, validation, and
+reflection remain unchanged:
 
 ```js
 const prototype = Object.getPrototypeOf(card);
@@ -297,20 +290,21 @@ console.log(countDescriptor.enumerable, countDescriptor.configurable); // true t
 
 Every component starts with these members:
 
-| Member | Behavior |
-| --- | --- |
-| `$data` | Parsed fetch result when the request target is `$data`. |
-| `$loading` | `true` while the component owns an active data request. |
-| `$error` | Current data error message, otherwise `null`. |
-| `$lastUpdated` | Timestamp refreshed after reactive prop changes. |
-| `$emit(name, detail)` | Dispatch a bubbling, composed `CustomEvent` from the host. |
-| `$reload(options?)` | Run the same pipeline as `element.reload(options)`. |
-| `$retry()` | Refresh the current data endpoint without remounting the template. |
-| `$cancel(reason)` | Cancel deferred loading and current component/data work. |
-| `$cache` | Component-scoped template/data cache helpers. |
-| `$persistence` | Async storage helpers, present only when persistence is enabled and initialized. |
+| Member                | Behavior                                                                         |
+| --------------------- | -------------------------------------------------------------------------------- |
+| `$data`               | Parsed fetch result when the request target is `$data`.                          |
+| `$loading`            | `true` while the component owns an active data request.                          |
+| `$error`              | Current data error message, otherwise `null`.                                    |
+| `$lastUpdated`        | Timestamp refreshed after reactive prop changes.                                 |
+| `$emit(name, detail)` | Dispatch a bubbling, composed `CustomEvent` from the host.                       |
+| `$reload(options?)`   | Run the same pipeline as `element.reload(options)`.                              |
+| `$retry()`            | Refresh the current data endpoint without remounting the template.               |
+| `$cancel(reason)`     | Cancel deferred loading and current component/data work.                         |
+| `$cache`              | Component-scoped template/data cache helpers.                                    |
+| `$persistence`        | Async storage helpers, present only when persistence is enabled and initialized. |
 
-See [Data, caching, polling, and persistence](data.md) for cache and storage helpers and [Lifecycle, events, and dynamic components](lifecycle.md) for control-method semantics.
+See [Data, caching, polling, and persistence](data.md) for cache and storage helpers and
+[Lifecycle, events, and dynamic components](lifecycle.md) for control-method semantics.
 
 ## Bind an Alpine store
 
@@ -333,14 +327,16 @@ AlpineComponentLoader.define('theme-panel', '/components/theme-panel.html', {
 <theme-panel bind-store="theme"></theme-panel>
 ```
 
-Before binding, the loader seeds missing declared props and built-in helper fields into the store; existing store keys win. The component and all other store consumers then share one reactive object. Create the store before the component initializes. If the named store does not exist, the loader reports a `store` diagnostic and continues with local reactive state.
+Create stores before initialization. ACL seeds missing props/helpers; existing keys win, and consumers share the store.
+Missing stores report a `store` diagnostic and retain local state.
 
 ## Shadow and Light DOM
 
 `shadow` defaults to `false`.
 
 - Shadow components render into an open shadow root and use native slots.
-- Light DOM components render in the host. Their original default and named children are captured and projected into matching `<slot>` elements.
+- Light DOM components render in the host. Their original default and named children are captured and projected into
+  matching `<slot>` elements.
 - Light DOM slot input is observed for changes until the component is torn down.
 
 ```js
@@ -352,58 +348,61 @@ AlpineComponentLoader.define('profile-card', '/components/profile-card.html', {
 
 ```html
 <profile-card name="Ada">
-    <img slot="avatar" src="/avatars/ada.webp" alt="">
+    <img slot="avatar" src="/avatars/ada.webp" alt="" />
     <p>Maintainer and reviewer.</p>
     <button slot="actions" type="button">Follow</button>
 </profile-card>
 ```
 
-The template can place those nodes with `<slot name="avatar">`, `<slot>`, and `<slot name="actions">`. Static SSR always supports Shadow definitions and can opt Light DOM definitions into structural server rendering with `renderLightDom` or per-render `lightDom`. Both modes require matching revisions for in-place hydration; see [Static SSR and hydration](ssr.md#opt-in-light-dom-ssr).
+Use named/default `<slot>` elements to place consumer nodes. SSR supports Shadow DOM and opt-in Light DOM through
+`renderLightDom`/`lightDom`; hydration needs matching revisions. See [Light DOM SSR](ssr.md#opt-in-light-dom-ssr).
 
-| Rendering option | Default | Behavior |
-| --- | --- | --- |
-| `shadow` | `false` | Render into an open Shadow Root instead of the host. |
-| `useConstructibleStyles` | `true` | Cache/adopt constructible stylesheets in Shadow DOM when supported. |
-| `sharedStyleSheets` | `[]` | Adopt application-owned `CSSStyleSheet` objects before local sheets. |
-| `stripStyles` | `false` | Remove component template `<style>` elements. |
-| `runtimeCacheMax` | `200` | Bound stylesheet, asset, and diagnostic metadata maps. |
+| Rendering option         | Default | Behavior                                                             |
+| ------------------------ | ------- | -------------------------------------------------------------------- |
+| `shadow`                 | `false` | Render into an open Shadow Root instead of the host.                 |
+| `useConstructibleStyles` | `true`  | Cache/adopt constructible stylesheets in Shadow DOM when supported.  |
+| `sharedStyleSheets`      | `[]`    | Adopt application-owned `CSSStyleSheet` objects before local sheets. |
+| `stripStyles`            | `false` | Remove component template `<style>` elements.                        |
+| `runtimeCacheMax`        | `200`   | Bound stylesheet, asset, and diagnostic metadata maps.               |
 
-Light DOM styles use native CSS `@scope` when available and selector rewriting otherwise. Light DOM `<slot>` elements become transparent containers; their fallback content remains until consumer content is available. The loader preserves consumer node identity and observes additions until reload, deactivation, or teardown.
+Light DOM uses native `@scope` or selector rewriting. Slots become transparent containers with fallback content until
+supplied nodes arrive. Node identity is preserved and additions are observed until reload/deactivation/teardown.
 
 ## Styles and external assets
 
-Ordinary `<style>` elements in Light DOM templates are scoped to the component host. Shadow styles remain inside the shadow root. `stripStyles`, `sharedStyleSheets`, and `useConstructibleStyles` control local style handling.
+Ordinary `<style>` elements in Light DOM templates are scoped to the component host. Shadow styles remain inside the
+shadow root. `stripStyles`, `sharedStyleSheets`, and `useConstructibleStyles` control local style handling.
 
 Load explicit dependencies with `externalCss` and `externalScripts`:
 
 ```js
 AlpineComponentLoader.define('profile-card', '/components/profile-card.html', {
     shadow: true,
-    externalCss: [
-        '/styles/profile-card.css',
-        { url: '/styles/profile-card-print.css', media: 'print' },
-    ],
+    externalCss: ['/styles/profile-card.css', { url: '/styles/profile-card-print.css', media: 'print' }],
     externalScripts: [{ url: '/components/profile-card.js', type: 'module' }],
 });
 ```
 
-Asset descriptors support `url`, `integrity`, `crossOrigin`, `referrerPolicy`, `nonce`, `timeout`, CSS `media`, and script `type`. Matching descriptors are structurally deduplicated across components, and scripts load in declaration order. CSS is inserted globally; Shadow components also receive local links so component selectors work inside the shadow tree.
+Descriptors support `url`, `integrity`, `crossOrigin`, `referrerPolicy`, `nonce`, `timeout`, CSS `media`, and script
+`type`. Matching descriptors deduplicate; scripts keep declaration order. CSS is global with local links for Shadow DOM.
 
-External assets participate in cancellation and teardown. If the component is included in an offline bundle, manifest-declared assets are added to its precache graph. External scripts are trusted executable dependencies and are not controlled by `executeScripts`, which applies only to scripts inside component templates. Template scripts remain separately controlled by `sanitize` and `executeScripts`; see [Security and Trusted Types](security.md).
+Assets participate in cancellation, teardown, and manifest offline graphs. External scripts are trusted dependencies;
+`executeScripts` controls only template scripts, also subject to sanitization. See [security](security.md).
 
 ## Loading and fallback UI
 
 Choose when resource work begins:
 
-| `loading` mode | Behavior |
-| --- | --- |
-| `eager` | Start as soon as the host connects. |
-| `lazy` | Wait for viewport intersection; use eager loading when `IntersectionObserver` is unavailable. |
-| `idle` | Schedule through `requestIdleCallback` with a timeout fallback. |
+| `loading` mode | Behavior                                                                                      |
+| -------------- | --------------------------------------------------------------------------------------------- |
+| `eager`        | Start as soon as the host connects.                                                           |
+| `lazy`         | Wait for viewport intersection; use eager loading when `IntersectionObserver` is unavailable. |
+| `idle`         | Schedule through `requestIdleCallback` with a timeout fallback.                               |
 
-Deferred and loading hosts expose `aria-busy="true"`. Once work begins, `loadingTemplate` or `loadingHtml` remains until template, external assets, Alpine initialization, and initial data work settle.
+Deferred/loading hosts expose `aria-busy="true"`. Loading UI remains until templates, assets, Alpine, and initial data
+settle.
 
-Provide loading UI directly with `loadingTemplate` or `loadingHtml`, or capture responsive skeletons from a rendered page:
+Supply loading UI or generate responsive skeletons:
 
 ```bash
 npx alpine-component-loader skeleton ./index.html \
@@ -411,13 +410,13 @@ npx alpine-component-loader skeleton ./index.html \
   --out-dir skeletons
 ```
 
-The default `css` mode writes `acl-skeletons.css`. Link it early in the document head so responsive SVG masks can reserve and paint component geometry before the loader starts:
+CSS mode emits `acl-skeletons.css`. Link it early to reserve geometry before registration:
 
 ```html
-<link rel="stylesheet" href="/skeletons/acl-skeletons.css">
+<link rel="stylesheet" href="/skeletons/acl-skeletons.css" />
 ```
 
-CSS selectors continue matching while the loader exposes its busy state and stop when the component is ready. No JavaScript registration is required.
+Selectors remain active while busy and stop when ready; no JavaScript registration is needed.
 
 The `manifest` mode writes a JavaScript skeleton manifest and reservation stylesheet. Register both before startup:
 
@@ -430,19 +429,21 @@ await AlpineComponentLoader.registerSkeletonManifest(skeletons);
 await AlpineComponentLoader.start();
 ```
 
-Generated loading UI applies only when a definition has no authored loading UI. Use `--mode css` for a standalone pre-definition stylesheet or `--mode both` for both delivery strategies.
+Generated UI applies only without authored loading UI. `--mode css` emits standalone CSS; `--mode both` adds the
+registered manifest.
 
-| Mode | Files | Integration |
-| --- | --- | --- |
-| `css` | `acl-skeletons.css` | Link one stylesheet before loader JavaScript. |
-| `manifest` | `acl-skeletons.generated.js` and `.css` | Import the reservation CSS and register the generated module. |
-| `both` | All three files | Produce both choices; integrate one workflow rather than loading both stylesheets. |
+| Mode       | Files                                   | Integration                                                                        |
+| ---------- | --------------------------------------- | ---------------------------------------------------------------------------------- |
+| `css`      | `acl-skeletons.css`                     | Link one stylesheet before loader JavaScript.                                      |
+| `manifest` | `acl-skeletons.generated.js` and `.css` | Import the reservation CSS and register the generated module.                      |
+| `both`     | All three files                         | Produce both choices; integrate one workflow rather than loading both stylesheets. |
 
-The generator visits every selected route at configurable mobile and desktop viewports, activates lazy components, and captures the first visible ready instance of each selected tag. By default any route/viewport failure prevents output; `--allow-partial` writes successful captures and reports the failures. `--include`, `--exclude`, `--timeout`, `--mobile`, `--desktop`, and `--breakpoint` control discovery.
+Capture selects the first ready visible instance per tag at configured viewports/routes. Failures prevent output unless
+`--allow-partial` is set. See [capture options](skeletons.md) for filtering, limits, and regeneration.
 
-Generated masks/fragments contain anonymous rectangles only; they do not copy text, form values, URLs, IDs, event attributes, or application DOM structure. Dimensions still reflect the fixture data, so capture representative states. Generated files replace only other recognized generated files unless `--force` is supplied. Registering a manifest after a definition affects eligible future loads but does not interrupt a generation already in progress.
-
-See [Skeleton loading UI](skeletons.md) for setup, route and component selection, responsive capture, output modes, regeneration, and troubleshooting.
+Output contains anonymous rectangles, never text, values, URLs, IDs, events, or DOM structure. Fixture data still
+affects dimensions. Only recognized generated files are replaced unless `--force` is set. Late manifest registration
+affects future eligible loads.
 
 Customize the standalone colors with:
 
@@ -466,9 +467,14 @@ AlpineComponentLoader.define('profile-card', '/components/profile-card.html', {
 });
 ```
 
-`fallback` accepts the same URL, selector, or `HTMLTemplateElement` forms as a component source. It handles an initial template or data failure, initializes Alpine, and emits the normal completion events. A later data refresh keeps the mounted component and exposes the problem through `$error` instead of replacing the UI.
+`fallback` accepts URLs, selectors, or template elements. Initial template/data failures render it with Alpine and
+normal completion events. Later data failures keep the mounted UI and update `$error`.
 
-Without a fallback, the component emits `acl:error` and renders an accessible `role="alert"` block. `errorCss` merges with the built-in error styles. External loading templates apply source resolution and template caching before parsing/sanitization; inline loading HTML is parsed and sanitized directly. Fallback content uses template caching and the normal sanitizer, Trusted Types, script, style, and rendering pipeline. All of this work remains owned by the component's cancellation boundary.
+Without a fallback, the component emits `acl:error` and renders an accessible `role="alert"` block. `errorCss` merges
+with the built-in error styles. External loading templates apply source resolution and template caching before
+parsing/sanitization; inline loading HTML is parsed and sanitized directly. Fallback content uses template caching and
+the normal sanitizer, Trusted Types, script, style, and rendering pipeline. All of this work remains owned by the
+component's cancellation boundary.
 
 ## Reloading and state retention
 
@@ -485,6 +491,9 @@ await card.reload({
 });
 ```
 
-Reload cancels stale template, asset, and data work. Development reloads can preserve public props, form controls, selection, focus, and scroll state. A disconnected host with `keep-alive` may retain state within the configured `keepAliveMax`; ordinary teardown releases observers, timers, listeners, persistence effects, assets, and Alpine trees.
+Reload cancels stale template, asset, and data work. Development reloads can preserve public props, form controls,
+selection, focus, and scroll state. A disconnected host with `keep-alive` may retain state within the configured
+`keepAliveMax`; ordinary teardown releases observers, timers, listeners, persistence effects, assets, and Alpine trees.
 
-For request and cache behavior see [Data, caching, polling, and persistence](data.md). For hooks and events see [Lifecycle, events, and dynamic components](lifecycle.md).
+For request and cache behavior see [Data, caching, polling, and persistence](data.md). For hooks and events see
+[Lifecycle, events, and dynamic components](lifecycle.md).

@@ -15,6 +15,7 @@ export interface AlpineComponentLoaderViteOptions {
     moduleBase?: string;
     routeDirectory?: string;
     generate?: boolean;
+    preload?: { entry?: 'default' | 'core'; tags?: string[]; groups?: string[]; features?: import('./project.d.ts').ACLRuntimeCapability[] };
 }
 
 export function alpineComponentLoader(options?: AlpineComponentLoaderViteOptions): ACLVitePlugin;

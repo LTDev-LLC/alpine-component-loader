@@ -355,6 +355,11 @@ test('polling runs only while an opted-in component intersects the viewport', as
                 this.target = target;
             }
 
+            unobserve() {
+                // Release the fixture target
+                this.target = null;
+            }
+
             disconnect() {
                 // Record observer disconnection for cleanup assertions
                 this.disconnected = true;

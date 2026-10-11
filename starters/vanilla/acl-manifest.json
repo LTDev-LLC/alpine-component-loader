@@ -8,7 +8,7 @@
         "attributes": {
           "name": "String"
         },
-        "templateRevision": "sha256-APEpb6nLDibruiMvdQ-rZHUrEge1-VYWXkfB0x8b7fc"
+        "templateRevision": "sha256-gxdx5IpqMwUCp5Wuq-vlfJqekm988AeQpbZQDp2Vlpw"
       },
       "metadata": {
         "description": "A minimal Alpine Component Loader component."

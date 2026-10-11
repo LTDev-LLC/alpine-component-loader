@@ -1,12 +1,9 @@
 // @license AlpineComponentLoader
-// Copyright (c) LTDev LLC
+// Copyright (c) LouisT
 // Licensed under the MIT license in the repository root
 
-// Propagate jsDelivr's generated minified entry suffix to package-owned dependencies
-const isMinifiedModule = new URL(import.meta.url).pathname.endsWith('.min.js'), resolveLocalModule = (specifier)=>isMinifiedModule ? specifier.replace(/\.js$/, '.min.js') : specifier, importLocalModule = (specifier)=>import(/* @vite-ignore */ resolveLocalModule(specifier)), [{ default: AlpineComponentLoader }, { getInlineComponentName }] = await Promise.all([
-    importLocalModule('./index.js'),
-    importLocalModule('./inline-templates.js')
-]);
+// Propagate the prebuilt minified entry suffix to package-owned dependencies
+const isMinifiedModule = new URL(import.meta.url).pathname.endsWith('.min.js'), resolveLocalModule = (specifier)=>isMinifiedModule ? specifier.replace(/\.js$/, '.min.js') : specifier, importLocalModule = (specifier)=>import(/* @vite-ignore */ resolveLocalModule(specifier)), importDeferredLocalModule = (specifier)=>import(/* @vite-ignore */ resolveLocalModule(specifier)), { default: AlpineComponentLoader } = await importLocalModule('./index.js');
 // Resolve fetchable template sources to absolute URLs while preserving inline selectors
 const normalizeSource = (source)=>{
     if (typeof source !== 'string' || source.startsWith('#')) return source;
@@ -35,6 +32,7 @@ const collectRoots = (root)=>{
 };
 // Invalidate changed templates and reload only live instances whose definitions use them
 export const reloadChangedTemplates = async (sources, loader = AlpineComponentLoader)=>{
+    const { getInlineComponentName } = await importDeferredLocalModule('./inline-templates.js');
     if (typeof document === 'undefined') return {
         sources: [],
         tags: [],
@@ -76,7 +74,8 @@ export const reloadChangedTemplates = async (sources, loader = AlpineComponentLo
     return detail;
 };
 // Resolve an inline-template payload completely before mutating the active document
-const prepareInlineTemplateUpdates = (templates, loader)=>{
+const prepareInlineTemplateUpdates = async (templates, loader)=>{
+    const { getInlineComponentName } = await importDeferredLocalModule('./inline-templates.js');
     if (!Array.isArray(templates) || !templates.length) throw new TypeError('[ACL Dev] Inline template updates require a non-empty template list.');
     const seen = new Set();
     return templates.map((update)=>{
@@ -116,7 +115,7 @@ const reloadInlineTemplateRevision = async (message, loader)=>{
         ...expected
     ].some(// Require the fetched revision to contain exactly the announced templates
     (key)=>!received.has(key))) throw new TypeError('[ACL Dev] Inline template revision contents did not match its event.');
-    const updates = prepareInlineTemplateUpdates(payload.templates, loader), replacements = updates.map(// Parse every inert replacement before changing any live template
+    const updates = await prepareInlineTemplateUpdates(payload.templates, loader), replacements = updates.map(// Parse every inert replacement before changing any live template
     (update)=>({
             ...update,
             fragment: document.createRange().createContextualFragment(update.html)

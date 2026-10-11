@@ -1,6 +1,6 @@
 # Data, caching, polling, and persistence
 
-Component data requests run as part of the component lifecycle. They support typed response handling, cancellation, bounded retries, polling, response sharing, cache strategies, and optional persisted component state.
+Lifecycle-owned data requests support parsing, cancellation, retries, polling, sharing, caches, and persisted state.
 
 ## Quick start
 
@@ -34,13 +34,12 @@ Inside the template, the parsed response is available at the configured target:
 </article>
 ```
 
-`params` appends URL query parameters. `keys` selects values from the current props/context, and both may be objects or async functions. `options` supplies ordinary `RequestInit`; the dedicated `method` and `body` settings are convenient overrides.
+`params` adds queries; `keys` reads props/context. Both accept objects or async functions. `options` supplies
+`RequestInit`, overridden by dedicated `method`/`body` settings.
 
 ## Declarative request settings
 
-Serializable settings can be supplied on a component host or on an inline
-definition template. Definition-level values become defaults for every
-instance; host attributes override them for that instance:
+Definition attributes set defaults; host attributes override individual instances:
 
 ```html
 <template
@@ -65,12 +64,7 @@ instance; host attributes override them for that instance:
 <profile-card user-id="user-2" data-retries="0"></profile-card>
 ```
 
-The same attributes work on `template[acl-component]`. Template declarations
-also accept `data-fetch-keys`, `data-fetch-poll`, `data-fetch-options`,
-`data-method`, `data-body`, `data-cache-key`, `data-retry-max-delay`,
-`data-retry-jitter`, `data-retry-unsafe-methods`,
-`pause-polling-when-offline`, and `pause-polling-when-offscreen` according to
-the table below.
+Both declaration markers accept the serializable controls below.
 
 Most common settings can also be supplied on the component host:
 
@@ -89,44 +83,43 @@ Most common settings can also be supplied on the component host:
 ></profile-card>
 ```
 
-JSON-valued attributes such as `data-fetch-params`, `data-fetch-keys`, and `data-fetch-options` must contain strict JSON, not JavaScript expressions. Invalid bounded numeric or enumerated settings fall back safely and are reported through diagnostics.
+JSON attributes require strict JSON. Invalid numeric/enum attributes fall back and emit diagnostics.
 
-Changing request-related attributes cancels stale work and starts a request with the new identity. Application code can also call `element.cancel('route-changed')`, `element.retry()`, or `element.reload()`.
+Request-attribute changes cancel stale work. Explicit controls are `cancel()`, `retry()`, and `reload()`.
 
 ## Data option reference
 
-Programmatic settings live under `data`. Serializable controls can also be
-placed on an inline definition template or registered component host;
-`data-fetch-options` is definition-only on `template[x-acl]`,
-`template[acl-component]`, and the declarative `<acl-component>` proxy.
+Programmatic options live under `data`. Attributes apply to templates/hosts, except `data-fetch-options`, which is
+definition-only on either template marker or `<acl-component>`.
 
-| JavaScript option | Declarative attribute | Default | Validation and behavior |
-| --- | --- | --- | --- |
-| `data.src` | `data-src` | `null` | Request URL; no request runs when absent. |
-| `data.keys` | `data-fetch-keys` | `null` | Object/async function replacing every matching `:name` segment; attribute is strict JSON. |
-| `data.params` | `data-fetch-params` | `null` | Object/async function appended as query parameters; attribute is strict JSON. |
-| `data.options` | `data-fetch-options` on definition templates and `<acl-component>` | `null` | Base `RequestInit`; it is definition-only and is not read from registered component hosts. Programmatic headers merge case-insensitively. |
-| `data.method` | `data-method` | `null` | HTTP method; effective default is `GET`. |
-| `data.body` | `data-body` | `null` | Body value; object/array bodies are JSON encoded. |
-| `data.target` | `data-target` | `$data` | Direct `$props` key receiving the parsed response. |
-| `data.poll` | `data-fetch-poll` | `null` | Non-negative polling interval in milliseconds. |
-| `data.timeout` | `data-fetch-timeout` | `30000` | Non-negative setting; a non-positive runtime value uses the 30-second fallback. |
-| `data.retries` | `data-retries` | `0` | Non-negative retry count after the first attempt. |
-| `data.retryDelay` | `data-retry-delay` | `250` | Non-negative initial exponential-backoff delay. |
-| `data.retryMaxDelay` | `data-retry-max-delay` | `30000` | Non-negative maximum backoff, never lower than the initial delay. |
-| `data.retryJitter` | `data-retry-jitter` | `0.2` | Random delay variation constrained to 0 through 1. |
-| `data.retryUnsafeMethods` | `data-retry-unsafe-methods` | `false` | Permit normally unsafe methods to retry. |
-| `data.responseType` | `data-response-type` | `json` | `json`, `text`, `blob`, `arrayBuffer`, `stream`, or `auto`. |
-| `data.parser` | JavaScript only | `null` | Custom sync/async `Response` parser. |
-| `data.cacheStrategy` | `data-cache-strategy` | `cache-first` | `cache-first`, `network-first`, `stale-while-revalidate`, or `no-store`. |
-| `data.cacheTtl` | `data-fetch-cache-ttl` | `300000` | Non-negative settled-entry lifetime; 0 retains only in-flight sharing. |
-| `data.cacheMax` | `data-fetch-cache-max` | `100` | Non-negative bound for settled shared entries. |
-| `data.cacheKey` | `data-cache-key` | `null` | Explicit string or async function used in request identity. |
-| `data.pauseWhenHidden` | `pause-polling-when-hidden` | `true` | Pause polls while the document is hidden. |
-| `data.pauseWhenOffline` | `pause-polling-when-offline` | `true` | Pause polls while `navigator.onLine` is false. |
-| `data.pauseWhenOffscreen` | `pause-polling-when-offscreen` | `false` | Pause polls while the host is outside the viewport. |
+| JavaScript option         | Declarative attribute                                              | Default       | Validation and behavior                                                                                                                   |
+| ------------------------- | ------------------------------------------------------------------ | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `data.src`                | `data-src`                                                         | `null`        | Request URL; no request runs when absent.                                                                                                 |
+| `data.keys`               | `data-fetch-keys`                                                  | `null`        | Object/async function replacing every matching `:name` segment; attribute is strict JSON.                                                 |
+| `data.params`             | `data-fetch-params`                                                | `null`        | Object/async function appended as query parameters; attribute is strict JSON.                                                             |
+| `data.options`            | `data-fetch-options` on definition templates and `<acl-component>` | `null`        | Base `RequestInit`; it is definition-only and is not read from registered component hosts. Programmatic headers merge case-insensitively. |
+| `data.method`             | `data-method`                                                      | `null`        | HTTP method; effective default is `GET`.                                                                                                  |
+| `data.body`               | `data-body`                                                        | `null`        | Body value; object/array bodies are JSON encoded.                                                                                         |
+| `data.target`             | `data-target`                                                      | `$data`       | Direct `$props` key receiving the parsed response.                                                                                        |
+| `data.poll`               | `data-fetch-poll`                                                  | `null`        | Non-negative polling interval in milliseconds.                                                                                            |
+| `data.timeout`            | `data-fetch-timeout`                                               | `30000`       | Non-negative setting; a non-positive runtime value uses the 30-second fallback.                                                           |
+| `data.retries`            | `data-retries`                                                     | `0`           | Non-negative retry count after the first attempt.                                                                                         |
+| `data.retryDelay`         | `data-retry-delay`                                                 | `250`         | Non-negative initial exponential-backoff delay.                                                                                           |
+| `data.retryMaxDelay`      | `data-retry-max-delay`                                             | `30000`       | Non-negative maximum backoff, never lower than the initial delay.                                                                         |
+| `data.retryJitter`        | `data-retry-jitter`                                                | `0.2`         | Random delay variation constrained to 0 through 1.                                                                                        |
+| `data.retryUnsafeMethods` | `data-retry-unsafe-methods`                                        | `false`       | Permit normally unsafe methods to retry.                                                                                                  |
+| `data.responseType`       | `data-response-type`                                               | `json`        | `json`, `text`, `blob`, `arrayBuffer`, `stream`, or `auto`.                                                                               |
+| `data.parser`             | JavaScript only                                                    | `null`        | Custom sync/async `Response` parser.                                                                                                      |
+| `data.cacheStrategy`      | `data-cache-strategy`                                              | `cache-first` | `cache-first`, `network-first`, `stale-while-revalidate`, or `no-store`.                                                                  |
+| `data.cacheTtl`           | `data-fetch-cache-ttl`                                             | `300000`      | Non-negative settled-entry lifetime; 0 retains only in-flight sharing.                                                                    |
+| `data.cacheMax`           | `data-fetch-cache-max`                                             | `100`         | Non-negative bound for settled shared entries.                                                                                            |
+| `data.cacheKey`           | `data-cache-key`                                                   | `null`        | Explicit string or async function used in request identity.                                                                               |
+| `data.pauseWhenHidden`    | `pause-polling-when-hidden`                                        | `true`        | Pause polls while the document is hidden.                                                                                                 |
+| `data.pauseWhenOffline`   | `pause-polling-when-offline`                                       | `true`        | Pause polls while `navigator.onLine` is false.                                                                                            |
+| `data.pauseWhenOffscreen` | `pause-polling-when-offscreen`                                     | `false`       | Pause polls while the host is outside the viewport.                                                                                       |
 
-Programmatic numeric violations throw during `config()` or `define()`. Invalid declarative numbers and enum values fall back to configured defaults and are reported. Boolean attributes accept `false` and `0` as explicit opt-outs.
+Invalid programmatic numbers throw during `config()`/`define()`. Invalid declarative numbers/enums use configured
+defaults with diagnostics. Boolean `false`/`0` opts out.
 
 ## Request hooks and response targets
 
@@ -151,15 +144,14 @@ AlpineComponentLoader.define('profile-card', '/components/profile-card.html', {
 });
 ```
 
-The default target is `$data`. Any other target is assigned as a direct key on `$props`, so `target: 'profile'` becomes `$props.profile`; target strings are not evaluated as JavaScript or expanded as dotted paths. A target changes where the response is assigned but does not change the underlying cache identity.
+`target` defaults to `$data` and assigns one direct `$props` key. Dotted paths are not expanded; targets do not affect
+cache identity.
 
-The same rule applies to authored templates: `data-target="$data"` exposes
-`$props.$data`, while `data-target="profile"` exposes `$props.profile`. Object
-responses are never spread across `$props`. Changing an instance's request
-attribute cancels stale work without changing the definition inherited by
-other instances.
+`data-target="profile"` writes `$props.profile`; responses are never spread into props. Instance changes leave other
+definitions/hosts unchanged.
 
-Response modes are `json`, `text`, `blob`, `arrayBuffer`, `stream`, and `auto`. A custom parser receives the `Response` and component context:
+Response modes are `json`, `text`, `blob`, `arrayBuffer`, `stream`, and `auto`. A custom parser receives the `Response`
+and component context:
 
 ```js
 data: {
@@ -173,7 +165,8 @@ Binary and streaming request bodies bypass shared response caching unless an exp
 
 ## URL, request body, and response handling
 
-`keys` replaces every matching `:key` segment and URL-encodes the value. `params` preserves an existing query, repeats array keys, and uses bracketed names for nested objects:
+`keys` replaces every matching `:key` segment and URL-encodes the value. `params` preserves an existing query, repeats
+array keys, and uses bracketed names for nested objects:
 
 ```js
 data: {
@@ -187,22 +180,25 @@ data: {
 }
 ```
 
-Object and array bodies are serialized with `JSON.stringify()` and receive `content-type: application/json` unless the request already sets it. Strings, `URLSearchParams`, `FormData`, `Blob`, and `ArrayBuffer` values are passed through. GET and HEAD requests omit the body.
+Objects/arrays become JSON with a default JSON content type. Strings, URLSearchParams, FormData, Blob, and ArrayBuffer
+pass through. GET/HEAD omit bodies.
 
-| Response mode | Result |
-| --- | --- |
-| `json` | Requires `application/json` or a `+json` content type, then calls `response.json()`. |
-| `text` | Calls `response.text()`. |
-| `blob` | Calls `response.blob()`. |
-| `arrayBuffer` | Calls `response.arrayBuffer()`. |
-| `stream` | Returns `response.body` and disables retained sharing. |
-| `auto` | Chooses JSON, text/XML/JavaScript, or Blob from the content type. |
+| Response mode | Result                                                                               |
+| ------------- | ------------------------------------------------------------------------------------ |
+| `json`        | Requires `application/json` or a `+json` content type, then calls `response.json()`. |
+| `text`        | Calls `response.text()`.                                                             |
+| `blob`        | Calls `response.blob()`.                                                             |
+| `arrayBuffer` | Calls `response.arrayBuffer()`.                                                      |
+| `stream`      | Returns `response.body` and disables retained sharing.                               |
+| `auto`        | Chooses JSON, text/XML/JavaScript, or Blob from the content type.                    |
 
-A custom parser receives `(response, context)`. Dynamic `keys`, `params`, `cacheKey`, `beforeFetch`, `afterFetch`, and parser functions receive aliases for the same values: `el`/`$el`, `props`/`$props`, and `root`/`$root`. `beforeFetch` may replace the final `RequestInit`; `afterFetch` runs per consuming component, so shared raw responses can be transformed differently.
+Parser, dynamic builders, and fetch hooks receive `el`/`$el`, `props`/`$props`, and `root`/`$root`. Parsers take
+`(response, context)`; `beforeFetch` may replace RequestInit. `afterFetch` runs per consumer, allowing distinct
+transformations of shared responses.
 
 ## Cancellation, retries, and timeouts
 
-Cancellation propagates through template, external-asset, and data work. Reload, disconnect, superseding attribute changes, and `cancel()` abort owned requests and prevent stale responses from updating the component.
+Reload, disconnect, superseding attributes, and `cancel()` abort owned work and block stale updates.
 
 Retries apply to transient failures and honor `Retry-After` when present:
 
@@ -229,9 +225,12 @@ data: {
 }
 ```
 
-GET, HEAD, OPTIONS, PUT, and DELETE may retry by default. POST, PATCH, and other methods require `retryUnsafeMethods: true` and should use an idempotency key or an otherwise idempotent endpoint. Retryable HTTP statuses are 408, 425, 429, 500, 502, 503, and 504. Delays use exponential backoff, bounded jitter, and `Retry-After` when supplied.
+GET, HEAD, OPTIONS, PUT, and DELETE retry by default; other methods need `retryUnsafeMethods: true` and an idempotent
+endpoint/key. Retryable statuses are 408, 425, 429, 500, 502, 503, and 504. Delays use backoff, bounded jitter, and
+`Retry-After`.
 
-Each component owns a subscriber abort signal. When several components share a request, canceling or disconnecting one consumer does not abort the network request while another subscriber still needs it. Endpoint changes, reloads, timeouts, teardown, and explicit cancellation prevent stale results from replacing current state.
+Each subscriber owns cancellation; the network request continues while another needs it. Changes, timeouts, teardown,
+and cancellation prevent stale assignment.
 
 ## Template and data cache strategies
 
@@ -254,23 +253,15 @@ AlpineComponentLoader.config({
 });
 ```
 
-Data request identity includes the final URL, method, headers, body, response/parser mode, and optional explicit key. Response targets are deliberately excluded so consumers can share the same parsed response.
+Request identity includes URL, method, headers, body, parser/response mode, and explicit key, but excludes target.
 
-Strings and `URLSearchParams` are replayable. `FormData` is shared only when every value is a string. File-containing `FormData`, `Blob`, `ArrayBuffer`, typed-array, and streaming bodies use `no-store` unless an explicit `data.cacheKey` supplies application-owned identity. Cached values are cloned for each consumer.
+Strings, URLSearchParams, and string-only FormData can share responses. Files, binary values, typed arrays, and streams
+bypass sharing unless `data.cacheKey` defines identity. Consumers receive cloned cached values.
 
-Template caching uses the browser Cache API when `cacheTemplates` is true.
-`cacheNamespace` and the loader `version` form the bucket name;
-`templateRevision` gives one source an explicit content identity.
-`templateCacheTtl` controls freshness and `templateCacheMax` applies
-expiry-first, least-recently-used pruning. A successfully stored new revision
-removes older revisions of the same source.
+`cacheTemplates` uses browser Cache API buckets by namespace/version. `templateRevision` identifies content; TTL
+controls freshness and max bounds expiry-first/LRU pruning. Stored new revisions replace older ones.
 
-The loader hydrates a private metadata index in batches of eight and thereafter
-reads response metadata only for cache keys it has not seen. Revision, expiry,
-and capacity eviction share one reconciliation pass; selected victims are
-deleted concurrently. Explicit cache clears and quota recovery invalidate the
-index, so later inspection or pruning rebuilds it from the Cache API rather than
-retaining stale metadata.
+Cache clears and quota recovery invalidate metadata; later inspection/pruning rebuilds it from Cache API.
 
 Inspect and clear caches during development or targeted recovery:
 
@@ -294,11 +285,14 @@ await card.$props.$cache.clearTemplate();
 await card.$props.$cache.clear();
 ```
 
-Clearing a cache does not cancel an already-owned request. Use `cancel()` or reload when in-flight work must also stop.
+Use `cancel()` or reload when cache invalidation must also stop component-owned work.
 
-`getDataCacheInfo()` exposes redacted request metadata such as final URL, target, strategy, expiry, pending state, and subscriber count, never the response body. `getTemplateCacheInfo()` exposes source, revision, timestamps, TTL, and request identity, never template content. `getTemplateLoadInfo()` reports the most recent in-memory load outcome.
+Inspection exposes redacted request/source/revision, freshness, strategy, pending/subscriber metadata, and recent load
+outcomes—not response or template bodies.
 
-`clearDataCache()` invalidates matching future consumption and may abort an unshared pending request. `clearTemplate()` removes all matching revisions of a source. `pruneTemplateCache()` applies expiry/capacity immediately, `clearTemplateCaches()` removes matching namespaces, and `pruneCaches()` removes older version buckets while preserving the active one.
+`clearDataCache()` invalidates future consumption and may abort unshared pending work. `clearTemplate()` removes source
+revisions; `pruneTemplateCache()` enforces limits. `clearTemplateCaches()` clears namespaces; `pruneCaches()` removes
+obsolete version buckets.
 
 ## Polling
 
@@ -326,7 +320,8 @@ Or configure it declaratively:
 ></profile-card>
 ```
 
-Hidden-page and offline pauses default to enabled; offscreen pausing is opt-in. Set a Boolean attribute to `"false"` or `"0"` to disable it explicitly. Poll timers, visibility listeners, network listeners, and intersection observers are released on reload, disconnect, and teardown.
+Polling pauses when hidden/offline by default; offscreen pausing is opt-in. Boolean `false`/`0` disables a pause.
+Reload/disconnect/teardown releases timers and subscriptions.
 
 ## Persist component state
 
@@ -347,23 +342,24 @@ AlpineComponentLoader.define('profile-card', '/components/profile-card.html', {
 });
 ```
 
-| `persist` value | Adapter |
-| --- | --- |
-| `local` | `window.localStorage`. |
-| `session` | `window.sessionStorage`. |
-| `indexeddb` | Shared IndexedDB database `alpine-component-loader`, store `persistence`. |
-| `custom` or another truthy name | The configured `persistAdapter`, otherwise session storage. |
+| `persist` value                 | Adapter                                                                   |
+| ------------------------------- | ------------------------------------------------------------------------- |
+| `local`                         | `window.localStorage`.                                                    |
+| `session`                       | `window.sessionStorage`.                                                  |
+| `indexeddb`                     | Shared IndexedDB database `alpine-component-loader`, store `persistence`. |
+| `custom` or another truthy name | The configured `persistAdapter`, otherwise session storage.               |
 
-The host equivalents are `persist`, `persist-key`, `persist-debounce`, and `persist-version`. Without an explicit key, the loader uses `acl:<tag-name>:<id>` and substitutes `default` when the host has no ID. Repeated component instances therefore need unique IDs or explicit keys.
+Host controls are `persist`, `persist-key`, `persist-debounce`, and `persist-version`. Default keys use
+`acl:<tag-name>:<id-or-default>`; repeated instances need unique IDs/keys.
 
-Automatic snapshots contain serializable public props. Names beginning with `$` and function values are excluded. Matching stored fields restore before Alpine initializes the rendered tree; an Alpine effect then queues debounced saves when reactive state changes.
+Snapshots include serializable public props, excluding `$` names and functions. Restore precedes Alpine initialization;
+effects queue debounced saves.
 
-Records use `{ version, data }` envelopes, and versions must be positive integers. A mismatched older version needs `persistMigrate`; invalid or future envelopes are not silently applied.
+Records require positive-version `{ version, data }` envelopes. Older versions need `persistMigrate`; invalid/future
+records are rejected.
 
-The migration context contains `fromVersion`, configured `toVersion`, resolved
-storage `key`, and the owning `component`. Migration runs before stored fields
-are applied and may return a value or promise. Throwing rejects the stored
-record and reports `ACL_PERSISTENCE_FAILED` without partially applying it.
+Migration receives `fromVersion`, `toVersion`, `key`, and `component`, returning a value or promise. Failure emits
+`ACL_PERSISTENCE_FAILED` without partial restoration.
 
 Persistence helpers are asynchronous:
 
@@ -374,21 +370,22 @@ await card.$props.$persistence.$flush();
 await card.$props.$persistence.$clear();
 ```
 
-| Helper | Behavior |
-| --- | --- |
-| `$key` | Resolved storage key. |
-| `$save()` | Queue a flush-time snapshot of current public props. |
-| `$save(value)` | Queue an explicit serializable value. |
-| `$get()` | Read, validate, migrate, and return the complete stored data value. |
+| Helper                  | Behavior                                                                     |
+| ----------------------- | ---------------------------------------------------------------------------- |
+| `$key`                  | Resolved storage key.                                                        |
+| `$save()`               | Queue a flush-time snapshot of current public props.                         |
+| `$save(value)`          | Queue an explicit serializable value.                                        |
+| `$get()`                | Read, validate, migrate, and return the complete stored data value.          |
 | `$get(field, fallback)` | Read one own field and preserve falsy values such as `false`, `0`, and `""`. |
-| `$flush()` | Commit pending debounced work immediately and await serialized prior writes. |
-| `$clear()` | Remove only this storage key; current in-memory props are unchanged. |
+| `$flush()`              | Commit pending debounced work immediately and await serialized prior writes. |
+| `$clear()`              | Remove only this storage key; current in-memory props are unchanged.         |
 
-State changes are saved through the component's Alpine effect. `pagehide` flushes debounced work when possible. Await explicit helpers when application flow depends on storage completion. To include mutations made in the same event handler before navigation, call `$save()`, then await `$flush()` and the save promise.
+Alpine effects save changes; `pagehide` attempts a flush. For same-handler mutations before navigation, call `$save()`,
+then await `$flush()` and the save promise.
 
 ## IndexedDB and custom adapters
 
-Use the built-in IndexedDB adapter directly when the application needs custom database names or an explicit close lifecycle:
+Create an application-owned IndexedDB adapter for custom databases or explicit closing:
 
 ```js
 import AlpineComponentLoader, { createIndexedDBPersistenceAdapter } from 'alpine-component-loader';
@@ -410,11 +407,8 @@ await card.$props.$persistence.$flush();
 adapter.close();
 ```
 
-`databaseName` defaults to `alpine-component-loader`, `storeName` defaults to
-`persistence`, and `indexedDBImpl` can supply an application/test-owned
-`IDBFactory`. Supplying a factory is useful in controlled browser tests; the
-adapter still uses the same asynchronous `getItem`/`setItem`/`removeItem`
-contract.
+Defaults: `databaseName` is `'alpine-component-loader'`; `storeName` is `'persistence'`. `indexedDBImpl` injects an
+IDBFactory for apps/tests. Storage methods remain asynchronous.
 
 A custom adapter may be synchronous or asynchronous and must implement `getItem`, `setItem`, and `removeItem`:
 
@@ -432,15 +426,17 @@ const adapter = {
 };
 ```
 
-| Adapter member | Contract |
-| --- | --- |
-| `getItem(key)` | Return a JSON envelope string, decoded envelope, `null`, or a promise of one. |
-| `setItem(key, value)` | Store the JSON envelope string synchronously or asynchronously. |
-| `removeItem(key)` | Remove one key synchronously or asynchronously. |
-| `close()` | Available on loader-created IndexedDB adapters for application-owned teardown. |
+| Adapter member        | Contract                                                                       |
+| --------------------- | ------------------------------------------------------------------------------ |
+| `getItem(key)`        | Return a JSON envelope string, decoded envelope, `null`, or a promise of one.  |
+| `setItem(key, value)` | Store the JSON envelope string synchronously or asynchronously.                |
+| `removeItem(key)`     | Remove one key synchronously or asynchronously.                                |
+| `close()`             | Available on loader-created IndexedDB adapters for application-owned teardown. |
 
-The shared adapter used by `persist: "indexeddb"` is loader-owned and remains open for reuse. Call `close()` only on an adapter created and owned by the application, after mounted components have flushed and released it.
+The built-in IndexedDB adapter stays open for loader reuse. Close application-owned adapters only after components flush
+and release them.
 
-Storage failures emit `acl:error` with code `ACL_PERSISTENCE_FAILED` and persistence context without exposing stored contents. Persistence values are never included in observability records, debugger exports, or SSR output.
+Storage failures emit `ACL_PERSISTENCE_FAILED` through `acl:error`. Stored contents stay out of errors, observability,
+debugger exports, and SSR.
 
-For component lifecycle behavior see [Lifecycle, events, and dynamic components](lifecycle.md). For offline asset behavior see [Offline behavior](offline.md).
+See [lifecycle](lifecycle.md) and [offline assets](offline.md).

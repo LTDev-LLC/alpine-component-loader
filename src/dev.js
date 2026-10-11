@@ -1,15 +1,13 @@
 // @license AlpineComponentLoader
-// Copyright (c) LTDev LLC
+// Copyright (c) LouisT
 // Licensed under the MIT license in the repository root
 
-// Propagate jsDelivr's generated minified entry suffix to package-owned dependencies
+// Propagate the prebuilt minified entry suffix to package-owned dependencies
 const isMinifiedModule = new URL(import.meta.url).pathname.endsWith('.min.js'),
     resolveLocalModule = (specifier) => (isMinifiedModule ? specifier.replace(/\.js$/, '.min.js') : specifier),
     importLocalModule = (specifier) => import(/* @vite-ignore */ resolveLocalModule(specifier)),
-    [{ default: AlpineComponentLoader }, { getInlineComponentName }] = await Promise.all([
-        importLocalModule('./index.js'),
-        importLocalModule('./inline-templates.js'),
-    ]);
+    importDeferredLocalModule = (specifier) => import(/* @vite-ignore */ resolveLocalModule(specifier)),
+    { default: AlpineComponentLoader } = await importLocalModule('./index.js');
 
 // Resolve fetchable template sources to absolute URLs while preserving inline selectors
 const normalizeSource = (source) => {
@@ -40,6 +38,7 @@ const collectRoots = (root) => {
 
 // Invalidate changed templates and reload only live instances whose definitions use them
 export const reloadChangedTemplates = async (sources, loader = AlpineComponentLoader) => {
+    const { getInlineComponentName } = await importDeferredLocalModule('./inline-templates.js');
     if (typeof document === 'undefined')
         return {
             sources: [],
@@ -108,7 +107,8 @@ export const reloadChangedTemplates = async (sources, loader = AlpineComponentLo
 };
 
 // Resolve an inline-template payload completely before mutating the active document
-const prepareInlineTemplateUpdates = (templates, loader) => {
+const prepareInlineTemplateUpdates = async (templates, loader) => {
+    const { getInlineComponentName } = await importDeferredLocalModule('./inline-templates.js');
     if (!Array.isArray(templates) || !templates.length)
         throw new TypeError('[ACL Dev] Inline template updates require a non-empty template list.');
     const seen = new Set();
@@ -186,7 +186,7 @@ const reloadInlineTemplateRevision = async (message, loader) => {
         )
     )
         throw new TypeError('[ACL Dev] Inline template revision contents did not match its event.');
-    const updates = prepareInlineTemplateUpdates(payload.templates, loader),
+    const updates = await prepareInlineTemplateUpdates(payload.templates, loader),
         replacements = updates.map(
             // Parse every inert replacement before changing any live template
             (update) => ({

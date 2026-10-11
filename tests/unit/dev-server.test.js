@@ -3,7 +3,12 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, test } from 'node:test';
-import { parseCLIArguments, resolveServeTarget, resolveSkeletonTarget } from '../../bin/alpine-component-loader.mjs';
+import {
+    applyProjectConfiguration,
+    parseCLIArguments,
+    resolveServeTarget,
+    resolveSkeletonTarget,
+} from '../../bin/alpine-component-loader.mjs';
 import {
     createRecursiveWatcher,
     diffInlineTemplates,
@@ -19,6 +24,7 @@ import {
     writeProjectFile,
 } from '../../server/project-tools.mjs';
 import { generateOfflineBundle } from '../../server/offline-generator.mjs';
+import { alpineRuntime } from '../../scripts/alpine-runtime.mjs';
 
 // Track disposable resources centrally so every assertion gets clean teardown
 const applications = new Set(),
@@ -73,6 +79,8 @@ test('HTML injection merges import maps before modules and remains idempotent', 
     assert.match(transformed, /"example": "\/example\.js"/);
     assert.match(transformed, /"alpine-component-loader": "\/__acl_hmr\/modules\/index\.min\.js"/);
     assert.match(transformed, /"alpine-component-loader\/dev": "\/__acl_hmr\/modules\/dev\.min\.js"/);
+    assert.match(transformed, /"alpine-component-loader\/core": "\/__acl_hmr\/modules\/core\.min\.js"/);
+    assert.match(transformed, /"alpine-component-loader\/polyfills": "\/__acl_hmr\/modules\/polyfills\.min\.js"/);
     assert.match(transformed, /"alpine-component-loader\/testing": "\/__acl_hmr\/modules\/testing\.min\.js"/);
     assert.ok(transformed.indexOf('type="importmap"') < transformed.indexOf('type="module"'));
     assert.equal((transformed.match(/data-acl-hmr-client/g) || []).length, 1);
@@ -82,6 +90,23 @@ test('HTML injection merges import maps before modules and remains idempotent', 
         '<head><script type="importmap">{"imports":{"alpine-component-loader":"/old.js"}}</script></head><body></body>',
     );
     assert.match(unsupportedRoot, /"alpine-component-loader": "\/__acl_hmr\/modules\/index\.js"/);
+});
+
+test('core-only import maps keep the development client and optional entries in one delivery family', () => {
+    // Preserve the startup entry's base when the page has no explicit root mapping
+    const minified = injectHMRBootstrap(
+        '<head><script type="importmap">{"imports":{"alpine-component-loader/core":"/vendor/acl/core.min.js"}}</script></head>',
+    );
+    assert.match(minified, /"alpine-component-loader": "\/vendor\/acl\/index\.min\.js"/);
+    assert.match(minified, /"alpine-component-loader\/core": "\/vendor\/acl\/core\.min\.js"/);
+    assert.match(minified, /"alpine-component-loader\/polyfills": "\/vendor\/acl\/polyfills\.min\.js"/);
+    assert.match(minified, /"alpine-component-loader\/dev": "\/vendor\/acl\/dev\.min\.js"/);
+
+    const readable = injectHMRBootstrap(
+        '<head><script type="importmap">{"imports":{"alpine-component-loader/core":"/vendor/acl/core.js"}}</script></head>',
+    );
+    assert.match(readable, /"alpine-component-loader": "\/vendor\/acl\/index\.js"/);
+    assert.match(readable, /"alpine-component-loader\/polyfills": "\/vendor\/acl\/polyfills\.js"/);
 });
 
 test('HTML injection handles malformed maps and documents without head, body, or doctype', () => {
@@ -643,37 +668,32 @@ test('checked-in offline example matches deterministic command output', async ()
             groups: ['offline-demo'],
             assets: [
                 'index.html',
-                'app.js',
+                'app.min.js',
+                'demo.html',
+                '../feature-lab/demos',
                 'styles.css',
                 'acl-manifest.json',
-                '../../dist/index.js',
-                '../../dist/inline-templates.js',
-                '../../dist/acl-load-error.js',
-                '../../dist/offline.js',
-                '../../dist/runtime/loader.js',
-                '../../dist/runtime/config.js',
-                '../../dist/runtime/errors.js',
-                '../../dist/runtime/values.js',
-                '../../dist/runtime/props.js',
-                '../../dist/runtime/data-options.js',
-                '../../dist/runtime/registry.js',
-                '../../dist/runtime/contracts.js',
-                '../../dist/runtime/component/factory.js',
-                '../../dist/runtime/component/lifecycle-controller.js',
-                '../../dist/runtime/component/loading-controller.js',
-                '../../dist/runtime/component/data-gate-controller.js',
-                '../../dist/runtime/component/render-controller.js',
-                '../../dist/runtime/component/state-controller.js',
-                '../../dist/runtime/lifecycle.js',
-                '../../dist/runtime/caches.js',
-                '../../dist/runtime/template-cache.js',
-                '../../dist/runtime/rendering.js',
-                'https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js',
+                alpineRuntime.cdnUrl,
             ],
+            runtime: {
+                entryUrl: '/dist/index.min.js',
+                features: [
+                    'offline',
+                    'polyfills',
+                    'data',
+                    'hydration',
+                    'triggers',
+                    'styles',
+                    'slots',
+                    'scripts',
+                    'environment',
+                    'scheduler',
+                ],
+            },
             baseUrl: '/examples/offline',
             namespace: 'example',
             configFile: join(exampleRoot, 'acl-offline.json'),
-            minifyJavaScriptAssets: true,
+            minifyJavaScriptAssets: false,
             dryRun: true,
         });
     assert.equal(await readFile(join(exampleRoot, 'acl-precache-manifest.json'), 'utf8'), generated.outputs.manifest);
@@ -701,6 +721,33 @@ test('CLI resolves a directory target as the static root and retains HTML target
         root,
         index: join(root, 'index.html'),
     });
+});
+
+test('serve preserves explicit roots with and without project configuration', async () => {
+    // Cover both root flag forms while retaining configured defaults and positional targets
+    const root = await createProject(),
+        siteRoot = join(root, 'site');
+    await mkdir(siteRoot);
+    await writeFile(join(siteRoot, 'index.html'), '<!doctype html><title>Site</title>');
+
+    // Exercise the optional configuration fallback before adding an authored root
+    for (const configured of [false, true]) {
+        if (configured)
+            await writeFile(join(root, 'acl.config.mjs'), "export default { root: './configured-site' };\n");
+
+        // Preserve separate and equals-delimited root flags through configuration and target resolution
+        for (const flags of [['--root', 'site'], ['--root=site']]) {
+            const options = await applyProjectConfiguration(parseCLIArguments(['serve', ...flags], root)),
+                target = await resolveServeTarget(options);
+            assert.equal(target.root, siteRoot);
+            assert.equal(target.index, 'index.html');
+        }
+
+        const defaults = await applyProjectConfiguration(parseCLIArguments(['serve'], root)),
+            positional = await applyProjectConfiguration(parseCLIArguments(['serve', 'site/'], root));
+        assert.equal(defaults.root, configured ? join(root, 'configured-site') : root);
+        assert.equal((await resolveServeTarget(positional)).root, siteRoot);
+    }
 });
 
 test('development server rejects invalid roots, indexes, host names, and ports', async () => {
@@ -921,7 +968,10 @@ export const minificationRevision = "second-version";
     assert.equal(minifiedPackageResponse.headers.get('content-type'), 'text/javascript; charset=utf-8');
     assert.ok(Buffer.byteLength(minifiedPackage) < Buffer.byteLength(readablePackage));
     assert.match(minifiedPackage, /@license AlpineComponentLoader/);
-    assert.equal((await fetch(`${application.origin}/__acl_hmr/modules/runtime/component/factory.min.js`)).status, 200);
+    assert.equal(
+        (await fetch(`${application.origin}/__acl_hmr/modules/runtime/component/lifecycle-controller.min.js`)).status,
+        200,
+    );
     assert.equal((await fetch(`${application.origin}/__acl_hmr/modules/runtime/missing.min.js`)).status, 404);
 });
 

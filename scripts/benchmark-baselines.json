@@ -1,0 +1,44 @@
+{
+    "cold-first": {
+        "moduleRequests": 12,
+        "transferredBytes": 46540,
+        "observers": 0,
+        "listeners": 0
+    },
+    "repeated-render": {
+        "moduleRequests": 12,
+        "transferredBytes": 46540,
+        "observers": 0,
+        "listeners": 0
+    },
+    "hydration-100": {
+        "moduleRequests": 15,
+        "transferredBytes": 49834,
+        "observers": 1,
+        "listeners": 0
+    },
+    "hydration-1000": {
+        "moduleRequests": 15,
+        "transferredBytes": 49834,
+        "observers": 1,
+        "listeners": 0
+    },
+    "url-template": {
+        "moduleRequests": 16,
+        "transferredBytes": 57446,
+        "observers": 0,
+        "listeners": 0
+    },
+    "optional-transformations": {
+        "moduleRequests": 16,
+        "transferredBytes": 51033,
+        "observers": 0,
+        "listeners": 0
+    },
+    "multiple-loaders": {
+        "moduleRequests": 12,
+        "transferredBytes": 46540,
+        "observers": 0,
+        "listeners": 0
+    }
+}

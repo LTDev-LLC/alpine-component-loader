@@ -9,7 +9,8 @@ npx alpine-component-loader audit / --root examples/feature-lab
 npx alpine-component-loader audit https://preview.example.com/account --format sarif --out audit.sarif
 ```
 
-Repeat `--route` to crawl selected routes. Output formats are `console`, `json`, `junit`, and `sarif`; `--no-axe` keeps the command dependency-free beyond Playwright and uses only ACL's scanner rules. Console errors and uncaught page errors are included and cause a non-zero exit status alongside accessibility violations.
+Repeat `--route` to select routes. Formats are `console`, `json`, `junit`, and `sarif`. `--no-axe` uses only ACL rules
+and Playwright. Accessibility violations, console errors, and uncaught page errors cause a non-zero exit.
 
 ## Baselines and expiring suppressions
 
@@ -27,9 +28,11 @@ npx alpine-component-loader audit / \
   --out reports/a11y.sarif
 ```
 
-Finding fingerprints normalize route path/query, engine, rule, and selector, so development origins and ports do not destabilize the baseline. With a baseline, new unsuppressed findings, expired suppressions, and page errors fail the command. Reports classify findings as `new`, `unchanged`, `suppressed`, `resolved`, or `expired` in console, JSON, JUnit, and SARIF output.
+Fingerprints normalize route path/query, engine, rule, and selector, excluding development origins/ports. With a
+baseline, new unsuppressed findings, expired suppressions, and page errors fail. Reports classify findings as `new`,
+`unchanged`, `suppressed`, `resolved`, or `expired`.
 
-The baseline is deliberately small and maps each fingerprint to its normalized finding:
+The baseline maps fingerprints to normalized findings:
 
 ```json
 {
@@ -48,7 +51,7 @@ The baseline is deliberately small and maps each fingerprint to its normalized f
 }
 ```
 
-Suppressions require an exact rule, a reason, and an ISO 8601 expiration timestamp. Route, engine, and selector are optional exact-match refinements:
+Suppressions require an exact rule, reason, and ISO 8601 expiration. Route, engine, and selector can narrow the match:
 
 ```json
 {
@@ -65,15 +68,17 @@ Suppressions require an exact rule, a reason, and an ISO 8601 expiration timesta
 }
 ```
 
-`--update-baseline` stores current unsuppressed findings only. Resolved findings disappear from the replacement baseline, while active suppressions remain policy rather than becoming accepted debt.
+`--update-baseline` stores current unsuppressed findings and removes resolved ones. Active suppressions stay in policy
+rather than becoming baseline debt.
 
-The [accessibility example](../examples/a11y/README.md#baseline-and-suppression-workflow) includes ready-to-run baseline and suppression files plus console/SARIF command lines.
+The [accessibility example](../examples/a11y/README.md#baseline-and-suppression-workflow) includes ready-to-run baseline
+and suppression files plus console/SARIF command lines.
 
-Accessibility auditing and interactive debugging are opt-in development tools. They are shipped as separate entry points and are not imported by the core runtime.
+Audits and debugging are opt-in development entries, loaded separately from the runtime.
 
 ## Run the basic accessibility audit
 
-`alpine-component-loader/a11y` includes a dependency-free set of common structural checks:
+`/a11y` provides dependency-free structural checks:
 
 ```js
 import { auditAccessibility } from 'alpine-component-loader/a11y';
@@ -86,10 +91,9 @@ console.log(`Audited in ${result.duration.toFixed(1)} ms`);
 console.table(result.violations);
 ```
 
-The asynchronous result contains normalized `violations` and total audit
-`duration` in milliseconds.
+Results contain normalized `violations` and total `duration` in milliseconds.
 
-Each violation contains a stable-enough selector for diagnostics, a rule, severity, and remediation:
+Violations include a diagnostic selector, rule, severity, and remediation:
 
 ```js
 {
@@ -108,7 +112,8 @@ import { runBasicAccessibilityAudit } from 'alpine-component-loader/a11y';
 const violations = runBasicAccessibilityAudit(document.querySelector('#fixture'));
 ```
 
-The built-in rules cover common accessible names, form labels, duplicate IDs, ARIA references/values, focusability conflicts, landmark/document basics, and interactive nesting. They intentionally do not attempt a full accessibility conformance evaluation.
+Rules check names, form labels, duplicate IDs, ARIA, focusability, landmarks, and interactive nesting. They do not
+establish full accessibility conformance.
 
 ## Observe loaded components
 
@@ -128,7 +133,7 @@ document.addEventListener('acl:a11y', event => {
 });
 ```
 
-The observer audits a component's open shadow root or Light DOM host and stores the latest result by element:
+The observer audits open Shadow Roots or Light DOM hosts and stores each element’s latest result:
 
 ```js
 const card = document.querySelector('profile-card');
@@ -138,26 +143,26 @@ const latest = observer.getResults(card);
 console.assert(immediate === latest);
 ```
 
-Release its document listeners and pending behavior during development-tool teardown:
+Release listeners and pending work during teardown:
 
 ```js
 observer.disconnect();
 ```
 
-Stale asynchronous results are ignored when a newer audit begins for the same element. Auditor failures remain development-tool failures and do not alter component rendering.
+New audits supersede stale results. Auditor failures do not affect rendering.
 
 The returned observer controller exposes:
 
-| Member | Result |
-| --- | --- |
-| `audit(element)` | Audit one component immediately and return its latest result. |
-| `getResults(element)` | Return the last completed result for an element, or `null`. |
-| `disconnect()` | Remove owned document listeners and cancel pending observer behavior. |
-| `loader` | The loader class supplied to `observeAccessibility()`. |
+| Member                | Result                                                                |
+| --------------------- | --------------------------------------------------------------------- |
+| `audit(element)`      | Audit one component immediately and return its latest result.         |
+| `getResults(element)` | Return the last completed result for an element, or `null`.           |
+| `disconnect()`        | Remove owned document listeners and cancel pending observer behavior. |
+| `loader`              | The loader class supplied to `observeAccessibility()`.                |
 
 ## Supply a custom auditor
 
-A custom auditor receives the component root and the built-in rule function. It may replace or extend the built-in results:
+Custom auditors receive the component root and built-in rule function and can replace or extend results:
 
 ```js
 const auditor = async (root, { basic }) => {
@@ -178,11 +183,12 @@ const auditor = async (root, { basic }) => {
 const result = await auditAccessibility(card.shadowRoot || card, { auditor });
 ```
 
-Returned entries are normalized, so integrations may use `rule`/`severity`/`selector`/`remediation` or common `id`/`impact`/`target`/`help` fields. Configure and load Axe or another engine in the application; ACL does not bundle it.
+Results accept ACL fields (`rule`, `severity`, `selector`, `remediation`) or common engine fields (`id`, `impact`,
+`target`, `help`). Applications load/configure Axe or other engines.
 
 ## Mount the floating scanner
 
-The `a11y-scanner` entry adds an opt-in launcher and modal results panel:
+`/a11y-scanner` adds a launcher and modal results panel:
 
 ```js
 import { mountAccessibilityScanner } from 'alpine-component-loader/a11y-scanner';
@@ -199,12 +205,12 @@ const scanner = mountAccessibilityScanner({
 
 Scanner options are:
 
-| Option | Default | Contract |
-| --- | --- | --- |
-| `root` | `document` | Document, element, or open shadow root to scan. |
-| `auditor` | built-in rules | Optional application auditor. |
-| `concurrency` | `4` | Positive bound for component audits. |
-| `button` | bottom-right defaults | Launcher placement and companion-selector offsets. |
+| Option        | Default               | Contract                                           |
+| ------------- | --------------------- | -------------------------------------------------- |
+| `root`        | `document`            | Document, element, or open shadow root to scan.    |
+| `auditor`     | built-in rules        | Optional application auditor.                      |
+| `concurrency` | `4`                   | Positive bound for component audits.               |
+| `button`      | bottom-right defaults | Launcher placement and companion-selector offsets. |
 
 Scan without opening the panel, or open it and receive the same page result:
 
@@ -217,7 +223,8 @@ scanner.close();
 console.log(scanner.getResult());
 ```
 
-The scanner discovers active ACL Light DOM and open Shadow DOM components, bounds audit concurrency, and isolates per-component failures. Its modal restores previous focus and traps keyboard focus while open.
+The scanner discovers active Light DOM and open Shadow DOM components, bounds concurrency, and isolates failures. The
+modal traps focus and restores previous focus on close.
 
 Destroy the complete UI and owned listeners when the tool is no longer needed:
 
@@ -225,21 +232,22 @@ Destroy the complete UI and owned listeners when the tool is no longer needed:
 scanner.destroy();
 ```
 
-After destruction, scan/open operations reject rather than silently creating another panel. Mount a new scanner explicitly if development tooling is restarted.
+After destruction, scan/open calls reject. Mount a new scanner to restart tooling.
 
 The scanner controller surface is:
 
-| Member | Result |
-| --- | --- |
-| `scan()` | Audit without opening the modal. |
-| `open()` | Audit as needed, open the modal, and return the page result. |
-| `close()` | Close the modal and restore focus. |
-| `getResult()` | Return the latest page result or `null`. |
-| `destroy()` | Permanently remove UI, listeners, and owned work. |
+| Member        | Result                                                       |
+| ------------- | ------------------------------------------------------------ |
+| `scan()`      | Audit without opening the modal.                             |
+| `open()`      | Audit as needed, open the modal, and return the page result. |
+| `close()`     | Close the modal and restore focus.                           |
+| `getResult()` | Return the latest page result or `null`.                     |
+| `destroy()`   | Permanently remove UI, listeners, and owned work.            |
 
 ## Inject the debugger
 
-The debugger adds an opt-in overlay with component state, lifecycle and request activity, cache/data diagnostics, reload/cache actions, snapshots, diffs, and virtualized lists:
+The debugger overlay shows lifecycle, requests, cache/data diagnostics, reload/cache actions, snapshots, diffs, and
+virtualized lists:
 
 ```js
 import ACLDebugger from 'alpine-component-loader/debugger';
@@ -248,7 +256,8 @@ ACLDebugger.inject(AlpineComponentLoader);
 await AlpineComponentLoader.toggleDebug();
 ```
 
-Call `toggleDebug()` again to stop the live debugger. Injection replaces the root loader's diagnostic stub; importing the debugger alone does not modify the page.
+Call `toggleDebug()` again to stop it. Injection replaces the loader’s diagnostic stub; importing alone does not modify
+the page.
 
 For a keyboard-accessible application control:
 
@@ -262,7 +271,7 @@ document.querySelector('#toggle-acl-debugger').addEventListener('click', () => {
 });
 ```
 
-The overlay is for local development. Do not expose it as an end-user support console without reviewing its UI, data retention, and application authorization requirements.
+The overlay is for local development. Review retention, UI, and authorization before exposing it to end users.
 
 ## Create diagnostic snapshots
 
@@ -286,16 +295,14 @@ const changes = diffDiagnosticSnapshots(before, after);
 console.log(component, changes);
 ```
 
-`ACLDebugger.getSnapshot(AlpineComponentLoader)` returns the active debugger snapshot when available and otherwise builds an equivalent static snapshot.
+`ACLDebugger.getSnapshot(AlpineComponentLoader)` uses an active debugger or builds a static snapshot.
 
-Snapshots use `schemaVersion: 1` and include generation metadata, sanitized
-global configuration, registered tags, cache summaries, and component
-diagnostics. An active debugger may add timeline, request activity, stored
-snapshots, and current selection.
+Version-one snapshots include generation metadata, sanitized configuration, tags, cache summaries, and component
+diagnostics. Active debuggers may add timeline, requests, stored snapshots, and selection.
 
 ## Redaction
 
-Diagnostic exports recursively redact credential-like names and sensitive URL query values. Apply the exported helper before combining application-owned data with a report:
+Exports redact credential-like names and sensitive URL queries. Apply the helper when adding application data:
 
 ```js
 import { redactDiagnostics } from 'alpine-component-loader/debugger';
@@ -307,7 +314,8 @@ const safe = redactDiagnostics({
 });
 ```
 
-ACL snapshots do not intentionally include fetched payloads or persistence contents. Application code can still make a report sensitive by attaching its own state, DOM text, screenshots, or logs; review exports before sharing them.
+ACL excludes fetched payloads and persistence contents. Attached state, DOM text, screenshots, or logs may still be
+sensitive; review reports before sharing.
 
 ## Limits of automated tools
 
@@ -320,6 +328,7 @@ Automated checks assist development but do not replace:
 - Product-specific focus order, announcements, instructions, and error recovery.
 - Testing with disabled users.
 
-Treat findings as actionable signals, not a conformance certificate. Keep audits in component tests and run broader page-level checks on integrated routes.
+Findings guide remediation without certifying conformance. Include component audits and page-level checks in testing.
 
-For structured local metrics and redaction guarantees see [Observability](observability.md). For lifecycle cleanup see [Lifecycle, events, and dynamic components](lifecycle.md).
+For structured local metrics and redaction guarantees see [Observability](observability.md). For lifecycle cleanup see
+[Lifecycle, events, and dynamic components](lifecycle.md).

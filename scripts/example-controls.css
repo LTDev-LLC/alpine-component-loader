@@ -1,0 +1,192 @@
+button,
+input,
+select,
+textarea:not([data-editor]) {
+    font: inherit;
+    line-height: 1.5;
+}
+
+button,
+input[type='button'],
+input[type='submit'],
+input[type='reset'],
+.demo-button,
+.demo-panel button,
+.button-row button,
+.lab-controls button {
+    min-height: 2.75rem;
+    max-width: 100%;
+    padding: 0.5rem 0.8rem;
+    border: 1px solid var(--primary, #1d4ed8);
+    border-radius: 6px;
+    color: #fff;
+    background: var(--primary, #1d4ed8);
+    font-weight: 700;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+button:hover:where(:not(:disabled)),
+input[type='button']:hover:where(:not(:disabled)),
+input[type='submit']:hover:where(:not(:disabled)),
+input[type='reset']:hover:where(:not(:disabled)),
+.demo-button:hover,
+.demo-panel button:hover:where(:not(:disabled)),
+.button-row button:hover:where(:not(:disabled)),
+.lab-controls button:hover:where(:not(:disabled)) {
+    background: var(--primary-hover, #1e40af);
+}
+
+button.secondary,
+.demo-button.secondary,
+.demo-panel button.secondary,
+.button-row button.secondary {
+    border-color: var(--line, #e5e7eb);
+    color: var(--text, #1f2937);
+    background: #fff;
+}
+
+button.secondary:hover:where(:not(:disabled)),
+.demo-button.secondary:hover,
+.demo-panel button.secondary:hover:where(:not(:disabled)),
+.button-row button.secondary:hover:where(:not(:disabled)) {
+    background: #f1f5f9;
+}
+
+button.danger {
+    border-color: #b91c1c;
+    background: #b91c1c;
+}
+
+button.danger:hover:where(:not(:disabled)) {
+    background: #991b1b;
+}
+
+select,
+.lab-controls select,
+input:not(
+    [type='checkbox'],
+    [type='radio'],
+    [type='range'],
+    [type='hidden'],
+    [type='button'],
+    [type='submit'],
+    [type='reset'],
+    [type='file']
+),
+textarea:not([data-editor]) {
+    min-width: 0;
+    max-width: 100%;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid var(--line, #e5e7eb);
+    border-radius: 6px;
+    color: var(--text, #1f2937);
+    background: #fff;
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+    width: 1rem;
+    height: 1rem;
+    min-width: 1rem;
+    min-height: 0;
+    flex-shrink: 0;
+    margin: 0;
+    padding: 0;
+    border: revert;
+    border-radius: revert;
+    background: revert;
+    vertical-align: middle;
+    accent-color: var(--primary, #1d4ed8);
+}
+
+input[type='range'] {
+    max-width: 100%;
+    accent-color: var(--primary, #1d4ed8);
+}
+
+input[type='hidden'] {
+    display: none;
+}
+
+input[type='file'] {
+    max-width: 100%;
+    color: var(--text, #1f2937);
+}
+
+input::file-selector-button {
+    min-height: 2.75rem;
+    margin-right: 0.65rem;
+    padding: 0.5rem 0.8rem;
+    border: 1px solid var(--line, #e5e7eb);
+    border-radius: 6px;
+    color: var(--text, #1f2937);
+    background: #fff;
+    font: inherit;
+    cursor: pointer;
+}
+
+.auto-run-control {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 2.75rem;
+}
+
+@supports selector(label:has(input)) {
+    label:has(> input[type='checkbox'], > input[type='radio']) {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.45rem;
+        min-height: 2.75rem;
+    }
+}
+
+.button-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.field-control {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+input.compact-input {
+    width: 6rem;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible,
+summary:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, 0.35);
+    outline-offset: 3px;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+    opacity: 0.58;
+    cursor: not-allowed;
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled,
+input[readonly],
+textarea[readonly] {
+    background: #f1f5f9;
+}

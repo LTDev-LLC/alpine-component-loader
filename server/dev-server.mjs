@@ -14,16 +14,18 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..'),
     eventPath = `${hmrPrefix}events`,
     clientPath = `${hmrPrefix}client.js`,
     alpinePath = `${hmrPrefix}alpine.js`,
+    examplePrefix = `${hmrPrefix}examples/`,
+    exampleAssetsRoot = resolve(packageRoot, 'examples/feature-lab/demos'),
     inlineTemplatePrefix = `${hmrPrefix}templates/`,
     inlineRevisionLimit = 32,
     ignoredDirectories = new Set(['.git', 'node_modules']),
     require = createRequire(import.meta.url);
 let parseDocument = null;
 
-// Resolve the optional Alpine browser bundle from the peer or test alias
+// Prefer the repository's pinned alias and retain peer resolution for installed consumers
 let alpineBrowserPath = null;
 // Process each candidate
-for (const candidate of ['alpinejs/dist/cdn.min.js', 'alpinejs-315/dist/cdn.min.js']) {
+for (const candidate of ['alpinejs-pinned/dist/cdn.min.js', 'alpinejs/dist/cdn.min.js']) {
     // Guard the operation against runtime failures
     try {
         alpineBrowserPath = require.resolve(candidate);
@@ -60,6 +62,7 @@ const contentTypes = {
 // Expose package entry points through development-only import map URLs
 const packageImports = {
     'alpine-component-loader': `${modulePrefix}index.js`,
+    'alpine-component-loader/core': `${modulePrefix}core.js`,
     'alpine-component-loader/auto': `${modulePrefix}auto.js`,
     'alpine-component-loader/dev': `${modulePrefix}dev.js`,
     'alpine-component-loader/debugger': `${modulePrefix}debugger.js`,
@@ -67,17 +70,18 @@ const packageImports = {
     'alpine-component-loader/a11y-scanner': `${modulePrefix}a11y-scanner.js`,
     'alpine-component-loader/offline': `${modulePrefix}offline.js`,
     'alpine-component-loader/observability-exporters': `${modulePrefix}observability-exporters.js`,
+    'alpine-component-loader/polyfills': `${modulePrefix}polyfills.js`,
     'alpine-component-loader/testing': `${modulePrefix}testing.js`,
     'alpine-component-loader/testing/playwright': `${modulePrefix}testing-playwright.js`,
     'alpine-component-loader/testing/vitest': `${modulePrefix}testing-vitest.js`,
 };
 
-// Derive every package entry from an explicit readable or minified root mapping
+// Derive every package entry from an explicit readable or minified startup mapping
 const resolvePackageImports = (existingImports = {}) => {
     const rootSpecifier = 'alpine-component-loader',
-        rootMapping = existingImports[rootSpecifier];
+        rootMapping = existingImports[rootSpecifier] ?? existingImports[`${rootSpecifier}/core`];
     if (typeof rootMapping !== 'string') return packageImports;
-    const rootMatch = /^(.*\/)index(\.min)?\.js(?:[?#].*)?$/.exec(rootMapping);
+    const rootMatch = /^(.*\/)(?:index|core)(\.min)?\.js(?:[?#].*)?$/.exec(rootMapping);
     if (!rootMatch) return packageImports;
     const base = rootMatch[1],
         suffix = rootMatch[2] ? '.min.js' : '.js',
@@ -1006,6 +1010,12 @@ export const createACLDevHMR = async ({
             send(request, response, 200, await readFile(alpineBrowserPath), contentTypes['.js']);
             return true;
         }
+        if (url.pathname.startsWith(examplePrefix)) {
+            const result = await resolveServedFile(exampleAssetsRoot, `/${url.pathname.slice(examplePrefix.length)}`);
+            if (result.status !== 200) send(request, response, result.status, 'Not found');
+            else send(request, response, 200, await readFile(result.path), contentTypes[extname(result.path)]);
+            return true;
+        }
         if (url.pathname.startsWith(modulePrefix)) {
             const modulePathname = url.pathname.slice(modulePrefix.length),
                 result = await resolveServedFile(distributionRoot, `/${modulePathname}`);
@@ -1322,6 +1332,21 @@ export const startACLDevServer = async ({
                 );
             }
         };
+
+        // Resolve package modules exclusively within the built distribution tree
+        if (url.pathname.startsWith(examplePrefix)) {
+            void resolveServedFile(exampleAssetsRoot, `/${url.pathname.slice(examplePrefix.length)}`)
+                .then((result) => {
+                    // Serve only contained example assets through the development namespace
+                    if (result.status !== 200) send(request, response, result.status, 'Not found');
+                    else void serveResolvedFile(result);
+                })
+                .catch(() => {
+                    // Contain unexpected filesystem failures within the request
+                    send(request, response, 500, 'Internal server error');
+                });
+            return;
+        }
 
         // Resolve package modules exclusively within the built distribution tree
         if (url.pathname.startsWith(modulePrefix)) {

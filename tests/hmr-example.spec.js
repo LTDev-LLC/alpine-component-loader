@@ -106,7 +106,7 @@ test('development server executes a synthesized minified package graph', async (
     expect(result.version).toBeTruthy();
     expect(moduleRequests).toContain('/__acl_hmr/modules/index.min.js');
     expect(moduleRequests).toContain('/__acl_hmr/modules/runtime/loader.min.js');
-    expect(moduleRequests).toContain('/__acl_hmr/modules/runtime/component/factory.min.js');
+    expect(moduleRequests).toContain('/__acl_hmr/modules/runtime/component/lifecycle-controller.min.js');
     expect(moduleRequests.length).toBeGreaterThan(8);
     expect(
         moduleRequests.every(
@@ -282,4 +282,23 @@ test('generic server reloads a changed component through its injected SSE client
         ),
     ).not.toBe(fallbackIdentity);
     expect(errors).toEqual([]);
+});
+
+test('HMR probes retain slot/input state, execute enabled scripts, and cancel pending loads', async ({ page }) => {
+    // Use the checked-in controls rather than private controller state
+    await page.goto(exampleApp.url);
+    await page.locator('#mount-transform-probe').click();
+    await expect(page.locator('#advanced-hmr-output')).toContainText('Transformation probe ready');
+    await page.locator('hmr-transform-probe input').fill('Preserved draft');
+    await page.locator('#reload-transform-probe').click();
+    await expect(page.locator('#advanced-hmr-output')).toContainText('"scriptExecutions": 2');
+    await expect(page.locator('#advanced-hmr-output')).toContainText('"projected": true');
+    await expect(page.locator('#advanced-hmr-output')).toContainText('Preserved draft');
+    // Both superseded reload and removed host must abort the obsolete transport
+    for (const action of ['reload', 'remove']) {
+        await page.locator('#pending-' + action).click();
+        await expect(page.locator('#advanced-hmr-output')).toContainText('"action": "' + action + '"');
+        await expect(page.locator('#advanced-hmr-output')).toContainText('"aborted": 1');
+        await expect(page.locator('#advanced-hmr-output')).toContainText('"staleContentInserted": false');
+    }
 });

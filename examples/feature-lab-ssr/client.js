@@ -1,7 +1,11 @@
-import AlpineComponentLoader from '/dist/index.min.js';
+import AlpineComponentLoader from '/dist/core.min.js';
 import ACLDebugger from '/dist/debugger.min.js';
 import ACLA11y from '/dist/a11y.min.js';
 import ACLA11yScanner from '/dist/a11y-scanner.min.js';
+
+const readyComponents = new WeakSet();
+// Handle the lifecycle event and release owned work
+document.addEventListener('loaded', (event) => readyComponents.add(event.target));
 
 Alpine.data('ssrLabHero', () => {
     // Create interactive state for the server-rendered hero
@@ -442,7 +446,8 @@ document.getElementById('collapse-usage').addEventListener('click', () => {
 
 // Wait until one component reaches a terminal initial lifecycle state
 const waitForSettlement = (element) => {
-    if (element._state === 'ready' || element._state === 'error') return Promise.resolve();
+    if (readyComponents.has(element) || element.getAttribute('data-acl-hydration-state') === 'error')
+        return Promise.resolve();
     return new Promise((resolve) => {
         // Remove both terminal listeners after the first one fires
         const finish = () => {
@@ -465,6 +470,13 @@ const manifest = await fetch('/acl-manifest.json').then(
     ),
     serverComponents = [...document.querySelectorAll('[data-acl-ssr]')];
 
+if (new URLSearchParams(location.search).has('scheduler'))
+    AlpineComponentLoader.config({
+        hydrationScheduler: {
+            budgetMs: 8,
+            maxTasksPerTurn: 4,
+        },
+    });
 await AlpineComponentLoader.registerManifest(manifest);
 await AlpineComponentLoader.start();
 await Promise.all(serverComponents.map(waitForSettlement));

@@ -1,5 +1,5 @@
 // @license AlpineComponentLoader
-// Copyright (c) LTDev LLC
+// Copyright (c) LouisT
 // Licensed under the MIT license in the repository root
 
 // Clone mutable runtime values while preserving unsupported host objects by identity
@@ -210,4 +210,4 @@ export const stableStringify = (value) => {
 
 // Namespace a template request by its active versioned cache key
 export const getTemplateLoadKey = (source, settings = {}) =>
-    `${settings?._templateCacheKey || ''}::${settings?.templateRevision ? `${settings.templateRevision}::` : ''}${source}`;
+    `${settings?._templateCacheKey || ''}::${settings?.templateRevision || ''}::${settings.templateCacheStrategy || 'cache-first'}::${settings.cacheTemplates !== false}::${settings.templateCacheTtl}::${settings.templateTimeout ?? 10000}::${settings.templateMaxBytes ?? 1048576}::${source}`;

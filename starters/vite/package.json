@@ -17,8 +17,8 @@
         "acl:audit:update": "npm run build && alpine-component-loader audit --config acl.config.mjs --no-axe --update-baseline"
     },
     "dependencies": {
-        "alpine-component-loader": "github:LTDev-LLC/alpine-component-loader",
-        "alpinejs": "^3.15.0"
+        "alpine-component-loader": "github:LouisT/alpine-component-loader",
+        "alpinejs": "3.17.4"
     },
     "devDependencies": {
         "vite": "^7.0.0"

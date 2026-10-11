@@ -1,22 +1,19 @@
 # Testing utilities
 
-The `alpine-component-loader/testing` entry provides small browser helpers for mounting components, waiting for lifecycle states, recording ACL events, and mocking fetch. Importing the entry is SSR-safe; calling DOM helpers requires a real browser or browser-like test environment.
+`/testing` provides browser helpers for mounting components, waiting for states, recording events, and mocking fetch.
+Importing is SSR-safe; DOM operations require a browser or browser-like environment.
 
 ## Running browser tests
 
-Install the repository dependencies with Node.js 22 or newer. The checked-in
-Playwright packages use one exact version so the installer and test runner
-always expect the same browser revisions:
+Use Node.js 22+. Pinned Playwright packages keep installer and test-runner browser revisions aligned:
 
 ```bash
 npm ci
 npm run playwright:install -- chromium firefox webkit
 ```
 
-The install command downloads all three supported engines. To install only one
-engine, pass just `chromium`, `firefox`, or `webkit`. On Linux CI runners, use
-`npm run playwright:install:ci -- <browser>` to install the browser and its
-system dependencies.
+The command installs Chromium, Firefox, and WebKit. Pass one engine to limit installation. Linux CI can use
+`playwright:install:ci -- <browser>` to include system dependencies.
 
 Repository test scripts perform the matching install preflight automatically:
 
@@ -26,8 +23,7 @@ npm run test:other-browsers   # Firefox and WebKit
 npm run test:cross-browser    # Chromium, Firefox, and WebKit
 ```
 
-For direct Playwright CLI use, install browsers before running tests. The
-command is `npx playwright install`, not `npx install playwright`:
+For direct CLI use, install browsers first with `npx playwright install`:
 
 ```bash
 npx playwright install chromium firefox webkit
@@ -45,7 +41,7 @@ import {
 } from 'alpine-component-loader/testing';
 ```
 
-The test page must load a compatible Alpine 3.14-3.x build, assign it to `window.Alpine`, and start it once as part of fixture setup. Do not call `Alpine.start()` independently in every test.
+Fixtures must expose Alpine 3.14-3.x as `window.Alpine` and start it once, rather than per test.
 
 Representative runner commands are:
 
@@ -54,11 +50,13 @@ npx playwright test
 npx playwright test tests/profile-card.spec.js --project=chromium
 ```
 
-Playwright test callbacks run in Node, so call DOM helpers in page-loaded browser code or through `page.evaluate()` after exposing a browser-resolvable test-support module. Browser-mode runners may import the helpers directly in the test module.
+Playwright callbacks run in Node. Invoke DOM helpers in page code or `page.evaluate()` with a browser-resolvable support
+module. Browser-mode runners can import directly.
 
 ## Mount, update, and unmount
 
-`mountComponent()` defines a unique inline custom-element name by default, starts or reuses a loader, mounts it, and waits for the requested lifecycle state:
+`mountComponent()` generates a unique inline tag, starts/reuses the loader, mounts the element, and waits for the
+requested state:
 
 ```js
 const mounted = await mountComponent({
@@ -96,23 +94,24 @@ try {
 
 Mount options are:
 
-| Option | Default | Contract |
-| --- | --- | --- |
-| `loader` | shared loader | Loader class used for definition and startup. |
-| `tagName` | unique `acl-test-*` | Explicit custom-element name when a stable tag is required. |
-| `template` | empty | Inline component markup. |
-| `options` | `{}` | Component definition options. |
-| `attributes` | `{}` | Initial HTML attribute values. |
-| `properties` | `{}` | Initial direct property values. |
-| `slots` | `{}` | Default string/node or named slot map. |
-| `container` | `document.body` | Parent that owns the mounted host. |
-| `state` | `ready` | Lifecycle state awaited after insertion. |
-| `timeout` | `2000` | Wait deadline in milliseconds. |
-| `signal` | none | Abort signal for the lifecycle wait. |
+| Option       | Default             | Contract                                                    |
+| ------------ | ------------------- | ----------------------------------------------------------- |
+| `loader`     | shared loader       | Loader class used for definition and startup.               |
+| `tagName`    | unique `acl-test-*` | Explicit custom-element name when a stable tag is required. |
+| `template`   | empty               | Inline component markup.                                    |
+| `options`    | `{}`                | Component definition options.                               |
+| `attributes` | `{}`                | Initial HTML attribute values.                              |
+| `properties` | `{}`                | Initial direct property values.                             |
+| `slots`      | `{}`                | Default string/node or named slot map.                      |
+| `container`  | `document.body`     | Parent that owns the mounted host.                          |
+| `state`      | `ready`             | Lifecycle state awaited after insertion.                    |
+| `timeout`    | `2000`              | Wait deadline in milliseconds.                              |
+| `signal`     | none                | Abort signal for the lifecycle wait.                        |
 
-The returned mount handle contains the mounted `element` plus `update(values)`, `reload(options)`, and `unmount()` methods.
+Mount handles expose `element`, `update(values)`, `reload(options)`, and `unmount()`.
 
-`attributes` follow HTML semantics: `true` creates a presence attribute, while `false`, `null`, and `undefined` omit or remove it. `properties` are assigned directly. Slots may be strings, nodes, arrays, or a record of default/named slot values:
+`attributes` use HTML semantics: `true` creates presence; `false`, `null`, and `undefined` omit/remove. `properties` are
+assigned directly. Slots accept strings, nodes, arrays, or default/named records:
 
 ```js
 const mounted = await mountComponent({
@@ -125,11 +124,11 @@ const mounted = await mountComponent({
 });
 ```
 
-`unmount()` is idempotent and explicitly waits for component destruction. Always call it in `finally` or runner cleanup.
+`unmount()` is idempotent and waits for destruction. Call it in `finally` or runner cleanup.
 
 ## Avoid custom-element collisions
 
-The platform cannot unregister custom elements. Let `mountComponent()` generate a unique tag for repeated tests:
+Custom elements cannot be unregistered. Use generated tags for repeated tests:
 
 ```js
 const first = await mountComponent({ template: '<p>First</p>' });
@@ -138,7 +137,7 @@ const second = await mountComponent({ template: '<p>Second</p>' });
 console.assert(first.element.localName !== second.element.localName);
 ```
 
-Supply `tagName` only when the test needs a predictable name, and ensure the suite never tries to define that name with a different class or template.
+Use explicit `tagName` only when needed; never redefine it with another class or template.
 
 A custom `container` can isolate mounts beneath one fixture:
 
@@ -162,9 +161,8 @@ card.remove();
 await waitForComponent(card, { state: 'destroyed', timeout: 1000 });
 ```
 
-Its options are requested `state`, positive `timeout`, and optional `signal`.
-An already-matching component resolves immediately; timeout and abort paths
-always release polling and event listeners.
+Options are `state`, positive `timeout`, and optional `signal`. Matching states resolve immediately; all outcomes
+release timers and listeners.
 
 Abort a pending wait when the owning test or route ends:
 
@@ -180,7 +178,7 @@ controller.abort('test-finished');
 await waiting.catch(error => console.assert(error.name === 'AbortError'));
 ```
 
-An error-state waiter resolves from `acl:error` or the component's terminal error state. A timeout rejects with the requested state in its message. Waiters remove their timers and listeners on every outcome.
+Error waiters resolve on `acl:error` or terminal error state. Timeouts reject with the requested state in the message.
 
 ## Record ACL events
 
@@ -209,11 +207,12 @@ try {
 
 The recorder exposes the live `records` array, `waitFor(name)`, `clear()`, and `stop()`.
 
-The default event list covers loading, errors, cache activity, revalidation, and hydration. `waitFor(name)` returns an event already recorded or waits for the next one. `stop()` is idempotent, removes listeners, and rejects pending event waiters so tests do not hang.
+Default events cover loads, errors, cache/revalidation, and hydration. `waitFor(name)` returns a recorded event or waits
+for one. Idempotent `stop()` removes listeners and rejects pending waits.
 
 ## Mock successful requests
 
-`installFetchMock()` replaces the selected target's `fetch`, records requests, and matches exact URLs, regular expressions, or callbacks:
+`installFetchMock()` replaces the target’s `fetch`, records requests, and matches exact URLs, regexes, or callbacks:
 
 ```js
 const profileUrl = new URL('/api/profile', location.href).href;
@@ -241,20 +240,20 @@ try {
 }
 ```
 
-Object responses are serialized as JSON and receive a JSON content type. Return an explicit `Response` when a test needs streams, unusual status text, or complete header control.
+Objects become JSON responses with a content type. Return a `Response` for streams or custom status/headers.
 
 Each mock route may use:
 
-| Field | Contract |
-| --- | --- |
-| `match` | Exact URL, regular expression, or normalized-request predicate. |
-| `url` | URL/regular-expression shorthand when `match` is omitted. |
-| `method` | Optional case-insensitive HTTP method filter. |
-| `response` | Value, `Response`, or sync/async response factory. |
-| `body` | Fallback response body when `response` is absent. |
-| `status` | Response status, defaulting to `200`. |
-| `headers` | Additional response headers. |
-| `delay` | Abort-aware response delay in milliseconds. |
+| Field      | Contract                                                        |
+| ---------- | --------------------------------------------------------------- |
+| `match`    | Exact URL, regular expression, or normalized-request predicate. |
+| `url`      | URL/regular-expression shorthand when `match` is omitted.       |
+| `method`   | Optional case-insensitive HTTP method filter.                   |
+| `response` | Value, `Response`, or sync/async response factory.              |
+| `body`     | Fallback response body when `response` is absent.               |
+| `status`   | Response status, defaulting to `200`.                           |
+| `headers`  | Additional response headers.                                    |
+| `delay`    | Abort-aware response delay in milliseconds.                     |
 
 ## Mock errors, delays, and cancellation
 
@@ -282,7 +281,7 @@ await mounted.unmount();
 mock.restore();
 ```
 
-Use `delay` to test cancellation. The mock observes the request's `AbortSignal` and rejects with `AbortError`:
+`delay` supports cancellation tests: aborted requests reject with `AbortError`:
 
 ```js
 const mock = installFetchMock([
@@ -299,17 +298,19 @@ mock.restore();
 
 The returned fetch-mock controller exposes:
 
-| Member | Result |
-| --- | --- |
-| `requests` | Live normalized request records containing `url`, `method`, `headers`, and the original `request`. |
-| `reset(nextRoutes)` | Clear request history and optionally replace the route table. |
-| `restore()` | Restore the target's original `fetch`; safe to call during cleanup. |
+| Member              | Result                                                                                             |
+| ------------------- | -------------------------------------------------------------------------------------------------- |
+| `requests`          | Live normalized request records containing `url`, `method`, `headers`, and the original `request`. |
+| `reset(nextRoutes)` | Clear request history and optionally replace the route table.                                      |
+| `restore()`         | Restore the target's original `fetch`; safe to call during cleanup.                                |
 
-An unmatched request throws immediately with its method and URL, preventing accidental network access.
+Unmatched requests throw with method/URL, preventing accidental network access.
 
 ## Automatic test harness
 
-`createACLTestHarness()` creates an isolated loader and owns every mount, event recorder, and fetch mock created through it. `cleanup()` unmounts components, restores fetch, stops recorders, and disposes the loader. `reset()` performs the same cleanup and creates a fresh isolated loader. Use `assertLifecycleSequence()` or `harness.assertLifecycle()` for ordered lifecycle assertions:
+`createACLTestHarness()` owns an isolated loader, mounts, recorders, and fetch mocks. `cleanup()` unmounts, restores
+fetch, stops recorders, and disposes; `reset()` does the same and creates a fresh loader. Assert order with
+`assertLifecycleSequence()` or `harness.assertLifecycle()`:
 
 ```js
 const harness = createACLTestHarness();
@@ -320,18 +321,15 @@ harness.assertLifecycle(events.records, ['acl:loadstart', 'acl:loadend']);
 await harness.cleanup();
 ```
 
-Harness construction accepts an existing `loader`, isolated `loaderOptions`, a
-default `container`, and `disposeLoader`. When no loader is supplied,
-`disposeLoader` defaults to `true`.
+Options include an existing `loader`, isolated `loaderOptions`, `container`, and `disposeLoader` (default `true` when no
+loader is supplied).
 
-The harness exposes its current `loader` plus owned `mount()`, `record()`,
-`mockFetch()`, and `assertLifecycle()` helpers. `reset()` releases owned
-resources and refreshes loader state; `cleanup()` permanently releases the
-harness and is idempotent.
+The harness exposes `loader`, `mount()`, `record()`, `mockFetch()`, and `assertLifecycle()`. `reset()` refreshes state;
+idempotent `cleanup()` permanently releases it.
 
 ## Playwright fixture
 
-`createACLPlaywrightTest()` from `alpine-component-loader/testing/playwright` provides `acl` and optional worker-scoped `aclServer` fixtures:
+`/testing/playwright` exports `createACLPlaywrightTest()` with `acl` and optional worker-scoped `aclServer` fixtures:
 
 ```js
 import { createACLPlaywrightTest, expect } from 'alpine-component-loader/testing/playwright';
@@ -349,21 +347,20 @@ test('resets loader state', async ({ acl }) => {
 
 Fixture factory options are:
 
-| Option | Contract |
-| --- | --- |
-| `server` | `false` or options forwarded to `startACLTestServer()`. |
-| `route` | Page route opened before installing the browser harness; defaults to `/`. |
-| `moduleUrl` | Browser-resolvable testing entry when no packaged server is used. |
+| Option      | Contract                                                                  |
+| ----------- | ------------------------------------------------------------------------- |
+| `server`    | `false` or options forwarded to `startACLTestServer()`.                   |
+| `route`     | Page route opened before installing the browser harness; defaults to `/`. |
+| `moduleUrl` | Browser-resolvable testing entry when no packaged server is used.         |
 
-The `acl` fixture exposes the Playwright `page`, nullable worker `server`,
-`reset()`, and `metrics()`. The optional `aclServer` result exposes `origin`,
-`url`, resolved `root`, `indexPath`, and `close()`.
+`acl` exposes `page`, nullable `server`, `reset()`, and `metrics()`. `aclServer` exposes `origin`, `url`, `root`,
+`indexPath`, and `close()`.
 
-The server fixture uses `startACLTestServer()` from `alpine-component-loader/testing/server`, binds to an ephemeral loopback port, disables file watching, and always closes after the worker.
+The server fixture uses `/testing/server`’s `startACLTestServer()`, an ephemeral loopback port, no file watching, and
+worker-end cleanup.
 
-For direct server use, `watchFiles` defaults to `false`. When watching is
-enabled, `watchDebounce` defaults to 75 ms and `watchPollInterval` defaults to
-5000 ms; set `watchPollInterval: 0` to disable periodic safety scans:
+Direct servers default to `watchFiles: false`. When enabled, debounce is 75 ms and safety scans run every 5,000 ms.
+`watchPollInterval: 0` disables scans:
 
 ```js
 import { startACLTestServer } from 'alpine-component-loader/testing/server';
@@ -376,12 +373,12 @@ const server = await startACLTestServer({
 });
 ```
 
-Direct server options include `root`, `index`, loopback `host`, ephemeral or
-explicit `port`, `watchFiles`, `watchDebounce`, `watchPollInterval`, and
-`injectAllHtml`. The result contains `origin`, alias `url`, resolved `root`,
-`indexPath`, `indexUrl`, live `clients`, and async `close()`.
+Server options are `root`, `index`, `host`, `port`, `watchFiles`, `watchDebounce`, `watchPollInterval`, and
+`injectAllHtml`. Results include `origin`/`url`, resolved `root`, `indexPath`, `indexUrl`, live `clients`, and async
+`close()`.
 
-The repository keeps an executable reference at [`tests/testing-integrations.spec.js`](../tests/testing-integrations.spec.js). It verifies worker-scoped server setup, a browser-isolated loader, metrics, event-recorder cleanup, state reset, and final disposal.
+[`tests/testing-integrations.spec.js`](../tests/testing-integrations.spec.js) demonstrates server setup, isolated
+loaders, metrics, recorder cleanup, reset, and disposal.
 
 ## Vitest Browser Mode fixture
 
@@ -399,11 +396,9 @@ it('mounts a component', async () => {
 });
 ```
 
-The supplied hooks object must provide `beforeEach` and `afterEach`. The
-returned fixture exposes `current` only while a test is running; it is a fresh
-harness for each test and is cleaned afterward.
+Hooks must include `beforeEach` and `afterEach`. `current` exposes a fresh harness during each test, cleaned afterward.
 
-This adapter is intended for Vitest Browser Mode, where DOM, Custom Elements, and Cache APIs are real browser implementations.
+Use this adapter in Vitest Browser Mode for real DOM, Custom Elements, and Cache APIs.
 
 ## Manual Playwright integration pattern
 
@@ -441,7 +436,8 @@ test('profile-card renders declared props', async ({ page }) => {
 });
 ```
 
-The application dev server or bundler must make the public package specifier browser-resolvable. Use the ready-made fixture when the packaged ephemeral server fits; retain the manual pattern for an existing application server.
+The server/bundler must resolve package specifiers in the browser. Use the packaged fixture or this manual pattern for
+an existing app server.
 
 ## Cleanup checklist
 
@@ -452,4 +448,5 @@ The application dev server or bundler must make the public package specifier bro
 - Avoid reusing explicit custom-element names with different definitions.
 - Prefer `createLoader()` or `createACLTestHarness()` when tests change loader configuration.
 
-For lifecycle event order see [Lifecycle, events, and dynamic components](lifecycle.md). For request behavior see [Data, caching, polling, and persistence](data.md).
+For lifecycle event order see [Lifecycle, events, and dynamic components](lifecycle.md). For request behavior see
+[Data, caching, polling, and persistence](data.md).

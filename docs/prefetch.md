@@ -1,6 +1,7 @@
 # Adaptive prefetch
 
-Prefetch warms the component template cache before a component is needed. Manual prefetch always follows the caller's request. Adaptive prefetch observes opt-in elements and skips speculative work when the connection is offline, data saver is enabled, or the effective connection is constrained.
+Prefetch warms template caches before use. Manual calls follow your request; adaptive prefetch observes opt-in targets
+and skips offline, data-saver, and constrained connections.
 
 ## Prepare a dependency graph
 
@@ -27,7 +28,8 @@ npx alpine-component-loader validate acl-manifest.json
 }
 ```
 
-The generator detects dependencies structurally with parse5, including nested templates and multiline markup. It does not infer route or feature groups. Put those groups and any explicit dependencies in adjacent `<tag>.acl.json` sidecars, then refresh safely with `manifest --update`; see [Manifests, generated contracts, and CLI tooling](manifests-and-cli.md).
+The generator infers dependencies, including nested templates, but not groups. Declare groups and explicit dependencies
+in `<tag>.acl.json` sidecars, then run `manifest --update`. See [manifest tooling](manifests-and-cli.md).
 
 Register the parsed manifest before prefetching:
 
@@ -42,7 +44,7 @@ await AlpineComponentLoader.start();
 
 ## Prefetch during registration
 
-Pass group or tag names to `registerManifest()` when an application knows its critical graph at startup:
+Prefetch known startup groups or tags during registration:
 
 ```js
 const result = await AlpineComponentLoader.registerManifest(manifest, {
@@ -55,7 +57,8 @@ for (const [tag, outcome] of Object.entries(result.prefetched)) {
 }
 ```
 
-`prefetch: true` selects every registered component. An array may mix group names and component tags. Dependencies are expanded before work begins, duplicate tags are removed, and every selected template produces an independent fulfilled or rejected result.
+`true` selects every registered component; arrays can mix groups and tags. Dependencies expand first, duplicates are
+removed, and each template settles independently.
 
 ## Manual prefetch
 
@@ -76,9 +79,10 @@ const graph = await AlpineComponentLoader.prefetchGraph(['profile-card'], {
 
 - `prefetch(tag)` loads one registered template and rejects when that load fails.
 - `prefetchAll(tags)` bounds concurrency and settles every requested tag.
-- `prefetchGraph(roots)` recursively loads manifest dependencies before the roots. Set `includeRoots: false` to warm dependencies only.
+- `prefetchGraph(roots)` recursively loads manifest dependencies before the roots. Set `includeRoots: false` to warm
+  dependencies only.
 
-Manual methods do not apply adaptive connection heuristics. This is useful for navigation the application has already committed to, but callers should avoid unnecessary work themselves.
+Manual calls bypass connection heuristics. Use them for committed navigation and avoid unnecessary requests.
 
 ## Observe opt-in targets
 
@@ -108,22 +112,23 @@ controller.disconnect();
 
 The controller exposes `prefetch(target)` for a direct adaptive request and `disconnect()` for complete cleanup.
 
-Calling `observePrefetch()` again disconnects the previous loader-owned controller. `AlpineComponentLoader.stopObservingPrefetch()` is an equivalent global cleanup when the controller handle is unavailable.
+A new `observePrefetch()` disconnects the previous loader-owned controller. `stopObservingPrefetch()` also releases it.
 
 Adaptive observation options are:
 
-| Option | Default | Contract |
-| --- | --- | --- |
-| `root` | `document` | Discovery and delegated hover/focus scope. |
-| `selector` | `[data-acl-prefetch]` | Candidate target selector. |
-| `triggers` | hover, focus, viewport | Any combination of `hover`, `focus`, `viewport`/`visible`, and `idle`. |
-| `hoverDelay` | `75` | Non-negative pointer dwell time in milliseconds. |
-| `rootMargin` | `200px` | IntersectionObserver margin used by viewport triggers. |
-| `concurrency` | `2` | Positive bound for each selected dependency graph. |
-| `respectDataSaver` | `true` | Skip speculative work on save-data/constrained connections. |
-| `intersectionRoot` | `null` | Optional element/document root for viewport observation. |
+| Option             | Default                | Contract                                                               |
+| ------------------ | ---------------------- | ---------------------------------------------------------------------- |
+| `root`             | `document`             | Discovery and delegated hover/focus scope.                             |
+| `selector`         | `[data-acl-prefetch]`  | Candidate target selector.                                             |
+| `triggers`         | hover, focus, viewport | Any combination of `hover`, `focus`, `viewport`/`visible`, and `idle`. |
+| `hoverDelay`       | `75`                   | Non-negative pointer dwell time in milliseconds.                       |
+| `rootMargin`       | `200px`                | IntersectionObserver margin used by viewport triggers.                 |
+| `concurrency`      | `2`                    | Positive bound for each selected dependency graph.                     |
+| `respectDataSaver` | `true`                 | Skip speculative work on save-data/constrained connections.            |
+| `intersectionRoot` | `null`                 | Optional element/document root for viewport observation.               |
 
-The default triggers are hover, focus, and viewport visibility. Hover waits 75 ms so passing pointer movement does not immediately fetch. Viewport observation uses a 200 px root margin. Add `idle` explicitly to process every marked target during idle time:
+Default triggers are hover (75 ms delay), focus, and viewport (200 px margin). Add `idle` to process marked targets
+during idle time:
 
 ```js
 const controller = await AlpineComponentLoader.observePrefetch({
@@ -132,11 +137,11 @@ const controller = await AlpineComponentLoader.observePrefetch({
 });
 ```
 
-`viewport` and `visible` are equivalent trigger names. If `IntersectionObserver` is unavailable, hover/focus/idle behavior can still run.
+`viewport` and `visible` are aliases. Without `IntersectionObserver`, hover, focus, and idle still work.
 
 ## Dynamic content and scoped observation
 
-New matching elements are discovered with a mutation observer. Scope discovery and event listeners to part of the page when appropriate:
+A mutation observer discovers new targets. Scope observation and listeners when appropriate:
 
 ```js
 const panel = document.querySelector('#account-panel');
@@ -148,13 +153,11 @@ const controller = await AlpineComponentLoader.observePrefetch({
 });
 ```
 
-With a custom selector, targets still need a `data-acl-prefetch` value unless their own custom-element tag names a registered component. An empty `data-acl-prefetch` on a registered component host resolves to that host's tag.
+Custom selectors still require `data-acl-prefetch`, unless the target itself is a registered component. An empty value
+on a component host selects its tag.
 
-Only active targets remain registered with the viewport observer. A target is
-unobserved after it intersects, and removing a target or an ancestor subtree
-releases its observation and any pending hover timer. Reinserted matching
-elements are discovered again and can trigger a new adaptive attempt. Calling
-`disconnect()` repeatedly is safe.
+Targets are unobserved after intersection. Removing targets or ancestors releases observations and hover timers;
+reinsertion allows another attempt. Repeated `disconnect()` is safe.
 
 ## Connection gates and events
 
@@ -165,7 +168,7 @@ Adaptive work is skipped when:
 - Effective connection type is `slow-2g` or `2g` (`constrained-network`).
 - A token names neither a registered component nor a manifest group (`unknown-target`).
 
-Set `respectDataSaver: false` only when the application has another appropriate policy. Offline checks still apply.
+`respectDataSaver: false` disables that heuristic; offline checks remain.
 
 Listen for structured lifecycle events:
 
@@ -175,20 +178,23 @@ addEventListener('acl:prefetchend', event => console.log(event.detail.fulfilled)
 addEventListener('acl:prefetchskip', event => console.log(event.detail.reason));
 ```
 
-Adaptive prefetch loads component templates and their manifest dependencies. It never requests component data endpoints. Failed tags are eligible for a later adaptive retry; successfully completed tags are not fetched repeatedly by the same controller.
+Adaptive prefetch loads templates and dependencies, never data endpoints. Failed tags can retry; successful tags are not
+repeated by the same controller.
 
 ## Troubleshooting
 
 ### A group does nothing
 
-Confirm the parsed manifest was registered, the group exists in `groups`, and its members name registered components. `registerManifest()` requires `prefetch: ['group-name']`; a bare string is not a supported prefetch option.
+Check manifest registration, group names, and members. Registration accepts `prefetch: ['group-name']`, not a bare
+string.
 
 ### A nested component is missing
 
-Add it to the parent's `dependencies` array. Prefetch uses the manifest graph, not arbitrary runtime DOM discovery.
+Declare the child in `dependencies`; prefetch follows the manifest graph.
 
 ### Observation keeps running after navigation
 
-Call `controller.disconnect()` or `stopObservingPrefetch()` during route/application teardown. Cleanup releases timers, listeners, intersection and mutation observers, and idle work.
+During teardown, call `disconnect()` or `stopObservingPrefetch()` to release timers, listeners, observers, and idle
+work.
 
 For template cache details see [Data, caching, polling, and persistence](data.md).

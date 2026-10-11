@@ -1,3 +1,9 @@
+import {
+    createTemplateRequests,
+    withSignal as raceSignal,
+    readTemplateResponse,
+} from '../dist/runtime/template-requests.js';
+import { renderOrderedBatch } from './render-batch.mjs';
 import { createHash } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
 import { readFile, realpath, stat } from 'node:fs/promises';
@@ -12,6 +18,17 @@ const { parseFragment, serialize, serializeOuter } = await loadOptionalDependenc
 const URL_ATTRIBUTES = new Set(['href', 'src', 'xlink:href', 'action', 'formaction', 'poster', 'data']),
     FORBIDDEN_ATTRIBUTES = new Set(['data-acl-ssr', 'data-acl-revision', 'shadowrootmode', 'shadowrootserializable']),
     textEncoder = new TextEncoder();
+
+// Preserve SSR AbortError and application reasons while bounding uncooperative callbacks
+const withSignal = async (operation, signal) => {
+    // Release resources on both success and failure
+    try {
+        return await raceSignal(operation, signal);
+    } catch (error) {
+        if (signal?.aborted && signal.reason instanceof Error) throw signal.reason;
+        throw error;
+    }
+};
 
 const privateAddress = (rawAddress) => {
     // Run the private address operation
@@ -67,39 +84,17 @@ const validateRemoteUrl = async (url, { allowPrivate = false } = {}) => {
         throw new TypeError(`[ACL SSR] Template source resolved to a non-public address: ${url.hostname}`);
 };
 
-const readResponseText = async (response, maxBytes, label = 'Template') => {
-    // Read a streamed response without exceeding the configured byte limit
-    const declared = Number(response.headers.get('content-length'));
-    if (Number.isFinite(declared) && declared > maxBytes)
-        throw new TypeError(`[ACL SSR] ${label} exceeds ${maxBytes} bytes.`);
-    const reader = response.body?.getReader();
-    if (!reader) {
-        const text = await response.text();
-        if (textEncoder.encode(text).byteLength > maxBytes)
+// Keep SSR diagnostics while sharing bounded streaming and cancellation handling
+const readResponseText = async (response, maxBytes, label = 'Template', signal) => {
+    // Release resources on both success and failure
+    try {
+        return await readTemplateResponse(response, maxBytes, signal);
+    } catch (error) {
+        if (signal?.aborted && signal.reason instanceof Error) throw signal.reason;
+        if (error.code === 'ACL_TEMPLATE_TOO_LARGE')
             throw new TypeError(`[ACL SSR] ${label} exceeds ${maxBytes} bytes.`);
-        return text;
+        throw error;
     }
-    const chunks = [];
-    let length = 0;
-    // Continue until the operation completes
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        length += value.byteLength;
-        if (length > maxBytes) {
-            await reader.cancel();
-            throw new TypeError(`[ACL SSR] ${label} exceeds ${maxBytes} bytes.`);
-        }
-        chunks.push(value);
-    }
-    const joined = new Uint8Array(length);
-    let offset = 0;
-    chunks.forEach((chunk) => {
-        // Process the current item
-        joined.set(chunk, offset);
-        offset += chunk.byteLength;
-    });
-    return new TextDecoder().decode(joined);
 };
 
 const sanitizeTree = (parent, security = {}, context = {}) => {
@@ -239,43 +234,42 @@ const renderSlots = (slots, security, context) => {
         .join('');
 };
 
-const renderLightTemplate = (source, slots, security, context) => {
-    // Replace Light DOM slots with the same transparent anchors used by the browser renderer
-    const values =
-            typeof slots === 'string'
-                ? { default: sanitizeSSRHtml(slots, security, context) }
-                : Object.fromEntries(
-                      Object.entries(slots || {}).map(([name, html]) => [
-                          name,
-                          sanitizeSSRHtml(Array.isArray(html) ? html.join('') : html, security, context),
-                      ]),
-                  ),
-        fragment = parseFragment(sanitizeSSRHtml(source, security, context)),
-        visit = (parent) => {
-            // Replace slots at any structural depth including template contents
-            // Run this operation
-            for (let index = 0; index < (parent.childNodes || []).length; index++) {
-                const node = parent.childNodes[index];
-                if (node.tagName === 'slot') {
-                    const name =
-                            node.attrs?.find(
-                                // Find the authored slot name
-                                (attribute) => attribute.name === 'name',
-                            )?.value || 'default',
-                        content = name in values ? values[name] : (node.childNodes || []).map(serializeOuter).join(''),
-                        replacement = parseFragment(
-                            `<div style="display: contents" data-acl-slot="${escapeAttribute(name)}">${content}</div>`,
-                        ).childNodes[0];
-                    replacement.parentNode = parent;
-                    parent.childNodes[index] = replacement;
-                    continue;
-                }
+// Replace slot anchors directly in a cloned sanitized parse tree
+const renderLightTemplate = (tree, slots, security, context) => {
+    const supplied = typeof slots === 'string' ? { default: slots } : slots || {},
+        values = new Map();
+    Object.entries(supplied).forEach(([name, html]) =>
+        values.set(
+            name,
+            sanitizeTree(parseFragment(Array.isArray(html) ? html.join('') : String(html)), security, context)
+                .childNodes,
+        ),
+    );
+    const visit = (parent) => {
+        // Enter template contents as well as ordinary children
+        for (let index = 0; index < (parent.childNodes || []).length; index++) {
+            const node = parent.childNodes[index];
+            if (node.tagName === 'slot') {
+                // Resolve this operation and preserve independent ownership
+                const name = node.attrs?.find((attribute) => attribute.name === 'name')?.value || 'default',
+                    replacement = parseFragment(
+                        `<div style="display: contents" data-acl-slot="${escapeAttribute(name)}"></div>`,
+                    ).childNodes[0];
+                replacement.childNodes = values.has(name) ? structuredClone(values.get(name)) : node.childNodes || [];
+                // Resolve this operation and preserve independent ownership
+                replacement.childNodes.forEach((child) => {
+                    child.parentNode = replacement;
+                });
+                replacement.parentNode = parent;
+                parent.childNodes[index] = replacement;
+            } else {
                 visit(node);
                 if (node.content) visit(node.content);
             }
-        };
-    visit(fragment);
-    return serialize(fragment);
+        }
+    };
+    visit(tree);
+    return serialize(tree);
 };
 
 const serializeInitialData = (value, maxBytes) => {
@@ -449,17 +443,24 @@ const resolvePolicyData = // Run this operation
             const controller = new AbortController(),
                 timer = setTimeout(
                     // Run this operation
-                    () => controller.abort('Data timeout'),
+                    () => controller.abort(new DOMException('Data timeout', 'AbortError')),
                     policy.timeout,
-                );
+                ),
+                // Resolve this operation and preserve independent ownership
+                abort = () => controller.abort(context.signal.reason);
+            if (context.signal?.aborted) abort();
+            else context.signal?.addEventListener('abort', abort, { once: true });
             // Process try
             try {
-                const response = await fetchImpl(url, {
-                    // Configure this value
-                    ...options,
-                    redirect: 'manual',
-                    signal: controller.signal,
-                });
+                const response = await withSignal(
+                    fetchImpl(url, {
+                        // Configure this value
+                        ...options,
+                        redirect: 'manual',
+                        signal: controller.signal,
+                    }),
+                    controller.signal,
+                );
                 if ([301, 302, 303, 307, 308].includes(response.status)) {
                     const location = response.headers.get('location');
                     await response.body?.cancel?.().catch(
@@ -496,7 +497,12 @@ const resolvePolicyData = // Run this operation
                 const contentType = (response.headers.get('content-type') || '').toLowerCase();
                 if (!contentType.includes('application/json') && !/application\/[a-z0-9.+-]+\+json\b/.test(contentType))
                     throw new TypeError('[ACL SSR] Data request did not return JSON.');
-                const text = await readResponseText(response, policy.maxResponseBytes, 'Data response');
+                const text = await readResponseText(
+                    response,
+                    policy.maxResponseBytes,
+                    'Data response',
+                    controller.signal,
+                );
                 let parsed;
                 // Process try
                 try {
@@ -507,6 +513,7 @@ const resolvePolicyData = // Run this operation
                 return parsed;
             } finally {
                 clearTimeout(timer);
+                context.signal?.removeEventListener('abort', abort);
             }
         }
         throw new TypeError('[ACL SSR] Data redirect limit exceeded.');
@@ -514,6 +521,7 @@ const resolvePolicyData = // Run this operation
 
 export const createSSRRenderer = ({
     manifest,
+    concurrency = 8,
     root,
     fetch: customFetch = null,
     resolver = null,
@@ -537,7 +545,13 @@ export const createSSRRenderer = ({
                 (component) => [component.tagName, component],
             ),
         ),
-        cache = new Map();
+        cache = new Map(),
+        // Resolve this operation and preserve independent ownership
+        requests = createTemplateRequests(new Map(), () => concurrency);
+    if (!Number.isInteger(concurrency) || concurrency < 1)
+        throw new TypeError('SSR concurrency must be a positive integer');
+    let cacheGeneration = 0;
+
     let resolvedRootPromise = null;
     const getRoot = async () => {
         // Resolve the required local project root through symlinks once
@@ -545,7 +559,7 @@ export const createSSRRenderer = ({
         return (resolvedRootPromise ||= realpath(resolve(root)));
     };
 
-    const fetchRemote = async (initial) => {
+    const fetchRemote = async (initial, signal) => {
         // Fetch a remote template through validated bounded redirects
         let url = new URL(initial);
         const fetchImpl = customFetch || globalThis.fetch;
@@ -556,14 +570,21 @@ export const createSSRRenderer = ({
             const controller = new AbortController(),
                 timer = setTimeout(() => {
                     // Abort remote template reads at the configured deadline
-                    controller.abort('Template timeout');
-                }, timeout);
+                    controller.abort(new DOMException('Template timeout', 'AbortError'));
+                }, timeout),
+                // Resolve this operation and preserve independent ownership
+                abort = () => controller.abort(signal.reason);
+            if (signal?.aborted) abort();
+            else signal?.addEventListener('abort', abort, { once: true });
             // Guard the fetch remote operation against runtime failures
             try {
-                const response = await fetchImpl(url, {
-                    redirect: 'manual',
-                    signal: controller.signal,
-                });
+                const response = await withSignal(
+                    fetchImpl(url, {
+                        redirect: 'manual',
+                        signal: controller.signal,
+                    }),
+                    controller.signal,
+                );
                 if ([301, 302, 303, 307, 308].includes(response.status)) {
                     const location = response.headers.get('location');
                     await response.body?.cancel?.().catch(() => {
@@ -576,24 +597,28 @@ export const createSSRRenderer = ({
                 }
                 if (!response.ok)
                     throw new TypeError(`[ACL SSR] Template request failed with HTTP ${response.status}.`);
-                return await readResponseText(response, maxTemplateBytes);
+                return await readResponseText(response, maxTemplateBytes, 'Template', controller.signal);
             } finally {
                 clearTimeout(timer);
+                signal?.removeEventListener('abort', abort);
             }
         }
         throw new TypeError('[ACL SSR] Template redirect limit exceeded.');
     };
 
-    const loadTemplate = async (definition) => {
+    const loadTemplate = async (definition, signal) => {
         // Load verify and cache one local or remote template source
         const source =
-                typeof resolver === 'function' ? await resolver(definition.source, definition) : definition.source,
+                typeof resolver === 'function'
+                    ? await withSignal(resolver(definition.source, definition, { signal }), signal)
+                    : definition.source,
             key = `${source}::${definition.options?.templateRevision || ''}`;
         if (cache.has(key)) return cache.get(key);
-        const task = (async () => {
+        const generation = cacheGeneration;
+        return await requests.subscribe(key, { signal }, async (ownership) => {
             // Run the task operation
             let text;
-            if (/^https:/i.test(source)) text = await fetchRemote(source);
+            if (/^https:/i.test(source)) text = await fetchRemote(source, ownership.signal);
             else {
                 if (typeof source !== 'string' || source.startsWith('#') || /^[A-Za-z][A-Za-z\d+.-]*:/.test(source))
                     throw new TypeError(`[ACL SSR] Unsupported template source: ${source}`);
@@ -606,21 +631,22 @@ export const createSSRRenderer = ({
                     throw new TypeError(`[ACL SSR] Template source escapes or resolves to the project root: ${source}`);
                 if (!(await stat(actual)).isFile())
                     throw new TypeError(`[ACL SSR] Template source is not a file: ${source}`);
-                text = await readFile(actual, 'utf8');
+                text = await readFile(actual, {
+                    encoding: 'utf8',
+                    signal: ownership.signal,
+                });
                 if (textEncoder.encode(text).byteLength > maxTemplateBytes)
                     throw new TypeError(`[ACL SSR] Template exceeds ${maxTemplateBytes} bytes.`);
             }
             ensureRevision(text, definition.options?.templateRevision);
-            return text;
-        })();
-        cache.set(key, task);
-        // Guard the load template operation against runtime failures
-        try {
-            return await task;
-        } catch (error) {
-            cache.delete(key);
-            throw error;
-        }
+            ownership.ensureActive();
+            const loaded = {
+                text,
+                tree: parseFragment(text),
+            };
+            if (cacheGeneration === generation) cache.set(key, loaded);
+            return loaded;
+        });
     };
 
     if (dataResolver != null && typeof dataResolver !== 'function')
@@ -628,6 +654,7 @@ export const createSSRRenderer = ({
     if (!Number.isInteger(maxDataBytes) || maxDataBytes <= 0)
         throw new TypeError('[ACL SSR] maxDataBytes must be a positive integer.');
 
+    // Resolve this operation and preserve independent ownership
     const render = async (
         tagName,
         {
@@ -638,8 +665,10 @@ export const createSSRRenderer = ({
             lightDom = renderLightDom,
             hydrate = null,
             hydrateMedia = null,
+            signal,
         } = {},
     ) => {
+        if (signal?.aborted) throw signal.reason;
         // Render one manifest component with sanitized declarative shadow markup
         const tag = String(tagName || '').toLowerCase(),
             definition = definitions.get(tag);
@@ -650,11 +679,16 @@ export const createSSRRenderer = ({
             throw new TypeError(`[ACL SSR] Unsupported hydration mode "${hydrationMode}".`);
         if (hydrationMode === 'media' && !String(hydrationMedia || '').trim())
             throw new TypeError('[ACL SSR] Media hydration requires hydrateMedia.');
-        const propDefinitions = definition.options?.attributes || {},
+        const renderContext = {
+                tagName: tag,
+                signal,
+            },
+            propDefinitions = definition.options?.attributes || {},
             hostAttributes = renderAttributes(attributes, props, propDefinitions),
-            slotHtml = renderSlots(slots, security, { tagName: tag }),
+            slotHtml = definition.options?.shadow || !lightDom ? renderSlots(slots, security, renderContext) : '',
             dataContext = {
                 tagName: tag,
+                signal,
                 props: structuredClone(props),
                 attributes: structuredClone(attributes),
                 slots: structuredClone(slots),
@@ -662,38 +696,48 @@ export const createSSRRenderer = ({
             },
             resolvedData =
                 dataResolver && resolveData
-                    ? await dataResolver({
-                          ...dataContext,
-                      })
+                    ? await withSignal(dataResolver({ ...dataContext }), signal)
                     : normalizedDataPolicy && resolveData
-                      ? await resolvePolicyData(normalizedDataPolicy, definition, dataContext)
+                      ? await withSignal(resolvePolicyData(normalizedDataPolicy, definition, dataContext), signal)
                       : undefined,
             dataHtml = resolvedData === undefined ? '' : serializeInitialData(resolvedData, maxDataBytes),
             hydrationAttributes =
                 (hydrationMode === 'eager' ? '' : ` hydrate="${escapeAttribute(hydrationMode)}"`) +
                 (hydrationMedia ? ` hydrate-media="${escapeAttribute(hydrationMedia)}"` : '');
         if (!definition.options?.shadow && !lightDom) return `<${tag}${hostAttributes}>${slotHtml}${dataHtml}</${tag}>`;
-        const source = await loadTemplate(definition),
-            safeTemplate = sanitizeSSRHtml(source, security, { tagName: tag }),
+        const loaded = await loadTemplate(definition, signal),
+            tree = sanitizeTree(structuredClone(loaded.tree), security, renderContext),
+            safeTemplate = definition.options?.shadow ? serialize(tree) : '',
             revision = definition.options?.templateRevision || '';
         if (!definition.options?.shadow)
-            return `<${tag}${hostAttributes}${hydrationAttributes} data-acl-ssr="1" data-acl-revision="${escapeAttribute(revision)}">${renderLightTemplate(source, slots, security, { tagName: tag })}${dataHtml}</${tag}>`;
+            return `<${tag}${hostAttributes}${hydrationAttributes} data-acl-ssr="1" data-acl-revision="${escapeAttribute(revision)}">${renderLightTemplate(tree, slots, security, renderContext)}${dataHtml}</${tag}>`;
         return `<${tag}${hostAttributes}${hydrationAttributes} data-acl-ssr="1" data-acl-revision="${escapeAttribute(revision)}"><template data-acl-ssr-shadow shadowrootmode="open" shadowrootserializable>${safeTemplate}</template>${slotHtml}${dataHtml}</${tag}>`;
     };
 
     return {
         render,
-        // Render multiple independent requests concurrently
-        renderMany: (requests) =>
-            Promise.all(
-                Array.from(
-                    requests || [],
-                    // Transform the current item
-                    (request) => render(request.tagName, request),
-                ),
-            ),
-        // Clear every cached template promise
-        clearCache: () => cache.clear(),
+        // Stream ordered HTML while bounding both execution and buffered results
+        renderStream: (items, options = {}) =>
+            renderOrderedBatch(items, render, {
+                concurrency,
+                ...options,
+            }),
+        async renderMany(items, options = {}) {
+            // Collect the same backpressured engine for existing array consumers
+            const output = [];
+            // Process queued work in a bounded deterministic order
+            for await (const html of renderOrderedBatch(items, render, {
+                concurrency,
+                ...options,
+            }))
+                output.push(html);
+            return output;
+        },
+        // Invalidate cached source and trees without reviving entries from older reads
+        clearCache: () => {
+            cacheGeneration++;
+            cache.clear();
+        },
     };
 };
 

@@ -32,46 +32,79 @@ const createRouteHost = (routeKey) => {
         tip.textContent = 'Edit this template while Vite is running to see a targeted, state-preserving reload.';
         host.append(tip);
     } else {
-        host.setAttribute('account-id', 'acct-2048');
+        host.setAttribute('accountId', 'acct-2048');
         host.setAttribute('plan', 'pro');
     }
     return host;
 };
 
-const waitForHost = (host) =>
+// Release readiness listeners when a route is superseded or its application stops
+const waitForHost = (host, signal) =>
     new Promise((resolve, reject) => {
-        host.addEventListener('loaded', resolve, { once: true });
-        host.addEventListener(
-            'acl:error',
-            (event) => reject(event.detail?.error || new Error('The route component failed to load.')),
-            { once: true },
-        );
+        const cleanup = () => {
+                host.removeEventListener('loaded', ready);
+                host.removeEventListener('acl:error', fail);
+                signal.removeEventListener('abort', cancel);
+            },
+            ready = () => {
+                cleanup();
+                resolve();
+            },
+            fail = (event) => {
+                cleanup();
+                reject(event.detail?.error || new Error('Route component failed'));
+            },
+            cancel = () => {
+                cleanup();
+                reject(new DOMException('Route superseded', 'AbortError'));
+            };
+        if (signal.aborted) {
+            cancel();
+            return;
+        }
+        host.addEventListener('loaded', ready, { once: true });
+        host.addEventListener('acl:error', fail, { once: true });
+        signal.addEventListener('abort', cancel, { once: true });
     });
 
-export const startRouter = async ({ outlet, status, title }) => {
+export const startRouter = async ({ outlet, status, title, Loader }) => {
+    let renderController = null,
+        prefetchController = null,
+        stopped = false;
     let generation = 0;
 
     const render = async (routeKey, { history = false } = {}) => {
         const route = routes[routeKey] || routes.home,
             activeKey = routes[routeKey] ? routeKey : 'home',
             currentGeneration = ++generation;
+        renderController?.abort();
+        renderController = new AbortController();
+        const signal = renderController.signal;
+        prefetchController?.abort();
+        outlet.replaceChildren();
         status.dataset.state = 'loading';
         status.textContent = `Loading the ${activeKey} shard…`;
         const registration = await registerRoute(activeKey);
-        if (currentGeneration !== generation) return;
+        if (stopped || currentGeneration !== generation) return;
 
         const host = createRouteHost(activeKey),
-            ready = waitForHost(host);
+            ready = waitForHost(host, signal);
         outlet.replaceChildren(host);
         title.textContent = route.title;
-        if (history) globalThis.history.pushState({ routeKey: activeKey }, '', routeHref(route));
+        if (history) globalThis.history.pushState({ routeKey: activeKey }, '', routeHref(route) + location.search);
         document.querySelectorAll('[data-route]').forEach((link) => {
-            link.setAttribute('href', routeHref(routes[link.dataset.route]));
+            link.setAttribute('href', routeHref(routes[link.dataset.route]) + location.search);
             if (link.dataset.route === activeKey) link.setAttribute('aria-current', 'page');
             else link.removeAttribute('aria-current');
         });
-        await ready;
-        if (currentGeneration !== generation) return;
+        // A newer navigation owns the UI after this readiness wait is canceled
+        try {
+            await ready;
+        } catch (error) {
+            if (signal.aborted) return;
+            throw error;
+        }
+        if (stopped || currentGeneration !== generation) return;
         status.dataset.state = 'ready';
         status.textContent = `${route.title} ready · ${registration.registered.length} components`;
     };
@@ -101,12 +134,35 @@ export const startRouter = async ({ outlet, status, title }) => {
             });
         };
 
+    // Warm intent-selected route templates, and cancel speculative ownership before a navigation
+    const onIntent = async (event) => {
+        const link = event.target.closest?.('[data-route]');
+        if (!link || stopped) return;
+        prefetchController?.abort();
+        const current = (prefetchController = new AbortController());
+        try {
+            await registerRoute(link.dataset.route);
+            if (stopped || current.signal.aborted) return;
+            await Loader.prefetchGraph([routes[link.dataset.route].tagName], { signal: current.signal });
+        } catch (error) {
+            if (!current.signal.aborted) console.warn('Route prefetch failed', error);
+        }
+    };
+    document.addEventListener('pointerover', onIntent);
+    document.addEventListener('focusin', onIntent);
     document.addEventListener('click', onNavigate);
     globalThis.addEventListener('popstate', onPopState);
     await render(currentRouteKey());
 
     return {
         stop() {
+            stopped = true;
+            generation++;
+            renderController?.abort();
+            prefetchController?.abort();
+            outlet.replaceChildren();
+            document.removeEventListener('pointerover', onIntent);
+            document.removeEventListener('focusin', onIntent);
             document.removeEventListener('click', onNavigate);
             globalThis.removeEventListener('popstate', onPopState);
         },

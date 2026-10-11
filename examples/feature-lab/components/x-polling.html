@@ -34,12 +34,17 @@
 <div x-data="{ paused: false }">
     <strong>Polling request <span x-text="$props.payload?.count || 0"></span></strong>
     <p
-        x-text="paused ? `Paused manually · ${$props.payload?.at || 'waiting'}` : ($props.payload ? `${$props.payload.state} · ${$props.payload.at}` : 'Starting poll…')">
-    </p>
+        x-text="paused ? `Paused manually · ${$props.payload?.at || 'waiting'}` : ($props.payload ? `${$props.payload.state} · ${$props.payload.at}` : 'Starting poll…')"
+    ></p>
     <div class="actions">
-        <button :disabled="paused"
-            @click="paused = true; $el.getRootNode().host.setAttribute('data-fetch-poll', '0')">Pause</button>
-        <button :disabled="!paused"
-            @click="paused = false; $el.getRootNode().host.setAttribute('data-fetch-poll', '1000')">Resume</button>
+        <button :disabled="paused" @click="paused = true; $el.getRootNode().host.setAttribute('data-fetch-poll', '0')">
+            Pause
+        </button>
+        <button
+            :disabled="!paused"
+            @click="paused = false; $el.getRootNode().host.setAttribute('data-fetch-poll', '1000')"
+        >
+            Resume
+        </button>
     </div>
 </div>

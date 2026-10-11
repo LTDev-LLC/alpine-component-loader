@@ -1,3 +1,4 @@
+import { selectRuntimeModules, resolveRuntimeModuleRecords } from './module-preloads.mjs';
 import { createHash } from 'node:crypto';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { dirname, extname, relative, resolve, sep } from 'node:path';
@@ -313,6 +314,7 @@ export const generateOfflineBundle = async ({
     outDir,
     groups = [],
     assets = [],
+    runtime = null,
     baseUrl = '/',
     minifyJavaScriptAssets = false,
     force = false,
@@ -342,7 +344,8 @@ export const generateOfflineBundle = async ({
         ),
         manifestDirectory = dirname(manifestFile),
         normalizedBaseUrl = normalizeBaseUrl(baseUrl),
-        assetRecords = new Map();
+        assetRecords = new Map(),
+        contentFeatures = new Set();
 
     // Hash local component assets while treating remote dependencies as optional
     for (const tag of tags) {
@@ -353,10 +356,27 @@ export const generateOfflineBundle = async ({
                 url = resolveBrowserAsset(normalizedBaseUrl, rawManifest.basePath, source);
             if (assetRecords.has(url)) continue;
             let revision = definition.options?.templateRevision || null;
+            if (
+                remote &&
+                [definition.source, definition.options?.loadingTemplate, definition.options?.fallback].includes(source)
+            ) {
+                contentFeatures.add('styles');
+                contentFeatures.add('slots');
+            }
             if (!remote) {
                 // Guard the generate offline bundle operation against runtime failures
                 try {
-                    revision ||= `sha256-${hash(await readFile(localFileFor(manifestDirectory, rawManifest.basePath, source)))}`;
+                    const bytes = await readFile(localFileFor(manifestDirectory, rawManifest.basePath, source));
+                    revision ||= `sha256-${hash(bytes)}`;
+                    if (
+                        [definition.source, definition.options?.loadingTemplate, definition.options?.fallback].includes(
+                            source,
+                        )
+                    ) {
+                        const html = bytes.toString();
+                        if (/<style\b/i.test(html)) contentFeatures.add('styles');
+                        if (/<slot\b/i.test(html)) contentFeatures.add('slots');
+                    }
                 } catch (error) {
                     throw new TypeError(`Offline asset does not exist for <${tag}>: ${source} (${error.message})`);
                 }
@@ -366,6 +386,30 @@ export const generateOfflineBundle = async ({
                 revision: revision || `url-${hash(source)}`,
                 required: !remote,
                 component: tag,
+            });
+        }
+    }
+
+    if (runtime) {
+        const paths = await selectRuntimeModules({
+            manifest: rawManifest,
+            groups,
+            features: [...contentFeatures, ...(runtime.features || [])],
+            entryUrl: runtime.entryUrl,
+            all: true,
+        });
+        // Process queued work in a bounded deterministic order
+        for (const { path, url } of await resolveRuntimeModuleRecords(runtime.entryUrl, paths)) {
+            const remote = isRemote(url),
+                deliveryPath = new URL(url, 'https://acl.invalid/').pathname.endsWith('.min.js')
+                    ? path.replace(/\.js$/, '.min.js')
+                    : path,
+                bytes = await readFile(new URL(`../dist/${deliveryPath}`, import.meta.url));
+            assetRecords.set(url, {
+                url,
+                revision: remote ? `url-${hash(url)}` : `sha256-${hash(bytes)}`,
+                required: !remote,
+                component: null,
             });
         }
     }

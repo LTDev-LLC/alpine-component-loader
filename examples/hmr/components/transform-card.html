@@ -1,0 +1,14 @@
+<style>
+    .transform-probe {
+        padding: 1rem;
+        border: 2px solid #2563eb;
+    }
+</style>
+<div class="transform-probe">
+    <h3>Transformation reload probe</h3>
+    <slot><p>Fallback slot content</p></slot>
+    <label>Preserved draft <input data-acl-preserve-key="transform-draft" /></label>
+</div>
+<script>
+    window.hmrScriptExecutions = (window.hmrScriptExecutions || 0) + 1;
+</script>

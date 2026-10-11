@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
+import { alpineRuntime } from '../../scripts/alpine-runtime.mjs';
 import {
     createStagedPackageImports,
     normalizeExampleNames,
@@ -16,7 +17,7 @@ import {
 } from '../../scripts/stage-example.mjs';
 
 const repositoryRoot = resolve('.'),
-    alpineUrl = 'https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js',
+    alpineUrl = alpineRuntime.cdnUrl,
     staticExamples = ['a11y', 'feature-lab', 'offline', 'playground'];
 
 const createSkeletonDependencies = (calls = []) => ({
@@ -226,11 +227,6 @@ test('stage selection accepts static examples and rejects backend or unsafe targ
         /development HMR server/,
     );
     assert.throws(
-        // Reject the focused SSR example
-        () => validateExampleName('ssr'),
-        /SSR server/,
-    );
-    assert.throws(
         // Reject the SSR feature lab
         () => validateExampleName('feature-lab-ssr'),
         /SSR server/,
@@ -249,8 +245,8 @@ test('stage selection accepts static examples and rejects backend or unsafe targ
 
 test('stage selections default, deduplicate, and retain first command-line order', () => {
     // Normalize empty, repeated, and reordered selector lists
-    assert.deepEqual(normalizeExampleNames(), ['playground']);
-    assert.deepEqual(normalizeExampleNames([]), ['playground']);
+    assert.deepEqual(normalizeExampleNames(), staticExamples);
+    assert.deepEqual(normalizeExampleNames([]), staticExamples);
     assert.deepEqual(normalizeExampleNames(['offline', 'a11y', 'offline', 'playground', 'a11y']), [
         'offline',
         'a11y',
@@ -281,7 +277,11 @@ test('every static source selects the exact pinned Alpine CDN runtime', async ()
     for (const name of staticExamples) {
         const source = await readFile(resolve('examples', name, 'index.html'), 'utf8'),
             expected = `<script defer src="${alpineUrl}"></script>`;
-        assert.equal(source.split(expected).length - 1, 1, `${name} must select the pinned Alpine CDN once`);
+        assert.equal(
+            source.split(expected).length - 1 + source.split(`data-alpine="${alpineUrl}"`).length - 1,
+            1,
+            `${name} must select the pinned Alpine CDN once`,
+        );
     }
     const playground = await readFile(resolve('examples/playground/playground.js'), 'utf8');
     assert.match(playground, new RegExp(`alpineUrl = '${alpineUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'`));
@@ -334,6 +334,16 @@ test('each supported example produces a direct-import-map static artifact', asyn
             new RegExp(`examples/${name}/index.html`),
         );
         assert.equal((await stat(resolve(outputRoot, 'dist/index.min.js'))).isFile(), true);
+        assert.deepEqual(
+            await readFile(resolve(outputRoot, 'dist/index.min.js')),
+            await readFile(resolve(repositoryRoot, 'dist/index.min.js')),
+        );
+        assert.ok(
+            (await collectFiles(resolve(outputRoot, 'dist'))).every(
+                // Staging must not transform already minified files into .min.min.js identities
+                ({ path }) => path.endsWith('.min.js') && !path.endsWith('.min.min.js'),
+            ),
+        );
         assert.equal((await stat(resolve(outputRoot, 'examples', name, 'skeletons/acl-skeletons.css'))).isFile(), true);
         await assert.rejects(stat(resolve(outputRoot, 'node_modules')), /ENOENT/);
         await assert.rejects(stat(resolve(outputRoot, 'styles.css')), /ENOENT/);
@@ -436,7 +446,7 @@ test('multiple examples produce an ordered Feature Lab styled catalog and one sh
     assert.match(catalog, /Test a generated precache graph, navigation fallback, runtime caching/);
     assert.match(catalog, /Run component audits, inspect scanner results/);
     assert.match(catalog, /Edit a complete ACL dashboard with incremental HMR/);
-    assert.match(catalog, /LTDev LLC · MIT License/);
+    assert.match(catalog, /LouisT · MIT License/);
     assert.match(catalog, /alpine-component-loader\/issues/);
     assert.match(catalog, /href="https:\/\/alpinejs\.dev\/"[^>]*>Alpine\.js<\/a>/);
     assert.match(catalog, /href="#top">Back to top/);
@@ -453,7 +463,8 @@ test('multiple examples produce an ordered Feature Lab styled catalog and one sh
         assert.match(entry, /data-acl-stage-skeletons/);
         assert.equal((await stat(resolve(outputRoot, 'examples', name, 'skeletons/acl-skeletons.css'))).isFile(), true);
     }
-    await assert.rejects(stat(resolve(outputRoot, 'examples/feature-lab')), /ENOENT/);
+    await assert.rejects(stat(resolve(outputRoot, 'examples/feature-lab/index.html')), /ENOENT/);
+    assert.equal((await stat(resolve(outputRoot, 'examples/feature-lab/demos/launcher.js'))).isFile(), true);
     assert.equal((await stat(resolve(outputRoot, 'dist/index.min.js'))).isFile(), true);
     assert.equal((await stat(resolve(outputRoot, 'examples/offline/app.min.js'))).isFile(), true);
     // Require every mapped browser export to exist in the one shared distribution
@@ -528,7 +539,7 @@ test('staging is reproducible and preserves existing output after a failure', as
     await assert.rejects(
         stageExamples(
             {
-                names: ['playground', 'ssr', 'a11y'],
+                names: ['playground', 'feature-lab-ssr', 'a11y'],
                 root: repositoryRoot,
                 outputRoot: protectedOutput,
             },

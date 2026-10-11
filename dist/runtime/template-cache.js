@@ -1,5 +1,5 @@
 // @license AlpineComponentLoader
-// Copyright (c) LTDev LLC
+// Copyright (c) LouisT
 // Licensed under the MIT license in the repository root
 
 // Store cache bookkeeping in private response headers alongside template content
@@ -11,6 +11,7 @@ const HEADER_PREFIX = 'acl__', HEADERS = {
     revision: `${HEADER_PREFIX}revision__`
 }, HYDRATION_CONCURRENCY = 8, CACHE_HANDLE_LIMIT = 16;
 let cacheIndexes = new WeakMap(), cacheHandlePromises = new Map();
+const pendingCacheWrites = new WeakMap();
 // Isolate authored template revisions without changing their source identity
 const appendRevision = (source, revision)=>{
     if (!revision) return source;
@@ -83,15 +84,15 @@ export const invalidateTemplateCacheHandle = (cacheKey = null)=>{
     cacheHandlePromises.delete(String(cacheKey));
 };
 export const settleTemplateCacheWrites = async (cache, request = null)=>{
-    // Let detached access-metadata writes finish before explicit entry deletion
-    const index = cacheIndexes.get(cache);
-    if (!index) return;
-    const pending = request == null ? [
-        ...index.writes.values()
-    ] : [
-        index.writes.get(requestUrl(request))
-    ];
-    await Promise.allSettled(pending.filter(Boolean));
+    // Drain foreground and metadata writes even after their metadata index was invalidated
+    const pending = pendingCacheWrites.get(cache);
+    if (!pending) return;
+    // Resolve the queued operation and release its resources
+    await Promise.allSettled([
+        ...pending
+    ]// Resolve the queued operation and release its resources
+    .filter((entry)=>request == null || entry.request === requestUrl(request))// Resolve the queued operation and release its resources
+    .map((entry)=>entry.promise));
 };
 export const touchTemplateCacheEntry = (cache, requestKey, text, response, { source, revision = null, ttl, fetchedAt = Date.now(), lastAccess = Date.now() } = {}, { coalesceMs = 1000 } = {})=>{
     // Update in-memory LRU order and construct a replacement response only when persistence is due
@@ -218,7 +219,7 @@ export const isQuotaError = (error)=>{
     return error?.name === 'QuotaExceededError' || error?.code === 22;
 };
 // Retry once after caller-managed pruning when browser storage reaches quota
-export const writeTemplateCacheEntry = async (cache, requestKey, response, { onQuota, coalesceMs = 0 } = {})=>{
+export const writeTemplateCacheEntry = async (cache, requestKey, response, { onQuota, coalesceMs = 0, isCurrent } = {})=>{
     const request = requestUrl(requestKey), interval = Math.max(0, Number(coalesceMs) || 0), index = getCacheIndex(cache), current = index.entries.get(request), entry = describeTemplateCacheResponse({
         url: request
     }, response);
@@ -233,7 +234,9 @@ export const writeTemplateCacheEntry = async (cache, requestKey, response, { onQ
     const persist = async ()=>{
         // Guard the write template cache entry operation against runtime failures
         try {
+            if (isCurrent && !isCurrent()) return false;
             await cache.put(requestKey, response.clone());
+            if (isCurrent && !isCurrent()) return false;
             recordTemplateCacheResponse(cache, requestKey, response, {
                 preserveNewer: interval > 0
             });
@@ -244,7 +247,9 @@ export const writeTemplateCacheEntry = async (cache, requestKey, response, { onQ
             await onQuota?.();
             // Guard the retried template cache write against runtime failures
             try {
+                if (isCurrent && !isCurrent()) return false;
                 await cache.put(requestKey, response.clone());
+                if (isCurrent && !isCurrent()) return false;
                 recordTemplateCacheResponse(cache, requestKey, response, {
                     preserveNewer: interval > 0
                 });
@@ -254,14 +259,108 @@ export const writeTemplateCacheEntry = async (cache, requestKey, response, { onQ
             }
         }
     };
-    if (interval === 0) return await persist();
-    const writing = persist();
-    index.writes.set(request, writing);
+    const writing = persist(), pending = pendingCacheWrites.get(cache) || new Set(), ownership = {
+        request,
+        promise: writing
+    };
+    pendingCacheWrites.set(cache, pending);
+    pending.add(ownership);
+    if (interval > 0) index.writes.set(request, writing);
     // Keep the coalescing registry aligned with the detached write lifetime
     try {
         return await writing;
     } finally{
+        pending.delete(ownership);
+        if (!pending.size) pendingCacheWrites.delete(cache);
         if (index.writes.get(request) === writing) index.writes.delete(request);
     }
 };
 export const TEMPLATE_CACHE_HEADERS = HEADERS;
+// Bind public cache management to explicit loader ownership
+export const createTemplateCacheManager = (AlpineComponentLoader)=>{
+    const state = AlpineComponentLoader._context;
+    // Expose the already active persistent backend to cache management operations
+    const loadTemplateCacheRuntime = async ()=>({
+            invalidateTemplateCacheHandle,
+            invalidateTemplateCacheIndex,
+            openTemplateCache,
+            settleTemplateCacheWrites,
+            getTemplateCacheRequestKey,
+            listTemplateCacheEntries,
+            pruneTemplateCacheEntries,
+            reconcileTemplateCacheEntries,
+            describeTemplateCacheResponse,
+            TEMPLATE_CACHE_HEADERS
+        });
+    class Manager {
+        static async clearTemplateCaches(prefix = AlpineComponentLoader.globalConfig._templateCachePrefix) {
+            // Remove every persistent template cache under the requested prefix
+            state.templateGeneration++;
+            if (!('caches' in window)) {
+                AlpineComponentLoader._report('warn', '[ACL] Cache API not supported.', null, {
+                    phase: 'cache'
+                });
+                return;
+            }
+            const { invalidateTemplateCacheHandle, invalidateTemplateCacheIndex, openTemplateCache, settleTemplateCacheWrites } = await loadTemplateCacheRuntime(), cacheKeys = (await caches.keys()).filter(// Select matching items
+            (key)=>key.startsWith(prefix));
+            await Promise.all(cacheKeys.map(async (key)=>{
+                // Drain detached access writes before deleting one explicit bucket
+                try {
+                    const cache = await openTemplateCache(key);
+                    await settleTemplateCacheWrites(cache);
+                    invalidateTemplateCacheIndex(cache);
+                } catch  {
+                // Continue with explicit bucket deletion when a handle cannot open
+                }
+                invalidateTemplateCacheHandle(key);
+            }));
+            invalidateTemplateCacheIndex();
+            // Delete every template cache bucket using the requested prefix
+            return await Promise.all(cacheKeys.map(// Transform the current item
+            (key)=>caches.delete(key)));
+        }
+        static async clearTemplate(source, cacheKey = AlpineComponentLoader.globalConfig._templateCacheKey) {
+            // Evict every persistent cache entry for one template source
+            state.templateGeneration++;
+            if (!('caches' in window)) return false;
+            const { invalidateTemplateCacheIndex, listTemplateCacheEntries, openTemplateCache, settleTemplateCacheWrites } = await loadTemplateCacheRuntime(), cache = await openTemplateCache(cacheKey);
+            await settleTemplateCacheWrites(cache);
+            const entries = await listTemplateCacheEntries(cache), matches = entries.filter(// Select matching items
+            (entry)=>entry.source === source || entry.request === source), results = await Promise.all(matches.map(// Transform the current item
+            (entry)=>cache.delete(entry.request)));
+            if (!matches.length) results.push(await cache.delete(source));
+            invalidateTemplateCacheIndex(cache);
+            return results.some(Boolean);
+        }
+        static async getTemplateCacheInfo(source = null, settings = AlpineComponentLoader.globalConfig) {
+            // Inspect persistent template cache metadata without exposing response bodies
+            if (typeof window === 'undefined' || !('caches' in window)) return source ? null : {
+                size: 0,
+                entries: []
+            };
+            const { listTemplateCacheEntries, openTemplateCache } = await loadTemplateCacheRuntime(), cache = await openTemplateCache(settings._templateCacheKey), entries = await listTemplateCacheEntries(cache), filtered = source == null ? entries : entries.filter(// Select matching items
+            (entry)=>entry.source === source);
+            return source == null ? {
+                size: entries.length,
+                entries
+            } : filtered[0] || null;
+        }
+        static async pruneTemplateCache({ max = AlpineComponentLoader.globalConfig.templateCacheMax } = {}) {
+            // Enforce the configured persistent template cache capacity
+            if (typeof window === 'undefined' || !('caches' in window)) return [];
+            const { openTemplateCache, pruneTemplateCacheEntries } = await loadTemplateCacheRuntime(), settings = AlpineComponentLoader.globalConfig, cache = await openTemplateCache(settings._templateCacheKey), evicted = await pruneTemplateCacheEntries(cache, {
+                max
+            });
+            evicted.forEach(// Process the current item
+            (entry)=>AlpineComponentLoader._dispatchRuntimeEvent('cacheevict', {
+                    phase: 'template',
+                    source: entry.source,
+                    cacheKey: settings._templateCacheKey,
+                    reason: entry.reason
+                }));
+            return evicted;
+        }
+    }
+    return Manager;
+};

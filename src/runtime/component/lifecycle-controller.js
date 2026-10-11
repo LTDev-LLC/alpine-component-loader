@@ -1,11 +1,46 @@
 // @license AlpineComponentLoader
-// Copyright (c) LTDev LLC
+// Copyright (c) LouisT
 // Licensed under the MIT license in the repository root
 
 const moduleSuffix = new URL(import.meta.url).pathname.endsWith('.min.js') ? '.min.js' : '.js',
     importLocalModule = (specifier) => import(/* @vite-ignore */ specifier.replace(/\.js$/, moduleSuffix)),
-    [{ DATA_CACHE_BOUND_ATTRIBUTES, DATA_FETCH_ATTRIBUTES, DATA_POLL_ATTRIBUTES }, { applyLifecycleState }] =
-        await Promise.all([importLocalModule('../data-options.js'), importLocalModule('../lifecycle.js')]);
+    [
+        {
+            DATA_CACHE_BOUND_ATTRIBUTES,
+            DATA_FETCH_ATTRIBUTES,
+            DATA_POLL_ATTRIBUTES,
+            readBooleanAttribute,
+            readNumberAttribute,
+            hasOwn,
+        },
+        { applyLifecycleState, createLifecycleEventDetail },
+        { ACLLoadError, toACLLoadError },
+        { toCssString, cloneRuntimeValue, parseJson },
+        { validateSchemaShape },
+    ] = await Promise.all([
+        importLocalModule('../config.js'),
+        importLocalModule('../lifecycle.js'),
+        importLocalModule('../errors.js'),
+        importLocalModule('../values.js'),
+        importLocalModule('../props.js'),
+    ]);
+// The required component group shares imports; optional behaviors remain behind activation gates
+let environment,
+    environmentPromise,
+    environmentAttempt = 0;
+
+// Share environmental activation and retries
+const loadEnvironment = (loader) => {
+    return (environmentPromise ||= loader._loadEnvironment(environmentAttempt++).then(
+        // Reuse the loaded module synchronously
+        (module) => (environment = module),
+        // Allow activation to retry after failure
+        (error) => {
+            environmentPromise = null;
+            throw error;
+        },
+    ));
+};
 
 // Private custom-element controller with definition context supplied by the facade
 export const withComponentLifecycle = (
@@ -100,6 +135,9 @@ export const withComponentLifecycle = (
             this._pollSignalCleanups = null;
             this._pollIntersectionObserver = null;
             this._pollIsIntersecting = true;
+            this._pollSetupGeneration = 0;
+            this._deferredSetupGeneration = 0;
+            this._pollSetupPending = false;
             this._alpinePropsScopeCleanup = null;
             this._cleanups = null;
             this._forwardEventCleanups = null;
@@ -362,24 +400,31 @@ export const withComponentLifecycle = (
         _startPolling() {
             this._stopPolling();
             const interval = parseInt(this.getAttribute('data-fetch-poll') || settings.data.poll);
-            if (isNaN(interval) || interval <= 0) return;
-            if (!this.isConnected) return;
-            this._attachPollingSignals();
-            if (this._isPollingPaused()) return;
-
-            // Start the next polling interval only while every pause condition is clear
-            this._pollTimer = setTimeout(async () => {
-                // Run the scheduled delayed task
-                if (!this.isConnected) return;
-
-                // Fetch data again
-                const src = this.getAttribute('data-src') || settings.data.src;
-                if (src && this._state === 'ready' && !this.$props.$loading && !this._isPollingPaused())
-                    await this._fetchData(src, true);
-
-                // Schedule next tick
-                this._startPolling();
-            }, interval);
+            if (!(interval > 0)) {
+                this._detachPollingSignals();
+                return;
+            }
+            if (!this.isConnected || this._pollDataPending) return;
+            const generation = this._pollSetupGeneration;
+            this._pollDataPending = true;
+            void this._ensureDataRuntime()
+                .then(() => {
+                    this._pollDataPending = false;
+                    if (
+                        this.isConnected &&
+                        generation === this._pollSetupGeneration &&
+                        !AlpineComponentLoader._disposed
+                    )
+                        this._startPolling();
+                })
+                .catch((error) => {
+                    this._pollDataPending = false;
+                    if (!this.isConnected || generation !== this._pollSetupGeneration) return;
+                    this._dispatchAcl('error', {
+                        error,
+                        phase: 'runtime-import',
+                    });
+                });
         }
 
         _stopPolling() {
@@ -389,63 +434,55 @@ export const withComponentLifecycle = (
             }
         }
 
-        _attachPollingSignals() {
-            if (this._pollSignalCleanups?.length) return;
-            // Restart polling only when every configured pause condition is clear
-            const resume = () => {
-                if (this.isConnected && !this._isPollingPaused()) this._startPolling();
-            };
-            if (this._getPollingPauseSetting('pause-polling-when-hidden', 'pauseWhenHidden')) {
-                document.addEventListener('visibilitychange', resume);
-                (this._pollSignalCleanups ||= []).push(
-                    // Capture the pushed value
-                    () => document.removeEventListener('visibilitychange', resume),
-                );
+        // Guard late module completion with independent polling and deferred-load ownership
+        _useEnvironment(polling, install) {
+            const field = polling ? '_pollSetupGeneration' : '_deferredSetupGeneration',
+                generation = this[field],
+                // Resolve the queued operation and release its resources
+                current = () =>
+                    this.isConnected &&
+                    !this._destroying &&
+                    !AlpineComponentLoader._disposed &&
+                    this[field] === generation &&
+                    (polling || this._state === 'deferred');
+            if (environment) {
+                if (current()) install(environment);
+                return true;
             }
-            if (this._getPollingPauseSetting('pause-polling-when-offline', 'pauseWhenOffline')) {
-                window.addEventListener('online', resume);
-                (this._pollSignalCleanups ||= []).push(
-                    // Capture the pushed value
-                    () => window.removeEventListener('online', resume),
-                );
-            }
-            if (this._getPollingPauseSetting('pause-polling-when-offscreen', 'pauseWhenOffscreen')) {
-                if ('IntersectionObserver' in window) {
-                    this._pollIsIntersecting = false;
-                    const observer = new IntersectionObserver((entries) => {
-                        // Process intersection changes
-                        const wasIntersecting = this._pollIsIntersecting,
-                            isIntersecting = entries.some(
-                                // Check the current item
-                                (entry) => entry.target === this && entry.isIntersecting,
-                            );
-                        this._pollIsIntersecting = isIntersecting;
-                        if (!isIntersecting) {
-                            this._stopPolling();
-                            return;
-                        }
-                        if (!wasIntersecting) resume();
+            if (polling && this._pollSetupPending) return false;
+            if (polling) this._pollSetupPending = true;
+            void loadEnvironment(AlpineComponentLoader)
+                .then((module) => {
+                    if (!current()) return;
+                    if (polling) this._pollSetupPending = false;
+                    install(module);
+                    if (polling) this._startPolling();
+                })
+                .catch((error) => {
+                    if (!current()) return;
+                    if (polling) this._pollSetupPending = false;
+                    else {
+                        this._cancelDeferredLoad();
+                        this._setLifecycleState('idle');
+                    }
+                    AlpineComponentLoader._report(
+                        'error',
+                        `[ACL] <${tagName}> environmental activation failed.`,
+                        error,
+                        { phase: 'runtime-import' },
+                    );
+                    this._dispatchAcl('error', {
+                        error,
+                        phase: 'runtime-import',
                     });
-                    this._pollIntersectionObserver = observer;
-                    observer.observe(this);
-                    (this._pollSignalCleanups ||= []).push(() => {
-                        // Capture the pushed value
-                        observer.disconnect();
-                        if (this._pollIntersectionObserver === observer) this._pollIntersectionObserver = null;
-                        this._pollIsIntersecting = true;
-                    });
-                } else this._pollIsIntersecting = true;
-            }
+                });
+            return false;
         }
 
         _detachPollingSignals() {
-            this._pollSignalCleanups?.forEach(
-                // Process the current item
-                (cleanup) => cleanup(),
-            );
-            this._pollSignalCleanups = null;
-            this._pollIntersectionObserver = null;
-            this._pollIsIntersecting = true;
+            this._pollSetupGeneration++;
+            this._pollSetupPending = false;
+            environment?.releasePollingSignals(this);
         }
 
         _addCleanup(cleanup) {
@@ -484,6 +521,7 @@ export const withComponentLifecycle = (
         }
 
         _cancelDeferredLoad() {
+            this._deferredSetupGeneration++;
             if (this._observer) {
                 this._observer.disconnect();
                 this._observer = null;
@@ -508,61 +546,63 @@ export const withComponentLifecycle = (
         }
 
         _initHydrationTrigger(mode) {
-            if (mode === 'visible') {
-                if (!('IntersectionObserver' in window)) {
-                    this._beginHydration();
-                    return;
-                }
-                const observer = new IntersectionObserver(
-                    // Run this operation
-                    (entries) => {
-                        if (
-                            entries.some(
-                                // Run this operation
-                                (entry) => entry.target === this && entry.isIntersecting,
-                            )
-                        )
-                            this._beginHydration();
-                    },
-                    { rootMargin: '100px' },
-                );
-                observer.observe(this);
-                this._observer = observer;
-                return;
-            }
-            if (mode === 'idle') {
-                this._initIdleLoader();
-                return;
-            }
-            if (mode === 'interaction') {
-                const start = // Run this operation
-                        () => this._beginHydration(),
-                    events = ['pointerover', 'touchstart', 'focusin'];
-                events.forEach((event) =>
-                    this.addEventListener(event, start, {
-                        // Configure this value
-                        capture: true,
-                        passive: true,
-                    }),
-                );
-                (this._hydrationCleanups ||= []).push(() =>
-                    events.forEach((event) => this.removeEventListener(event, start, { capture: true })),
-                );
-                return;
-            }
-            if (mode === 'media') {
-                const query = this.getAttribute('hydrate-media') || settings.hydrateMedia,
-                    media = window.matchMedia(query),
-                    change = // Run this operation
-                        () => {
-                            if (media.matches) this._beginHydration();
-                        };
-                if (media.matches) this._beginHydration();
-                else {
-                    media.addEventListener?.('change', change);
-                    (this._hydrationCleanups ||= []).push(() => media.removeEventListener?.('change', change));
-                }
-            }
+            this._activateTriggers(mode, '_initHydrationTrigger');
+        }
+
+        _activateTriggers(mode, method) {
+            const generation = this._deferredSetupGeneration,
+                // Reject deferred setup after ownership or connection changes
+                current = () =>
+                    this.isConnected &&
+                    this._state === 'deferred' &&
+                    !this._destroying &&
+                    !AlpineComponentLoader._disposed &&
+                    generation === this._deferredSetupGeneration;
+            let interacted = false;
+            const events = mode === 'interaction' ? ['pointerover', 'touchstart', 'focusin'] : [],
+                // Remember interaction while trigger implementation is loading
+                record = () => {
+                    interacted = true;
+                },
+                // Release early interaction listeners after activation or cancellation
+                release = () => events.forEach((name) => this.removeEventListener(name, record, true));
+            events.forEach((name) =>
+                this.addEventListener(name, record, {
+                    capture: true,
+                    passive: true,
+                }),
+            );
+            (this._hydrationCleanups ||= []).push(release);
+            void AlpineComponentLoader._loadModule('./component/triggers.js')
+                .then((module) => {
+                    release();
+                    if (!current()) return;
+                    const controller = module.withTriggers(class {}, { settings });
+                    // Install trigger methods only on this component instance
+                    for (const name of Reflect.ownKeys(controller.prototype)) {
+                        if (name !== 'constructor')
+                            Object.defineProperty(
+                                this,
+                                name,
+                                Object.getOwnPropertyDescriptor(controller.prototype, name),
+                            );
+                    }
+                    if (interacted) this._beginHydration();
+                    else this[method](mode);
+                })
+                .catch((error) => {
+                    release();
+                    if (!current()) return;
+                    this._cancelDeferredLoad();
+                    this._setLifecycleState('idle');
+                    AlpineComponentLoader._report('error', '[ACL] Deferred activation failed.', error, {
+                        phase: 'runtime-import',
+                    });
+                    this._dispatchAcl('error', {
+                        error,
+                        phase: 'runtime-import',
+                    });
+                });
         }
 
         _cancelAlpineWait(reason = 'Canceled') {
@@ -572,86 +612,14 @@ export const withComponentLifecycle = (
         }
 
         _initLazyObserver() {
-            if (!('IntersectionObserver' in window)) {
-                this._load();
-                return;
-            }
-            const placeholder = document.createElement('div');
-            placeholder.style.minHeight = '1px';
-            placeholder.setAttribute('data-acl-placeholder', '');
-            this._root.appendChild(placeholder);
-            this._observer = new IntersectionObserver(
-                (entries) => {
-                    // Process intersection changes
-                    if (entries[0].isIntersecting) {
-                        this._load();
-                        this._cancelDeferredLoad();
-                    }
-                },
-                { rootMargin: '100px' },
-            );
-            this._observer.observe(this);
+            this._activateTriggers('lazy', '_initLazyObserver');
         }
 
         _initIdleLoader() {
-            if ('requestIdleCallback' in window) {
-                this._idleCallbackId = requestIdleCallback(
-                    () => {
-                        // Run the scheduled idle task
-                        this._idleCallbackId = null;
-                        if (this.isConnected) {
-                            if (this._ssrHydration) this._beginHydration();
-                            else this._load();
-                        }
-                    },
-                    { timeout: 2000 },
-                );
-            } else {
-                this._idleTimeoutId = setTimeout(() => {
-                    // Run the scheduled delayed task
-                    this._idleTimeoutId = null;
-                    if (this.isConnected) {
-                        if (this._ssrHydration) this._beginHydration();
-                        else this._load();
-                    }
-                }, 200);
-            }
+            this._activateTriggers('idle', '_initIdleLoader');
         }
 
-        _initSlotObserver() {
-            if (this._slotObserver) return;
-
-            this._slotObserver = new MutationObserver(
-                // Process observed DOM mutations
-                (mutations) =>
-                    mutations.forEach((mutation) => {
-                        // Process the current item
-                        mutation.addedNodes.forEach((node) => {
-                            // Only handle Elements and Text nodes
-                            if (node.nodeType !== Node.ELEMENT_NODE && node.nodeType !== Node.TEXT_NODE) return;
-
-                            // Ignore the slot containers themselves if they trigger an add
-                            if (node.nodeType === Node.ELEMENT_NODE && node.hasAttribute('data-acl-slot')) return;
-                            if (node.nodeType === Node.ELEMENT_NODE && node.hasAttribute('data-acl-form-proxy')) return;
-
-                            // Determine target slot name + find the internal slot container
-                            const slotName =
-                                    (node.nodeType === Node.ELEMENT_NODE ? node.getAttribute('slot') : null) ||
-                                    'default',
-                                container = this._root.querySelector(`div[data-acl-slot="${slotName}"]`);
-
-                            // Move the node into the container
-                            if (container) {
-                                (this._lightSlotNodes ||= new Set()).add(node);
-                                container.appendChild(node);
-                            }
-                        });
-                    }),
-            );
-
-            // Only observe direct children additions
-            this._slotObserver.observe(this, { childList: true });
-        }
+        _initSlotObserver() {}
     }
 
     Object.entries(settings.attributes || {}).forEach(([name, definition]) => {
@@ -681,4 +649,1162 @@ export const withComponentLifecycle = (
         });
     });
     return Component;
+};
+
+// Compose the required controllers around one immutable definition context
+export const createComponentElementClass = ({ base, context, controllers }) => {
+    if (typeof base !== 'function')
+        throw new TypeError('[ACL] Component construction requires a browser HTMLElement base class.');
+    if (
+        !Array.isArray(controllers) ||
+        !controllers.length ||
+        controllers.some(
+            // Check the current item
+            (controller) => typeof controller !== 'function',
+        )
+    )
+        throw new TypeError('[ACL] Component construction requires implementation controllers.');
+    const definitionContext = Object.freeze({ ...(context || {}) }),
+        elementClass = controllers.reduce(
+            // Accumulate the current item
+            (current, controller) => controller(current, definitionContext),
+            base,
+        );
+    if (typeof elementClass !== 'function' || !(elementClass.prototype instanceof base))
+        throw new TypeError('[ACL] Component implementation factories must return an HTMLElement subclass.');
+    return elementClass;
+};
+
+let dataRuntimePromise = null;
+
+// Load and memoize optional data modules when a component first needs them
+const loadDataRuntime = (owner) => {
+    if (dataRuntimePromise) return dataRuntimePromise;
+    // Share one loading transaction and allow retries after a failed import
+    const loading = Promise.all([
+        owner._loadModule('./component/data-controller.js'),
+        owner._loadModule('./fetch-cache.js'),
+    ])
+        .then(([controller, cache]) => ({
+            controller,
+            cache,
+        }))
+        .catch((error) => {
+            if (dataRuntimePromise === loading) dataRuntimePromise = null;
+            throw new ACLLoadError('Unable to load the component data runtime.', {
+                code: 'ACL_RUNTIME_MODULE_LOAD_FAILED',
+                phase: 'runtime-import',
+                cause: error,
+                retryable: true,
+            });
+        });
+    dataRuntimePromise = loading;
+    return loading;
+};
+
+// Keep the component contract synchronous while installing data behavior on first activation
+export const withComponentDataGate = (Base, context) => {
+    const { AlpineComponentLoader, settings, contentSource } = context;
+    return class extends Base {
+        async _ensureDataRuntime() {
+            const generation = this._loadGeneration,
+                epoch = this._cleanupEpoch;
+            if (
+                !this._dataRuntimePromise ||
+                this._dataSetupGeneration !== generation ||
+                this._dataSetupEpoch !== epoch
+            ) {
+                this._dataSetupGeneration = generation;
+                this._dataSetupEpoch = epoch;
+
+                const loading = loadDataRuntime(AlpineComponentLoader)
+                    .then(
+                        // Install the concrete data controller after its modules arrive
+                        ({ controller, cache }) => {
+                            if (
+                                this._destroying ||
+                                AlpineComponentLoader._disposed ||
+                                generation !== this._loadGeneration ||
+                                epoch !== this._cleanupEpoch
+                            )
+                                throw new ACLLoadError('Data activation was canceled.', {
+                                    code: 'ACL_LOAD_CANCELED',
+                                    phase: 'runtime-import',
+                                });
+                            AlpineComponentLoader._dataRuntime ||= cache.createDataCache(AlpineComponentLoader);
+                            const DataController = controller.withComponentData(class {}, context);
+                            // Install the deferred controller methods on this component instance
+                            for (const name of Reflect.ownKeys(DataController.prototype)) {
+                                if (name === 'constructor') continue;
+                                Object.defineProperty(
+                                    this,
+                                    name,
+                                    Object.getOwnPropertyDescriptor(DataController.prototype, name),
+                                );
+                            }
+                            return this;
+                        },
+                    )
+                    .catch((error) => {
+                        // Permit the same component instance to retry a failed capability import
+                        if (this._dataRuntimePromise === loading) this._dataRuntimePromise = null;
+                        throw error;
+                    });
+                this._dataRuntimePromise = loading;
+            }
+            return await this._dataRuntimePromise;
+        }
+
+        _getDataTarget() {
+            return this.getAttribute('data-target') || settings.data.target || '$data';
+        }
+
+        _getDataFetchCacheMax() {
+            return readNumberAttribute(this, 'data-fetch-cache-max', Number(settings.data.cacheMax), { min: 0 });
+        }
+
+        _getPollingPauseSetting(attributeName, groupName) {
+            return readBooleanAttribute(this, attributeName, settings.data[groupName]);
+        }
+
+        _setFetchedData(target, data) {
+            if (!target || target === '$data') this.$props.$data = data;
+            else this.$props[target] = data;
+        }
+
+        _clearFetchedData(target) {
+            if (!target || target === '$data') this.$props.$data = null;
+            else this.$props[target] = null;
+        }
+
+        async _clearTemplateCache() {
+            if (!settings.cacheTemplates || !('caches' in window)) return false;
+            return await AlpineComponentLoader.clearTemplate(contentSource, settings._templateCacheKey);
+        }
+
+        async _clearDataCache() {
+            const currentDataSrc = this.getAttribute('data-src') || settings.data.src;
+            if (!currentDataSrc && !this._aclDebug?.dataCacheKey) return false;
+            await this._ensureDataRuntime();
+            return await this._clearDataCache();
+        }
+
+        async _fetchData(...args) {
+            if (!args[0]) return;
+            await this._ensureDataRuntime();
+            return await this._fetchData(...args);
+        }
+
+        async _triggerHook(hookName, detail = {}) {
+            if (settings.hooks && typeof settings.hooks[hookName] === 'function') {
+                const cleanupEpoch = this._cleanupEpoch;
+                // Guard the trigger hook operation against runtime failures
+                try {
+                    const cleanup = await settings.hooks[hookName].call(this, {
+                        el: this,
+                        root: this._root,
+                        props: this.$props,
+                        ...detail,
+                    });
+                    if (typeof cleanup === 'function') {
+                        if (cleanupEpoch === this._cleanupEpoch && this._state !== 'destroyed')
+                            this._addCleanup(cleanup);
+                        else cleanup();
+                    }
+                    return cleanup;
+                } catch (error) {
+                    throw toACLLoadError(error, {
+                        code: 'ACL_HOOK_FAILED',
+                        phase: 'hook',
+                    });
+                }
+            }
+        }
+    };
+};
+
+// Own safe rendering and activate transformations only for matching content
+export const withComponentRendering = (Base, { AlpineComponentLoader, settings, tagName, internalObservedAttrs }) => {
+    return class extends Base {
+        // Run application hooks without delaying the owning lifecycle phase
+        _runHookDetached(hookName, detail = {}) {
+            void this._triggerHook(hookName, detail).catch((error) => {
+                // Handle the rejected operation
+                AlpineComponentLoader._report('error', `[ACL] ${hookName} hook failed for <${tagName}>`, error, {
+                    tagName,
+                    phase: 'hook',
+                    hook: hookName,
+                });
+                this._dispatchAcl('error', {
+                    error,
+                    phase: 'hook',
+                    hook: hookName,
+                });
+            });
+        }
+
+        // Activate shadow stylesheet support when external CSS is configured
+        async _appendShadowExternalStyles(signal = null) {
+            const { appendShadowExternalStyles } = await AlpineComponentLoader._loadModule(
+                './component/asset-controller.js',
+            );
+            return await appendShadowExternalStyles(this, settings, signal);
+        }
+
+        // Activate external assets on explicit component demand
+        async _loadExternalDependencies(signal = null) {
+            const { loadExternalDependencies } = await AlpineComponentLoader._loadModule(
+                './component/asset-controller.js',
+            );
+            return await loadExternalDependencies(settings, signal, AlpineComponentLoader);
+        }
+
+        // Capture consumer nodes before loading UI or asynchronous work replaces them
+        _captureLightSlots() {
+            this._originalLightDom ||= document.createDocumentFragment();
+            this._lightSlotNodes ||= new Set();
+            if (!this._hasRenderedContent) {
+                // Keep original consumer nodes while excluding server-rendered content
+                for (const node of Array.from(this.childNodes)) {
+                    if (this._ssrLightNodes?.has(node)) continue;
+                    if (
+                        node.nodeType === 1 &&
+                        (node.hasAttribute('data-acl-placeholder') || node.hasAttribute('data-acl-loading'))
+                    ) {
+                        node.remove();
+                        continue;
+                    }
+                    if (node.nodeType === 1 && node.hasAttribute('data-acl-form-proxy')) continue;
+                    this._lightSlotNodes.add(node);
+                    this._originalLightDom.appendChild(node);
+                }
+            }
+            return null;
+        }
+
+        // Load required transformations concurrently and commit them in render order
+        async _renderSafe(content, lightSlots) {
+            const signal = this._loadAbortController?.signal,
+                generation = this._loadGeneration;
+            // Prevent stale optional imports from committing DOM after cancellation
+            const ensureCurrent = () => {
+                if (signal?.aborted || generation !== this._loadGeneration || AlpineComponentLoader._disposed)
+                    throw new ACLLoadError('Rendering was canceled.', {
+                        code: 'ACL_LOAD_CANCELED',
+                        phase: 'render',
+                    });
+            };
+
+            const { applySanitizer, cloneParsedFragment } = await AlpineComponentLoader._loadModule('./rendering.js');
+            let rootNode;
+
+            // Parse string to DOM if needed, otherwise clone fragment
+            if (typeof content === 'string') {
+                rootNode = cloneParsedFragment(content, settings);
+            } else rootNode = content.cloneNode(true);
+
+            rootNode = await applySanitizer(rootNode, settings, {
+                el: this,
+                root: this._root,
+                props: this.$props,
+                tagName,
+            });
+
+            const needsStyles =
+                    !settings.stripStyles &&
+                    (rootNode.querySelector('style') || (settings.shadow && settings.sharedStyleSheets.length)),
+                needsSlots = !settings.shadow && Boolean(rootNode.querySelector('slot')),
+                needsScripts = settings.executeScripts && Boolean(rootNode.querySelector('script')),
+                [styles, slots, scriptRuntime] = await Promise.all([
+                    needsStyles ? AlpineComponentLoader._loadModule('./component/styles.js') : null,
+                    needsSlots ? AlpineComponentLoader._loadModule('./component/slots.js') : null,
+                    needsScripts ? AlpineComponentLoader._loadModule('./component/scripts.js') : null,
+                ]);
+            ensureCurrent();
+            if (styles) await styles.transformStyles(rootNode, this, settings, AlpineComponentLoader);
+            // Remove disabled styles before insertion
+            else if (settings.stripStyles) rootNode.querySelectorAll('style').forEach((node) => node.remove());
+            const scripts = scriptRuntime ? scriptRuntime.prepareScripts(rootNode) : [];
+            // Remove scripts unless execution is explicitly enabled
+            if (!scriptRuntime) rootNode.querySelectorAll('script').forEach((node) => node.remove());
+            if (slots) {
+                if (!this._slotsRuntime) {
+                    const controller = slots.withSlots(class {});
+                    // Install projection methods on the owning component instance
+                    for (const name of Reflect.ownKeys(controller.prototype)) {
+                        if (name !== 'constructor')
+                            Object.defineProperty(
+                                this,
+                                name,
+                                Object.getOwnPropertyDescriptor(controller.prototype, name),
+                            );
+                    }
+                    this._slotsRuntime = true;
+                }
+                slots.projectSlots(rootNode, this._captureLightSlots());
+            }
+
+            ensureCurrent();
+            // Move nodes to component root
+            this._installAlpinePropsScope();
+            const rootChildren = Array.from(rootNode.childNodes);
+            rootChildren.forEach((node) => {
+                // Process the current item
+                this._exposePropsToNode(node);
+            });
+            this._root.append(...rootChildren);
+            styles?.finishStyles(this);
+            this._hasRenderedContent = true;
+
+            // Append scripts to trigger execution
+            this._root.append(...scripts);
+        }
+
+        // Forward configured component events with independent cleanup ownership
+        _setupEventForwarding() {
+            this._forwardEventCleanups?.forEach(
+                // Process the current item
+                (cleanup) => cleanup(),
+            );
+            this._forwardEventCleanups = null;
+
+            settings.events.forward.forEach((eventRule) => {
+                // Redispatch the configured event name without reprocessing forwarded events
+                const handler = (e) => {
+                    this.dispatchEvent(
+                        new CustomEvent(eventRule.as, {
+                            bubbles: eventRule.bubbles,
+                            composed: eventRule.composed,
+                            detail: e.detail,
+                        }),
+                    );
+                };
+                this._root.addEventListener(eventRule.from, handler);
+                (this._forwardEventCleanups ||= []).push(
+                    // Capture the pushed value
+                    () => this._root.removeEventListener(eventRule.from, handler),
+                );
+            });
+        }
+
+        _updateProp(name, value) {
+            // Skip loader internals, they are handled separately
+            if (internalObservedAttrs.has(name)) return;
+
+            // Read the declared prop configuration for this attribute
+            const configDef = settings.attributes[name];
+
+            // Normalize object and constructor prop definitions
+            const type = configDef && configDef.type ? configDef.type : configDef,
+                required = (configDef && configDef.required) === true,
+                nullable = (configDef && configDef.nullable) === true,
+                coerce = configDef && typeof configDef.coerce === 'function' ? configDef.coerce : null,
+                validator = configDef && configDef.validator ? configDef.validator : null,
+                configuredDefault = configDef && hasOwn(configDef, 'default') ? configDef.default : undefined,
+                getDefaultValue = () =>
+                    cloneRuntimeValue(
+                        typeof configuredDefault === 'function' ? configuredDefault.call(this) : configuredDefault,
+                    ),
+                options = configDef && configDef.options ? configDef.options : null,
+                schema = configDef && configDef.schema ? configDef.schema : null;
+
+            // Handle null/undefined values
+            if (value === null || value === undefined) {
+                if (configuredDefault !== undefined) {
+                    this.$props[name] = getDefaultValue();
+                    return;
+                }
+                if (required) this._reportPropIssue(`[ACL] Missing required prop "${name}" on <${tagName}>.`);
+
+                if (nullable) {
+                    this.$props[name] = null;
+                    return;
+                }
+
+                this._applyTypeDefault(name, type);
+                return;
+            }
+
+            // Cast string attributes into configured runtime types
+            let parsedValue;
+            if (nullable && value === 'null') {
+                parsedValue = null;
+            } else if (coerce) {
+                parsedValue = coerce.call(this, value, {
+                    el: this,
+                    props: this.$props,
+                    name,
+                    definition: configDef,
+                });
+            } else if (type === Boolean) {
+                parsedValue = value !== null && value !== 'false';
+            } else if (type === Number) {
+                const num = Number(value);
+                if (isNaN(num)) {
+                    this._reportPropIssue(`[ACL] Attribute "${name}" must be a number on <${tagName}>.`);
+                    parsedValue = 0;
+                } else parsedValue = num;
+            } else if (type === Object || type === Array) {
+                if (!value) parsedValue = type === Array ? [] : {};
+                else {
+                    const invalid = Symbol('invalid-json');
+                    parsedValue = parseJson(value, invalid);
+                    if (parsedValue === invalid) {
+                        this._reportPropIssue(`[ACL] Attribute "${name}" contains invalid JSON on <${tagName}>.`);
+                        parsedValue = type === Array ? [] : {};
+                    }
+                }
+                if (
+                    (type === Array && !Array.isArray(parsedValue)) ||
+                    (type === Object &&
+                        (typeof parsedValue !== 'object' || Array.isArray(parsedValue) || parsedValue === null))
+                ) {
+                    this._reportPropIssue(
+                        `[ACL] Attribute "${name}" does not match its declared type on <${tagName}>.`,
+                    );
+                    parsedValue = type === Array ? [] : {};
+                }
+            } else {
+                parsedValue = value;
+            }
+
+            if (parsedValue === null && nullable) {
+                this.$props[name] = null;
+                return;
+            }
+
+            // Validate against enum-style allowed values
+            if (options && Array.isArray(options) && !options.includes(parsedValue)) {
+                this._reportPropIssue(
+                    `[ACL] Value "${parsedValue}" is not a valid option for prop "${name}" on <${tagName}>. Allowed: ${options.join(', ')}.`,
+                );
+                if (configuredDefault !== undefined) this.$props[name] = getDefaultValue();
+                else if (this.$props[name] === undefined) this._applyTypeDefault(name, type);
+                return;
+            }
+
+            // Validate nested object shapes
+            if (schema && type === Object && typeof parsedValue === 'object' && parsedValue !== null) {
+                const schemaError = validateSchemaShape(parsedValue, schema, name);
+                if (schemaError) {
+                    this._reportPropIssue(
+                        `[ACL] Schema validation failed for prop "${name}" on <${tagName}>: ${schemaError}`,
+                    );
+                    if (configuredDefault !== undefined) this.$props[name] = getDefaultValue();
+                    else if (this.$props[name] === undefined) this._applyTypeDefault(name, type);
+                    return;
+                }
+            }
+
+            // Validate with a custom predicate when provided
+            if (validator && typeof validator === 'function') {
+                if (!validator(parsedValue)) {
+                    this._reportPropIssue(`[ACL] Validation failed for prop "${name}" on <${tagName}>.`);
+                    // Prefer the configured default after validation failure
+                    if (configuredDefault !== undefined) this.$props[name] = getDefaultValue();
+                    // If prop is currently undefined (initial load), set a safe type default
+                    else if (this.$props[name] === undefined) this._applyTypeDefault(name, type);
+                    // Keep the previous valid value when an update fails validation
+                    return;
+                }
+            }
+
+            this.$props[name] = parsedValue;
+        }
+    };
+};
+
+// Manage props and initialization without activating optional data behavior
+export const withComponentState = (Base, { AlpineComponentLoader, settings, tagName, observedAttrs }) => {
+    return class extends Base {
+        // Initialize missing public props using their declared types
+        _applyTypeDefault(name, type) {
+            if (type === Number) this.$props[name] = 0;
+            else if (type === Boolean) this.$props[name] = false;
+            else if (type === Array) this.$props[name] = [];
+            else if (type === Object) this.$props[name] = {};
+            else this.$props[name] = '';
+        }
+
+        // Synchronize observed public attributes into props
+        _syncAllAttributes() {
+            observedAttrs.forEach(
+                // Process the current item
+                (name) => this._updateProp(name, this.getAttribute(name)),
+            );
+        }
+
+        // Drain and release activated persistence subscriptions
+        async _releasePersistence(flush = true) {
+            const dispose = this._persistenceDispose,
+                persistence = this.$props.$persistence;
+            this._persistenceDispose = null;
+            if (!dispose) return;
+            // Guard the release persistence operation against runtime failures
+            try {
+                await dispose({ flush });
+            } catch {
+                // Persistence operations report typed errors before teardown continues
+            } finally {
+                if (this.$props.$persistence === persistence) delete this.$props.$persistence;
+            }
+        }
+
+        // Activate persistence only when a store is requested
+        async _initPersistence() {
+            if (!(this.getAttribute('persist') || settings.persist)) return;
+            const { initializeComponentPersistence } = await AlpineComponentLoader._loadModule(
+                './component/persistence-controller.js',
+            );
+            return await initializeComponentPersistence(this, {
+                AlpineComponentLoader,
+                settings,
+                tagName,
+            });
+        }
+
+        // Initialize Alpine now or await its availability with cancellation
+        async _initAlpine() {
+            if (window.Alpine) return this._finishAlpineInit();
+
+            // Bind to alpine:init event + timeout if it is not fired
+            return new Promise((resolve, reject) => {
+                // Settle the asynchronous operation
+                let settled = false,
+                    timeoutId = null;
+                // Release both readiness paths and clear externally callable cancellation ownership
+                const cleanup = () => {
+                    clearTimeout(timeoutId);
+                    document.removeEventListener('alpine:init', finish);
+                    if (this._alpineWaitCleanup === cancel) this._alpineWaitCleanup = null;
+                };
+                // Initialize Alpine once whether readiness comes from the event or timeout check
+                const finish = async () => {
+                        if (settled) return;
+                        settled = true;
+                        cleanup();
+                        // Guard the init alpine operation against runtime failures
+                        try {
+                            await this._finishAlpineInit();
+                            resolve();
+                        } catch (e) {
+                            reject(e);
+                        }
+                    },
+                    // Reject a pending Alpine wait when reload or teardown supersedes it
+                    cancel = (reason = 'Canceled') => {
+                        if (settled) return;
+                        settled = true;
+                        cleanup();
+                        reject(
+                            new ACLLoadError(`Alpine initialization ${String(reason).toLowerCase()}.`, {
+                                code: 'ACL_ALPINE_INIT_CANCELED',
+                                phase: 'alpine',
+                            }),
+                        );
+                    };
+
+                this._alpineWaitCleanup = cancel;
+                document.addEventListener('alpine:init', finish);
+
+                // Fail initialization when Alpine never appears
+                timeoutId = setTimeout(() => {
+                    // Run the scheduled delayed task
+                    if (window.Alpine) void finish();
+                    else {
+                        settled = true;
+                        cleanup();
+                        reject(new Error('Alpine.js not found (Timeout)'));
+                    }
+                }, 5000);
+            });
+        }
+
+        async _finishAlpineInit() {
+            // Bind Alpine store if provided
+            const storeName = this.getAttribute('bind-store') || settings.bindStore;
+            if (storeName) {
+                let store = window.Alpine.store(storeName);
+                if (store) {
+                    // Merge Alpine store with provided $props
+                    if (this.$props && typeof this.$props === 'object')
+                        Object.keys(this.$props)
+                            .filter(
+                                // Select matching items
+                                (key) => store[key] === undefined,
+                            )
+                            .forEach(
+                                // Process the current item
+                                (key) => (store[key] = this.$props[key]),
+                            );
+
+                    // Set $props to Alpine store
+                    this.$props = store;
+                } else {
+                    AlpineComponentLoader._report(
+                        'error',
+                        `[ACL] Store "${storeName}" not found. Falling back to local state.`,
+                        null,
+                        {
+                            tagName,
+                            phase: 'store',
+                        },
+                    );
+                    this.$props = window.Alpine.reactive(this.$props || {});
+                }
+            } else {
+                // Initialize Alpine Store
+                this.$props = window.Alpine.reactive(this.$props || {});
+            }
+
+            // Initialize persistence
+            await this._initPersistence();
+
+            // Track reactive updates while excluding $lastUpdated to prevent an infinite effect loop
+            const updateRunner = window.Alpine.effect(() => {
+                // Synchronize reactive state
+                if (this.$props) {
+                    Object.keys(this.$props).forEach((k) => {
+                        // Process the current item
+                        if (k !== '$lastUpdated') void this.$props[k];
+                    });
+                    this.$props.$lastUpdated = Date.now();
+                }
+            });
+            if (updateRunner && window.Alpine.release)
+                this._addCleanup(
+                    // Register cleanup work
+                    () => window.Alpine.release(updateRunner),
+                );
+
+            // Refresh expandos after store binding and attach a late Alpine scope if needed
+            this._installAlpinePropsScope();
+            if (this._root && this._root.children)
+                Array.from(this._root.children).forEach((node) => {
+                    // Process the current item
+                    this._exposePropsToNode(node);
+                });
+
+            // We wrap in nextTick to ensure the DOM is settled before Alpine scans it
+            return await new Promise((resolve) => {
+                // Settle the asynchronous operation
+                window.Alpine.nextTick(() => {
+                    // Continue after the Alpine DOM update
+                    if (this._root) window.Alpine.initTree(this._root);
+                    resolve();
+                });
+            });
+        }
+
+        // Render the configured safe error presentation
+        _renderError(msg) {
+            const container = document.createElement('div');
+            container.style.cssText = toCssString(settings.errorCss);
+            container.setAttribute('role', 'alert');
+
+            const header = document.createElement('strong');
+            header.textContent = `Load Failed: <${tagName}>`;
+
+            const code = document.createElement('code');
+            code.textContent = msg;
+            code.style.display = 'block';
+            code.style.marginTop = '4px';
+            container.appendChild(header);
+            container.appendChild(code);
+
+            if (settings.shadow) this._root.replaceChildren(container);
+            else this._root.appendChild(container);
+        }
+
+        // Dispatch the compatibility lifecycle event
+        _dispatch(eventName) {
+            this.dispatchEvent(
+                new CustomEvent(eventName, {
+                    bubbles: true,
+                    composed: true,
+                    detail: { props: this.$props },
+                }),
+            );
+        }
+
+        // Publish the structured lifecycle event and observability record
+        _dispatchAcl(eventName, detail = {}) {
+            const eventDetail = createLifecycleEventDetail(this, tagName, detail);
+            AlpineComponentLoader._observability.emit(eventName, eventDetail, { tagName });
+            this.dispatchEvent(
+                new CustomEvent(`acl:${eventName}`, {
+                    bubbles: true,
+                    composed: true,
+                    detail: eventDetail,
+                }),
+            );
+        }
+
+        // Resolve template content with this component load signal
+        async _resolveContent(source, signal = this._loadAbortController?.signal) {
+            const content = await AlpineComponentLoader.loadTemplate(source, settings, { signal }),
+                info = AlpineComponentLoader.getTemplateLoadInfo(source, settings);
+            this._aclDebug.templateCacheHit = info?.cacheHit ?? null;
+            this._aclDebug.templateCacheKey = info?.cacheKey ?? null;
+            this._aclDebug.templateSource = source;
+            return content;
+        }
+
+        // Prune obsolete persistent buckets through the owning loader
+        async _pruneCache() {
+            return await AlpineComponentLoader.pruneCaches(settings._templateCachePrefix, settings._templateCacheKey);
+        }
+    };
+};
+
+// Own component load, reload, fallback, and cancellation phases
+export const withComponentLoading = (
+    Base,
+    { AlpineComponentLoader, settings, tagName, contentSource, resolveSource },
+) => {
+    return class extends Base {
+        async _scheduleInitialization(run, signal) {
+            // Load scheduling only when the application explicitly enables its budget
+            const { scheduleComponentInitialization } = await AlpineComponentLoader._loadModule(
+                './initialization-scheduler.js',
+            );
+            return scheduleComponentInitialization(AlpineComponentLoader, this, settings, run, signal);
+        }
+
+        // Return existing rendering work directly on the unscheduled path
+        _renderInitialization(content, lightSlots, hydrating, signal) {
+            if (hydrating) return this._hydrateContent(signal);
+            if (!settings.shadow) lightSlots = this._captureLightSlots();
+            this._root.replaceChildren();
+            if (settings.shadow && settings.externalCss.length)
+                // Finish shadow asset loading before rendering the component
+                return this._appendShadowExternalStyles(signal).then(() => this._renderSafe(content, lightSlots));
+            return this._renderSafe(content, lightSlots);
+        }
+
+        // Sanitize cloned server markup while retaining per-instance policies
+        async _hydrateContent(loadSignal) {
+            const { hydrateContent } = await AlpineComponentLoader._loadModule('./component/hydration.js');
+            loadSignal.throwIfAborted();
+            return hydrateContent(this, settings, tagName, AlpineComponentLoader, loadSignal);
+        }
+
+        // Invalidate stale work and start a new component load generation
+        async reload({ preserveState = false, clearTemplate = true, clearData = true, reason = 'manual' } = {}) {
+            const reloadGeneration = ++this._reloadGeneration,
+                startedAt = performance.now();
+            AlpineComponentLoader._report('info', `[ACL] Reloading <${tagName}>...`, null, {
+                tagName,
+                phase: 'hmr',
+            });
+            this._dispatchAcl('dev-reload-start', {
+                reason,
+                preserveState,
+            });
+
+            let reloadSnapshot = null,
+                customSnapshot = null;
+            if (preserveState) {
+                const { captureReloadState } = await AlpineComponentLoader._loadModule('./hmr.js');
+                reloadSnapshot = captureReloadState(this, this._root, this.$props);
+                if (typeof settings.hooks?.captureState === 'function') {
+                    // Guard the reload operation against runtime failures
+                    try {
+                        customSnapshot = await settings.hooks.captureState.call(this, {
+                            el: this,
+                            root: this._root,
+                            props: this.$props,
+                            reason,
+                        });
+                    } catch (error) {
+                        AlpineComponentLoader._report(
+                            'warn',
+                            `[ACL] captureState hook failed for <${tagName}>`,
+                            error,
+                            {
+                                tagName,
+                                phase: 'hmr',
+                            },
+                        );
+                    }
+                }
+            }
+
+            this._cancelDeferredLoad();
+            this._cancelAlpineWait('Reloaded');
+            this._stopPolling();
+            this._detachPollingSignals();
+            this._loadGeneration++;
+            this._loadAbortController?.abort('Reloaded');
+            this._loadAbortController = null;
+            this._fetchGeneration++;
+            this._fetchAbortController?.abort('Reloaded');
+            this._fetchAbortController = null;
+            const activeLoad = this._activeLoadPromise;
+            if (activeLoad)
+                await activeLoad.catch(() => {
+                    // Drain the superseded load before starting the replacement
+                });
+            if (reloadGeneration !== this._reloadGeneration) return;
+
+            // Clear caches specific to this component's source/data endpoint
+            await Promise.all([
+                clearData ? this._clearDataCache() : Promise.resolve(true),
+                clearTemplate ? this._clearTemplateCache() : Promise.resolve(true),
+            ]);
+            if (reloadGeneration !== this._reloadGeneration) return;
+
+            if (!settings.shadow) this._captureLightSlots();
+            this._slotObserver?.disconnect();
+            this._slotObserver = null;
+            await this._releasePersistence(true);
+            if (this._root && window.Alpine && this._state === 'ready') window.Alpine.destroyTree(this._root);
+            this._runCleanups();
+
+            // Reset state
+            this._setLifecycleState('idle');
+            this.$props.$loading = false;
+            this.$props.$error = null;
+            if (clearData) this._clearFetchedData(this._getDataTarget());
+            if (reloadSnapshot) {
+                const { restoreReloadProps } = await AlpineComponentLoader._loadModule('./hmr.js');
+                restoreReloadProps(this.$props, reloadSnapshot);
+            }
+            this._skipNextDataFetch = preserveState && !clearData;
+
+            // Re-trigger load
+            if (this.isConnected) await this._load();
+            if (reloadGeneration === this._reloadGeneration) {
+                if (reloadSnapshot) {
+                    // Guard the reload operation against runtime failures
+                    try {
+                        const { restoreReloadDomState } = await AlpineComponentLoader._loadModule('./hmr.js');
+                        restoreReloadDomState(this, this._root, reloadSnapshot);
+                        if (typeof settings.hooks?.restoreState === 'function') {
+                            await settings.hooks.restoreState.call(this, customSnapshot, {
+                                el: this,
+                                root: this._root,
+                                props: this.$props,
+                                reason,
+                            });
+                        }
+                    } catch (error) {
+                        AlpineComponentLoader._report('error', `[ACL] restoreState failed for <${tagName}>`, error, {
+                            tagName,
+                            phase: 'hmr',
+                        });
+                        this._dispatchAcl('error', {
+                            error: toACLLoadError(error, {
+                                code: 'ACL_HMR_RESTORE_FAILED',
+                                phase: 'hmr',
+                            }),
+                            phase: 'hmr',
+                        });
+                        await this.reload({
+                            preserveState: false,
+                            clearTemplate: false,
+                            clearData: true,
+                            reason: 'hmr-fallback',
+                        });
+                        return;
+                    }
+                }
+                this._startPolling();
+                this._dispatchAcl('dev-reload-end', {
+                    reason,
+                    preserveState,
+                    restored: Boolean(reloadSnapshot),
+                    duration: performance.now() - startedAt,
+                });
+            }
+        }
+
+        // Retry the data source only when one exists
+        async retry() {
+            const dataSrc = this.getAttribute('data-src') || settings.data.src;
+            if (!dataSrc) return;
+            return await this._fetchData(dataSrc, true);
+        }
+
+        // Release this component load and its pending activations
+        cancel(reason = 'Canceled by component consumer') {
+            this._cancelDeferredLoad();
+            this._cancelAlpineWait(reason);
+            this._loadGeneration++;
+            this._loadAbortController?.abort(reason);
+            this._loadAbortController = null;
+            this._fetchGeneration++;
+            this._fetchAbortController?.abort(reason);
+            this._fetchAbortController = null;
+            this.$props.$loading = false;
+            if (this._state !== 'ready') this._setLifecycleState('idle');
+            this._dispatchAcl('loadend', {
+                canceled: true,
+                reason,
+            });
+        }
+
+        // Render configured loading content with the same load ownership
+        async _renderLoading() {
+            const loadingSource = this.getAttribute('loading-template') || settings.loadingTemplate,
+                loadingHtml = this.getAttribute('loading-html') || settings.loadingHtml;
+            if (!loadingSource && !loadingHtml) return;
+            const { applySanitizer, cloneParsedFragment } = await AlpineComponentLoader._loadModule('./rendering.js');
+
+            // Guard the render loading operation against runtime failures
+            try {
+                let content;
+                if (loadingHtml) {
+                    content = loadingHtml;
+                } else if (
+                    loadingSource instanceof HTMLTemplateElement ||
+                    (typeof loadingSource === 'string' && loadingSource.startsWith('#'))
+                ) {
+                    content = await AlpineComponentLoader.loadTemplate(loadingSource, settings, {
+                        signal: this._loadAbortController?.signal,
+                    });
+                } else {
+                    content = await AlpineComponentLoader.loadTemplate(resolveSource(loadingSource), settings, {
+                        signal: this._loadAbortController?.signal,
+                    });
+                }
+
+                let fragment =
+                    typeof content === 'string' ? cloneParsedFragment(content, settings) : content.cloneNode(true);
+                fragment = await applySanitizer(fragment, settings, {
+                    el: this,
+                    root: this._root,
+                    props: this.$props,
+                    tagName,
+                });
+
+                this._installAlpinePropsScope();
+                Array.from(fragment.childNodes).forEach((node) => {
+                    // Process the current item
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        node.setAttribute('data-acl-loading', '');
+                        if (!node.hasAttribute('role')) node.setAttribute('role', 'status');
+                        if (!node.hasAttribute('aria-live')) node.setAttribute('aria-live', 'polite');
+                    }
+                    this._exposePropsToNode(node);
+                });
+
+                this._root.replaceChildren(fragment);
+            } catch (e) {
+                AlpineComponentLoader._report('warn', `[ACL] Failed to render loading state for <${tagName}>`, e, {
+                    tagName,
+                    phase: 'render',
+                });
+            }
+        }
+
+        // Coalesce active loads and preserve asynchronous completion results
+        _load() {
+            if (this._state === 'ready') return Promise.resolve();
+            if (this._state === 'loading') return this._activeLoadPromise || Promise.resolve();
+            const operation = this._performLoad();
+            this._activeLoadPromise = operation;
+            // Clear load ownership only if no newer load has replaced this promise
+            const clear = () => {
+                // Clear
+                if (this._activeLoadPromise === operation) this._activeLoadPromise = null;
+            };
+            void operation.then(clear, clear);
+            return operation;
+        }
+
+        // Execute the component pipeline while checking load generation ownership
+        async _performLoad() {
+            const startMark = performance.now(),
+                generation = ++this._loadGeneration,
+                requestId = `${tagName}:component:${generation}`,
+                loadController = new AbortController(),
+                loadSignal = loadController.signal,
+                hydrating = this._ssrHydration;
+            this._loadAbortController?.abort('Superseded');
+            this._loadAbortController = loadController;
+            this._unmounted = false;
+            // Guard the perform load operation against runtime failures
+            try {
+                // Lock loading state
+                this._setLifecycleState('loading');
+
+                // Preserve consumer light-DOM nodes before loading UI can replace the host content
+                let lightSlots = settings.shadow ? null : this._captureLightSlots();
+
+                // Emit beforeMount
+                this._dispatchAcl('loadstart', {
+                    phase: 'component',
+                    source: contentSource,
+                    requestId,
+                    startedAt: startMark,
+                });
+                if (hydrating)
+                    this._dispatchAcl('hydrationstart', {
+                        phase: 'hydrate',
+                        requestId,
+                        startedAt: startMark,
+                    });
+                await this._triggerHook('beforeMount');
+
+                // Render optional loading UI while template/data work completes
+                if (!hydrating) await this._renderLoading();
+                if (generation !== this._loadGeneration) return;
+
+                // Load external dependencies, get content, and data if needed
+                const dataSrc = this.getAttribute('data-src') || settings.data.src,
+                    fallbackSource = this.getAttribute('fallback') || settings.fallback,
+                    skipDataFetch = this._skipNextDataFetch,
+                    promises = [
+                        settings.externalCss.length || settings.externalScripts.length
+                            ? this._loadExternalDependencies(loadSignal)
+                            : Promise.resolve(),
+                        hydrating ? Promise.resolve(null) : this._resolveContent(contentSource),
+                        dataSrc && !skipDataFetch
+                            ? this._fetchData(dataSrc, false, {
+                                  throwOnError: Boolean(fallbackSource) && !this._hasLoadedOnce,
+                              })
+                            : Promise.resolve(),
+                    ];
+                this._skipNextDataFetch = false;
+
+                // Get content from the resolved source
+                const content = (await Promise.all(promises))[1];
+                if (generation !== this._loadGeneration) return;
+
+                await (settings.hydrationScheduler
+                    ? this._scheduleInitialization(
+                          // Queue the render phase only when scheduling is enabled
+                          () => this._renderInitialization(content, lightSlots, hydrating, loadSignal),
+                          loadSignal,
+                      )
+                    : this._renderInitialization(content, lightSlots, hydrating, loadSignal));
+                if (generation !== this._loadGeneration) return;
+
+                // Setup event bubbling for Shadow DOM
+                if (settings.shadow && settings.events.forward.length > 0) this._setupEventForwarding();
+
+                // Start observing Light DOM for dynamic updates
+                if (!settings.shadow) this._initSlotObserver();
+
+                // Initialize Alpine
+                await (settings.hydrationScheduler
+                    ? // Queue Alpine initialization only when scheduling is enabled
+                      this._scheduleInitialization(() => this._initAlpine(), loadSignal)
+                    : this._initAlpine());
+                if (generation !== this._loadGeneration) return;
+
+                // Stop timer and store metrics
+                this._perf = { duration: performance.now() - startMark };
+
+                // Mark success and unlock
+                this._hasLoadedOnce = true;
+                this._setLifecycleState('ready');
+
+                // Notify consumers after Alpine initialization completes
+                this._dispatch('mount');
+                await this._triggerHook('mounted');
+
+                // Notify consumers that the component finished loading
+                this._dispatch('loaded');
+                await this._triggerHook('loaded');
+                if (hydrating) {
+                    this._ssrHydration = false;
+                    this.setAttribute('data-acl-hydration-state', 'hydrated');
+                    this.setAttribute('data-acl-hydrated', '');
+                    this._dispatchAcl('hydrationend', {
+                        phase: 'hydrate',
+                        duration: performance.now() - startMark,
+                        requestId,
+                    });
+                }
+                this._dispatchAcl('loadend', {
+                    phase: 'component',
+                    duration: this._perf.duration,
+                    fallback: false,
+                    requestId,
+                    endedAt: performance.now(),
+                });
+            } catch (err) {
+                if (generation !== this._loadGeneration || loadSignal.aborted) return;
+                AlpineComponentLoader._report('error', `[ACL] <${tagName}>`, err, {
+                    tagName,
+                    phase: 'component',
+                });
+                const loadError = toACLLoadError(err, {
+                    code: 'ACL_COMPONENT_LOAD_FAILED',
+                    phase: 'component',
+                });
+                if (hydrating) this.setAttribute('data-acl-hydration-state', 'error');
+                if (hydrating)
+                    this._dispatchAcl('hydrationerror', {
+                        error: loadError,
+                        phase: 'hydrate',
+                        requestId,
+                    });
+                this._dispatchAcl('error', {
+                    error: loadError,
+                    phase: loadError.phase,
+                });
+                // Unlock on error so callers can retry
+                this._setLifecycleState('idle');
+                const fallbackSource = this.getAttribute('fallback') || settings.fallback;
+                if (fallbackSource) {
+                    // Guard the perform load operation against runtime failures
+                    try {
+                        // Clear failed state
+                        this._root.replaceChildren();
+
+                        // Render fallback; pass null for slots as fallback usually doesn't slot user content
+                        await this._renderSafe(await this._resolveContent(fallbackSource), null);
+
+                        // Initialize Alpine so fallback content can be interactive
+                        await (settings.hydrationScheduler
+                            ? // Complete fallback Alpine initialization under the current scheduler policy
+                              this._scheduleInitialization(() => this._initAlpine(), loadSignal)
+                            : this._initAlpine());
+
+                        // Stop timer and store metrics
+                        this._perf = { duration: performance.now() - startMark };
+
+                        // Mark success and unlock
+                        this._hasLoadedOnce = true;
+                        this._setLifecycleState('ready');
+
+                        // Dispatch 'loaded' event
+                        this._dispatch('loaded');
+                        await this._triggerHook('loaded');
+                        this._dispatchAcl('loadend', {
+                            phase: 'component',
+                            duration: this._perf.duration,
+                            fallback: true,
+                            error: loadError,
+                            requestId,
+                            endedAt: performance.now(),
+                        });
+
+                        // Stop here, do not render default error
+                        return;
+                    } catch (fallbackErr) {
+                        AlpineComponentLoader._report('error', `[ACL] <${tagName}> Fallback Failed:`, fallbackErr, {
+                            tagName,
+                            phase: 'fallback',
+                        });
+                        // Show the original error when fallback rendering also fails
+                        this._renderError(`Load Failed: ${err.message}. (Fallback also failed)`);
+                    }
+                } else {
+                    // Render the default error UI
+                    this._renderError(err.message);
+                }
+                this._dispatchAcl('loadend', {
+                    phase: 'component',
+                    error: loadError,
+                    fallback: false,
+                });
+            } finally {
+                if (this._loadAbortController === loadController) this._loadAbortController = null;
+            }
+        }
+    };
 };

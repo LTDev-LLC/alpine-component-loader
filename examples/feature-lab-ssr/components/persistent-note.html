@@ -54,7 +54,7 @@
 </style>
 <article x-data="ssrPersistentNote">
     <h3><span x-text="$props.storage">localStorage</span> note</h3>
-    <input x-model="$props.note" aria-label="Persistent note">
+    <input x-model="$props.note" aria-label="Persistent note" />
     <div class="actions">
         <button type="button" @click="increment">Count <span x-text="$props.count">0</span></button>
         <button type="button" @click="flush">Flush now</button>

@@ -1,7 +1,5 @@
-import AlpineComponentLoader from 'alpine-component-loader';
-import ACLA11y from 'alpine-component-loader/a11y';
-import ACLA11yScanner from 'alpine-component-loader/a11y-scanner';
-import ACLDebugger from 'alpine-component-loader/debugger';
+let componentReady = false;
+import AlpineComponentLoader from 'alpine-component-loader/core';
 
 const component = document.querySelector('a11y-demo-card'),
     status = document.querySelector('#audit-status'),
@@ -14,6 +12,15 @@ const component = document.querySelector('a11y-demo-card'),
         fix: document.querySelector('#fix-issues'),
         debugger: document.querySelector('#open-debugger'),
     };
+
+component.addEventListener(
+    'loaded',
+    // Complete the current demonstration operation
+    () => {
+        componentReady = true;
+    },
+    { once: true },
+);
 
 // Extend the built-in checks with an application ownership policy
 const applicationAuditor = async (root, { basic }) => {
@@ -32,13 +39,59 @@ const applicationAuditor = async (root, { basic }) => {
     return violations;
 };
 
-// Send normalized audit results into the component debugger
-ACLDebugger.inject(AlpineComponentLoader);
-const audits = ACLA11y.observe(AlpineComponentLoader, {
-        auditor: applicationAuditor,
-        debounce: 0,
-    }),
-    scanner = ACLA11yScanner.mount({ auditor: applicationAuditor });
+// Coalesce optional tool activation while leaving the manual startup path free of their imports
+const manualTools = new URLSearchParams(location.search).get('tools') === 'manual';
+let audits = null,
+    scanner = null,
+    debuggerModule = null,
+    toolsPromise = null;
+const ensureAudits = () =>
+    (toolsPromise ||= import('alpine-component-loader/a11y')
+        .then(({ default: ACLA11y }) => {
+            // Keep one observation owner even when several controls activate concurrently
+            audits = ACLA11y.observe(AlpineComponentLoader, {
+                auditor: applicationAuditor,
+                debounce: 0,
+            });
+            if (window.__aclA11yExample) window.__aclA11yExample.audits = audits;
+            return audits;
+        })
+        // Settle feature activation and allow a clean retry
+        .catch((error) => {
+            toolsPromise = null;
+            throw error;
+        }));
+
+const ensureScanner = async () => {
+    // Mount the optional scanner only when its UI is requested
+    if (!scanner) {
+        const { default: ACLA11yScanner } = await import('alpine-component-loader/a11y-scanner');
+        scanner ||= ACLA11yScanner.mount({ auditor: applicationAuditor });
+        if (window.__aclA11yExample) window.__aclA11yExample.scanner = scanner;
+    }
+};
+
+const ensureDebugger = async () => {
+    // Preserve one debugger integration while deferring its implementation in manual mode
+    if (!debuggerModule) {
+        debuggerModule = (await import('alpine-component-loader/debugger')).default;
+        debuggerModule.inject(AlpineComponentLoader);
+    }
+};
+if (!manualTools) {
+    await ensureAudits();
+    await ensureScanner();
+    await ensureDebugger();
+}
+window.addEventListener(
+    'pagehide',
+    // Complete the current demonstration operation
+    () => {
+        audits?.disconnect();
+        scanner?.destroy();
+    },
+    { once: true },
+);
 
 // Render normalized violations without inserting auditor HTML
 const renderResult = (result) => {
@@ -76,7 +129,7 @@ const audit = async () => {
     // Run the audit operation
     status.dataset.state = 'pending';
     status.textContent = 'Auditing…';
-    return await audits.audit(component);
+    return await (await ensureAudits()).audit(component);
 };
 
 // Replace semantic elements because tag names cannot be mutated in place
@@ -193,6 +246,7 @@ controls.fix.addEventListener('click', async () => {
 });
 controls.debugger.addEventListener('click', async () => {
     // Handle the click event
+    await ensureDebugger();
     await AlpineComponentLoader.toggleDebug();
     await audit();
 });
@@ -211,10 +265,15 @@ window.AlpineComponentLoader = AlpineComponentLoader;
 AlpineComponentLoader.config({ basePath: './components/' });
 AlpineComponentLoader.define('a11y-demo-card', 'audit-card.html', { shadow: true });
 await AlpineComponentLoader.start();
-if (component._state !== 'ready')
+if (!componentReady)
     await new Promise(
         // Settle the asynchronous operation
         (resolve) => component.addEventListener('loaded', resolve, { once: true }),
     );
-await audit();
+if (!manualTools) await audit();
+else status.textContent = 'Component ready; audit tools activate when requested';
 window.__aclA11yExample.ready = true;
+// Handle the lifecycle event and release owned work
+document.querySelector('#activate-scanner').addEventListener('click', () => {
+    void ensureScanner();
+});

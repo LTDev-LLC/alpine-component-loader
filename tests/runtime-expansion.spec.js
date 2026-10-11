@@ -27,6 +27,9 @@ test('progressive hydration gates only valid SSR markup and cleans every trigger
                 // Run this operation
                 observe() {}
 
+                // Release only the target owned by this mocked subscription
+                unobserve() {}
+
                 // Run this operation
                 disconnect() {
                     this.disconnected = true;

@@ -1,9 +1,16 @@
+import { chromium } from 'playwright';
+import { createServer } from 'node:http';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, realpath, stat, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
-import { build as viteBuild, createLogger as createViteLogger, createServer as createViteServer } from 'vite';
+// Load each pinned Vite version through the same real integration suite
+const {
+    build: viteBuild,
+    createLogger: createViteLogger,
+    createServer: createViteServer,
+} = await import(process.env.ACL_VITE_PACKAGE || 'vite');
 import { applyProjectConfiguration, parseCLIArguments, runCLI } from '../../bin/alpine-component-loader.mjs';
 import {
     classifyAuditFindings,
@@ -496,7 +503,7 @@ test('Vite plugin injects base-aware maps, external delivery, virtual routes, an
         command: 'build',
         build: { outDir: 'dist' },
     });
-    const html = external.transformIndexHtml('<!doctype html><html><head></head><body></body></html>', {});
+    const html = await external.transformIndexHtml('<!doctype html><html><head></head><body></body></html>', {});
     assert.match(html, /https:\/\/cdn\.example\/acl\/1\.2\.0\/index\.js/);
     assert.match(external.load(external.resolveId('virtual:alpine-component-loader/routes')), /registerRouteManifest/);
 
@@ -509,7 +516,7 @@ test('Vite plugin injects base-aware maps, external delivery, virtual routes, an
         command: 'build',
         build: { outDir: 'build' },
     });
-    const copiedHtml = copied.transformIndexHtml('<html><head></head></html>', {});
+    const copiedHtml = await copied.transformIndexHtml('<html><head></head></html>', {});
     assert.ok(copiedHtml.includes(`/nested/assets/alpine-component-loader/${packageVersion}/index.js`));
     copied.configResolved({
         // Verify the common root-base path never becomes a protocol-relative URL
@@ -518,7 +525,7 @@ test('Vite plugin injects base-aware maps, external delivery, virtual routes, an
         command: 'build',
         build: { outDir: 'build' },
     });
-    const rootBaseHtml = copied.transformIndexHtml('<html><head></head></html>', {});
+    const rootBaseHtml = await copied.transformIndexHtml('<html><head></head></html>', {});
     assert.ok(
         rootBaseHtml.includes(
             `"alpine-component-loader": "/assets/alpine-component-loader/${packageVersion}/index.js"`,
@@ -579,6 +586,20 @@ test('Vite hooks serve native files, emit targeted HMR, validate delivery, and c
     );
     assert.equal(served.statusCode, 200);
     assert.equal(served.headers['Content-Type'], 'text/javascript; charset=utf-8');
+    await middleware[0](
+        { url: '/application/@acl/core.js' },
+        served,
+        // The development module must also be served before Vite removes its base
+        () => assert.fail('base-prefixed core module was not served'),
+    );
+    assert.equal(served.statusCode, 200);
+    await middleware[1](
+        { url: '/application/@acl-routes/acl-routes.json' },
+        served,
+        // Route manifests use the same base-aware middleware contract
+        () => assert.fail('base-prefixed route manifest was not served'),
+    );
+    assert.equal(String(served.body), '{"version":1,"routes":{}}');
     let nextCalls = 0;
     await middleware[0](
         { url: '/other' },
@@ -620,7 +641,10 @@ test('Vite hooks serve native files, emit targeted HMR, validate delivery, and c
     );
     assert.match(plugin.load(plugin.resolveId('virtual:alpine-component-loader/client')), /import\.meta\.hot/);
     assert.match(plugin.load(plugin.resolveId('virtual:alpine-component-loader/routes')), /@acl-routes/);
-    assert.equal(plugin.resolveId('alpine-component-loader'), null);
+    assert.deepEqual(plugin.resolveId('alpine-component-loader'), {
+        id: '/@acl/index.js',
+        external: true,
+    });
     assert.equal(plugin.resolveId('ordinary-module'), null);
     assert.equal(plugin.load('ordinary-module'), null);
 
@@ -649,7 +673,7 @@ test('Vite hooks serve native files, emit targeted HMR, validate delivery, and c
     );
 });
 
-test('Vite development and production integration preserve native external module delivery', async () => {
+test('Vite development and production integration preserve native external module delivery', async (t) => {
     // Run this operation
     const root = await realpath(await mkdtemp(join(tmpdir(), 'acl-vite-integration-'))),
         repositoryRoot = await realpath('.'),
@@ -659,24 +683,71 @@ test('Vite development and production integration preserve native external modul
     logger.warn = (message) => warnings.push(String(message));
     // Record warnings that Vite deduplicates across repeated transforms
     logger.warnOnce = (message) => warnings.push(String(message));
+    await writeFile(
+        join(root, 'acl-manifest.json'),
+        JSON.stringify({
+            version: 1,
+            components: { 'initial-card': 'initial.html' },
+            groups: { initial: ['initial-card'] },
+        }),
+    );
+    await mkdir(join(root, 'route-source'));
+    await mkdir(join(root, 'public/templates'), { recursive: true });
+    await writeFile(join(root, 'public/templates/route.html'), '<p>Route initial</p>');
+    await writeFile(
+        join(root, 'route-source/acl-routes.json'),
+        JSON.stringify({
+            version: 1,
+            routes: { home: { manifest: 'home.json' } },
+        }),
+    );
+    await writeFile(
+        join(root, 'route-source/home.json'),
+        JSON.stringify({
+            version: 1,
+            components: { 'route-card': '/templates/route.html' },
+        }),
+    );
+    await writeFile(
+        join(root, 'acl.config.mjs'),
+        `export default { components: { manifest: './acl-manifest.json' }, routes: { outDir: './route-source' } };`,
+    );
+
     await mkdir(join(root, 'node_modules'));
     await symlink(repositoryRoot, join(root, 'node_modules', 'alpine-component-loader'), 'dir');
     await writeFile(
         join(root, 'index.html'),
-        '<!doctype html><html><head></head><body><script type="module" src="/main.js"></script></body></html>',
+        '<!doctype html><html><head><script>window.Alpine = { reactive: value => value, effect: callback => callback(), release() {}, destroyTree() {}, initTree() {}, nextTick: callback => Promise.resolve().then(callback) };</script></head><body><script type="module" src="/main.js"></script></body></html>',
     );
     await writeFile(
         join(root, 'main.js'),
-        "import Loader from 'alpine-component-loader'; window.__aclVite = Loader.version;",
+        `import Loader from 'alpine-component-loader';
+        import Core from 'alpine-component-loader/core';
+        import registerRoute from 'virtual:alpine-component-loader/routes';
+        window.__aclVite = Loader.version;
+        window.__aclCore = Core.version;
+        window.__aclRoute = registerRoute('home').then(() => Loader.start()).then(() => {
+            const host = document.createElement('route-card');
+            window.__aclRouteHost = host;
+            document.body.append(host);
+        });`,
     );
     const server = await createViteServer({
         root,
-        appType: 'custom',
+        appType: 'spa',
         logLevel: 'silent',
         customLogger: logger,
         optimizeDeps: { noDiscovery: true },
-        server: { middlewareMode: true },
-        plugins: [alpineComponentLoader({ generate: false })],
+        server: {
+            port: 0,
+            host: '127.0.0.1',
+        },
+        plugins: [
+            alpineComponentLoader({
+                generate: false,
+                preload: { groups: ['initial'] },
+            }),
+        ],
     });
     // Process try
     try {
@@ -687,9 +758,76 @@ test('Vite development and production integration preserve native external modul
         await server.transformRequest(`/@fs${repositoryRoot}/dist/runtime/rendering.js`);
         assert.match(developmentHtml, /"alpine-component-loader": "\/@acl\/index\.js"/);
         assert.match(developmentHtml, /virtual:alpine-component-loader\/client/);
-        assert.match(developmentModule.code, /\/@fs\/.*\/dist\/index\.js/);
+        assert.match(developmentHtml, /rel="modulepreload" href="\/@acl\/runtime\/loader.js"/);
+        const routeModule = await server.transformRequest('virtual:alpine-component-loader/routes');
+        assert.match(routeModule.code, /registerRouteManifest/);
+        assert.match(developmentModule.code, /\/@acl\/index\.js/);
         assert.ok(server.config.server.fs.allow.includes(repositoryRoot));
         assert.doesNotMatch(warnings.join('\n'), /dynamic import cannot be analyzed/i);
+        await server.listen();
+        const browser = await chromium.launch();
+        // Release resources on both success and failure
+        try {
+            const page = await browser.newPage(),
+                errors = [];
+            // Inspect the controlled fixture and its completion
+            page.on('pageerror', (error) => errors.push(error.message));
+            // Inspect the controlled fixture and its completion
+            page.on('console', (message) => {
+                if (message.type() === 'error') errors.push(message.text());
+            });
+            const frames = [];
+            // Inspect the controlled fixture and its completion
+            page.on('websocket', (socket) => socket.on('framereceived', (frame) => frames.push(frame.payload)));
+            // Inspect the controlled fixture and its completion
+            await page.addInitScript(() =>
+                // Inspect the controlled fixture and its completion
+                window.addEventListener('acl:dev-reload', (event) => (window.__aclDevReload = event.detail)),
+            );
+            await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`);
+            await page
+                // Inspect the controlled fixture and its completion
+                .waitForFunction(() => window.__aclRouteHost?.textContent === 'Route initial', null, { timeout: 10000 })
+                // Inspect the controlled fixture and its completion
+                .catch(async (error) => {
+                    throw new Error(error.message + '\n' + errors.join('\n') + '\n' + (await page.content()));
+                });
+            await writeFile(join(root, 'public/templates/route.html'), '<p>Route changed</p>');
+            // Inspect the controlled fixture and its completion
+            await page
+                // Inspect the controlled fixture and its completion
+                .waitForFunction(() => window.__aclRouteHost?.textContent === 'Route changed', null, { timeout: 10000 })
+                // Inspect the controlled fixture and its completion
+                .catch(async (error) => {
+                    throw new Error(
+                        error.message +
+                            '\n' +
+                            errors.join('\n') +
+                            '\n' +
+                            JSON.stringify(frames) +
+                            '\n' +
+                            // Inspect the controlled fixture and its completion
+                            JSON.stringify(await page.evaluate(() => window.__aclDevReload)),
+                    );
+                });
+            assert.deepEqual(errors, []);
+            // Inspect the controlled fixture and its completion
+            assert.deepEqual(await page.evaluate(() => window.__aclDevReload.tags), ['route-card']);
+            // Inspect the controlled fixture and its completion
+            assert.equal(
+                await page.evaluate(
+                    // Inspect the controlled fixture and its completion
+                    () =>
+                        performance
+                            .getEntriesByType('resource')
+                            // Inspect the controlled fixture and its completion
+                            .filter((entry) => entry.name.includes('/dist/index.js')).length,
+                ),
+                0,
+            );
+        } finally {
+            await browser.close();
+        }
     } finally {
         await server.close();
     }
@@ -698,11 +836,17 @@ test('Vite development and production integration preserve native external modul
         root,
         base: '/nested/',
         logLevel: 'silent',
-        plugins: [alpineComponentLoader({ generate: false })],
+        plugins: [
+            alpineComponentLoader({
+                generate: false,
+                preload: { groups: ['initial'] },
+            }),
+        ],
         build: { outDir: 'production' },
     });
     const productionHtml = await readFile(join(root, 'production', 'index.html'), 'utf8');
     assert.ok(productionHtml.includes(`/nested/assets/alpine-component-loader/${packageVersion}/index.js`));
+    assert.match(productionHtml, /rel="modulepreload"/);
     assert.ok(
         (
             await stat(
@@ -710,6 +854,68 @@ test('Vite development and production integration preserve native external modul
             )
         ).isFile(),
     );
+    // Inspect the controlled fixture and its completion
+    const productionServer = createServer(async (request, response) => {
+        // Release resources on both success and failure
+        try {
+            const pathname = new URL(request.url, 'http://localhost').pathname,
+                directory = pathname.startsWith('/native-runtime/')
+                    ? join(repositoryRoot, 'dist')
+                    : join(root, pathname.startsWith('/external/') ? 'external-production' : 'production'),
+                relativePath = pathname.replace(/^\/(?:nested|external|native-runtime)\//, '/'),
+                file = join(directory, relativePath === '/' ? 'index.html' : relativePath);
+            response.setHeader(
+                'content-type',
+                file.endsWith('.js') ? 'text/javascript' : file.endsWith('.json') ? 'application/json' : 'text/html',
+            );
+            response.end(await readFile(file));
+        } catch {
+            response.writeHead(404).end();
+        }
+    });
+    // Inspect the controlled fixture and its completion
+    await new Promise((resolve) => productionServer.listen(0, '127.0.0.1', resolve));
+    const productionBrowser = await chromium.launch();
+    // Release resources on both success and failure
+    try {
+        const page = await productionBrowser.newPage(),
+            errors = [];
+        // Inspect the controlled fixture and its completion
+        page.on('pageerror', (error) => errors.push(error.message));
+        await page.goto(`http://127.0.0.1:${productionServer.address().port}/nested/`);
+        await page.waitForFunction(() => window.__aclRouteHost?.textContent === 'Route changed');
+        assert.deepEqual(errors, []);
+        await viteBuild({
+            root,
+            base: '/external/',
+            logLevel: 'silent',
+            plugins: [
+                alpineComponentLoader({
+                    generate: false,
+                    moduleDelivery: 'external',
+                    moduleBase: `http://127.0.0.1:${productionServer.address().port}/native-runtime`,
+                    preload: {
+                        entry: 'core',
+                        tags: ['initial-card'],
+                    },
+                }),
+            ],
+            build: { outDir: 'external-production' },
+        });
+        const externalHtml = await readFile(join(root, 'external-production/index.html'), 'utf8');
+        assert.match(externalHtml, /href="http:\/\/127\.0\.0\.1:\d+\/native-runtime\/runtime\/loader.js"/);
+        assert.match(externalHtml, /href="http:\/\/127\.0\.0\.1:\d+\/native-runtime\/core.js"/);
+        await assert.rejects(stat(join(root, 'external-production/assets/alpine-component-loader')), {
+            code: 'ENOENT',
+        });
+        await page.goto(`http://127.0.0.1:${productionServer.address().port}/external/`);
+        await page.waitForFunction(() => window.__aclRouteHost?.textContent === 'Route changed');
+        assert.deepEqual(errors, []);
+    } finally {
+        await productionBrowser.close();
+        // Inspect the controlled fixture and its completion
+        await new Promise((resolve) => productionServer.close(resolve));
+    }
 });
 
 test('SSR data policy authorizes bounded JSON requests and rejects conflicts and private redirects', async () => {

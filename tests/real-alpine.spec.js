@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { dirname, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { alpineRuntime } from '../scripts/alpine-runtime.mjs';
 
 // Serve real Alpine distributions and strict CSP fixtures from one controlled origin
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..'),
@@ -96,10 +97,10 @@ test.afterAll(async () => {
     );
 });
 
-// Run the same integration contract against every supported Alpine minor line
+// Exercise the minimum supported Alpine release and the configured build version
 for (const [label, packageName] of [
     ['Alpine 3.14', 'alpinejs-314'],
-    ['Alpine 3.15', 'alpinejs-315'],
+    [`Alpine ${alpineRuntime.version}`, alpineRuntime.alias],
 ]) {
     test(`${label} initializes reactive light and shadow components`, async ({ page }) => {
         // Exercise the test scenario
@@ -182,7 +183,7 @@ for (const [label, packageName] of [
                 // Read the browser state
                 () => window.__realAlpine.version,
             ),
-        ).toMatch(/^3\.(14|15)\./);
+        ).toBe(packageName === alpineRuntime.alias ? alpineRuntime.version : '3.14.0');
         expect(errors).toEqual([]);
     });
 }

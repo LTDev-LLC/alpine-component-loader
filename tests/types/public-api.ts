@@ -8,20 +8,27 @@ import AlpineComponentLoader, {
     type ACLProps,
 } from 'alpine-component-loader';
 import AutoAlpineComponentLoader, { startAutoLoader } from 'alpine-component-loader/auto';
+import CoreLoader, { ACLLoadError as CoreLoadError, type ACLComponentOptions as CoreOptions } from 'alpine-component-loader/core';
 import ACLDebugger, { createDiagnosticSnapshot } from 'alpine-component-loader/debugger';
 import connectACLDevServer, { reloadChangedTemplates } from 'alpine-component-loader/dev';
 import { getOfflineStatus, registerOfflineWorker } from 'alpine-component-loader/offline';
+import loadPolyfills, { waitForWebComponents, type ACLPolyfillOptions } from 'alpine-component-loader/polyfills';
 import ACLA11y, { auditAccessibility } from 'alpine-component-loader/a11y';
 import ACLA11yScanner, { mountAccessibilityScanner } from 'alpine-component-loader/a11y-scanner';
 import ACLTesting, { installFetchMock, mountComponent, recordACLEvents, waitForComponent } from 'alpine-component-loader/testing';
 import ACLSSR, { createSSRRenderer } from 'alpine-component-loader/ssr';
-import { defineConfig } from 'alpine-component-loader/project';
+import { generateModulePreloads, type ACLRuntimeCapability, defineConfig } from 'alpine-component-loader/project';
 import { startACLTestServer } from 'alpine-component-loader/testing/server';
 
 interface CardProps extends ACLProps {
     count: number;
     label: string;
 }
+
+const polyfillOptions: ACLPolyfillOptions = { url: '/polyfills/webcomponents-loader.js', timeout: 10000, nonce: 'example' };
+void loadPolyfills(polyfillOptions);
+const polyfillResult: Promise<number> = waitForWebComponents(async () => 42);
+void polyfillResult;
 
 const options: ACLComponentOptions<CardProps> = {
     attributes: {
@@ -160,3 +167,23 @@ void eventSource;
 void registeredSkeletons;
 void manifestDependencies;
 void metrics;
+
+const signal = new AbortController().signal;
+const capabilities: ACLRuntimeCapability[] = ['scheduler', 'data', 'debugger'];
+void generateModulePreloads({ manifest: { version: 1, components: {} }, entryUrl: '/dist/index.min.js', features: capabilities });
+AlpineComponentLoader.config({ templateTimeout: 0, templateMaxBytes: Infinity, prefetchConcurrency: 4, hydrationScheduler: { budgetMs: 8, maxTasksPerTurn: 4 } });
+void AlpineComponentLoader.loadTemplate('/template.html', {}, { signal });
+void AlpineComponentLoader.prefetch('example-card', { signal });
+void AlpineComponentLoader.prefetchAll(['example-card'], { signal });
+void AlpineComponentLoader.prefetchGraph(['example-card'], { signal });
+const streamingRenderer = createSSRRenderer({ manifest: { version: 1, components: {} }, concurrency: 8, resolver: (source, _definition, context) => { void context.signal; return source; } });
+const htmlStream: AsyncIterable<string> = streamingRenderer.renderStream([{ tagName: 'example-card', signal }], { concurrency: 2, signal });
+void htmlStream;
+void streamingRenderer.renderMany([], { signal });
+
+const explicitOptions: CoreOptions = { templateTimeout: 10000, templateMaxBytes: 1048576 };
+CoreLoader.config(explicitOptions);
+void CoreLoader.start();
+new CoreLoadError('core error', { code: 'ACL_LOAD_CANCELED' });
+const transformCapabilities: ACLRuntimeCapability[] = ['hydration', 'triggers', 'styles', 'slots', 'scripts'];
+void transformCapabilities;

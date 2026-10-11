@@ -1,16 +1,61 @@
 {
     "entries": {
-        "core": { "initial": 9506, "full": 80051 },
-        "debugger": { "initial": 12217, "full": 14415 },
-        "auto": { "initial": 9969, "full": 80537 },
-        "dev": { "initial": 12219, "full": 82696 },
-        "offline": { "initial": 1203, "full": 1203 },
-        "a11y": { "initial": 4723, "full": 4723 },
-        "scanner": { "initial": 9248, "full": 11764 },
-        "testing": { "initial": 16930, "full": 83934 },
-        "testingPlaywright": { "initial": 1033, "full": 1033 },
-        "testingVitest": { "initial": 17165, "full": 84163 },
-        "observabilityExporters": { "initial": 2334, "full": 2334 }
+        "core": {
+            "initial": 7593,
+            "full": 107703
+        },
+        "explicitCore": {
+            "initial": 6747,
+            "full": 107703
+        },
+        "basicReady": {
+            "initial": 46540,
+            "full": 107703
+        },
+        "debugger": {
+            "initial": 12656,
+            "full": 15240
+        },
+        "auto": {
+            "initial": 8420,
+            "full": 108530
+        },
+        "dev": {
+            "initial": 10958,
+            "full": 111057
+        },
+        "offline": {
+            "initial": 1200,
+            "full": 1200
+        },
+        "a11y": {
+            "initial": 4720,
+            "full": 4720
+        },
+        "scanner": {
+            "initial": 10383,
+            "full": 13371
+        },
+        "testing": {
+            "initial": 15739,
+            "full": 112319
+        },
+        "testingPlaywright": {
+            "initial": 1029,
+            "full": 1029
+        },
+        "testingVitest": {
+            "initial": 16401,
+            "full": 112981
+        },
+        "observabilityExporters": {
+            "initial": 2330,
+            "full": 2330
+        },
+        "polyfills": {
+            "initial": 4747,
+            "full": 4747
+        }
     },
-    "sharedGraph": 88845
+    "sharedGraph": 118106
 }

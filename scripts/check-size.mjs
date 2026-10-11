@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { builtinModules } from 'node:module';
-import { gzipSync } from 'node:zlib';
+import { gzipSync, brotliCompressSync } from 'node:zlib';
+import { writeFile } from 'node:fs/promises';
 
 /**
  * @typedef {{ source: string, static: string[], dynamic: string[], external: string[] }} GraphNode
@@ -13,10 +14,20 @@ import { gzipSync } from 'node:zlib';
 const root = resolve('dist'),
     /** @type {{ entries: Record<string, { initial: number, full: number }>, sharedGraph: number }} */
     baselines = JSON.parse(await readFile(new URL('./size-baselines.json', import.meta.url), 'utf8')),
-    /** @type {Record<string, { path: string }>} */
+    /** @type {Record<string, { path: string, initialRoots?: string[] }>} */
     entries = {
         core: {
             path: 'dist/index.js',
+        },
+        explicitCore: { path: 'dist/core.js' },
+        polyfills: { path: 'dist/polyfills.js' },
+        basicReady: {
+            path: 'dist/index.js',
+            initialRoots: [
+                'dist/runtime/loader.js',
+                'dist/runtime/component/lifecycle-controller.js',
+                'dist/runtime/rendering.js',
+            ],
         },
         debugger: {
             path: 'dist/debugger.js',
@@ -63,78 +74,49 @@ const walk = async (directory) => {
     return files.sort();
 };
 
-const importPatterns = {
-        static: /(?:\bfrom\s*|\bimport\s*)["']([^"']+)["']/g,
-        dynamic: /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g,
-        eagerHelper: /\bimportLocalModule\s*\(\s*["']([^"']+)["']/g,
-        deferredHelper: /\b(?:importDeferredLocalModule|loadRuntimeModule)\s*\(\s*["']([^"']+)["']/g,
-    },
+/** @type {{ nodes: Record<string, { eager: string[], deferred: string[], external: string[], staticRelative: string[] }> }} */
+const moduleGraph = JSON.parse(await readFile(join(root, 'module-graph.json'), 'utf8')),
     /** @type {Map<string, GraphNode>} */
     graph = new Map(),
     /** @type {Set<string>} */
     relativeStaticImports = new Set(),
-    builtins = new Set([
-        ...builtinModules,
-        ...builtinModules.map(
-            // Transform the current item
-            (name) => `node:${name}`,
-        ),
-    ]);
-// Process each path
-for (const path of await walk(root)) {
-    const source = await readFile(path, 'utf8'),
-        directDynamicSpecifiers = new Set(
-            [...source.matchAll(importPatterns.dynamic)].map(
-                // Transform the current item
-                (match) => match[1],
-            ),
-        ),
-        eagerHelperSpecifiers = new Set(
-            [...source.matchAll(importPatterns.eagerHelper)].map(
-                // Transform the current item
-                (match) => match[1],
-            ),
-        ),
-        deferredHelperSpecifiers = new Set(
-            [...source.matchAll(importPatterns.deferredHelper)].map(
-                // Transform the current item
-                (match) => match[1],
-            ),
-        ),
-        dynamicSpecifiers = new Set([...directDynamicSpecifiers, ...deferredHelperSpecifiers]),
-        directStaticSpecifiers = [...source.matchAll(importPatterns.static)]
-            .map(
-                // Transform the current item
-                (match) => match[1],
-            )
-            .filter(
-                // Select matching items
-                (specifier) => !directDynamicSpecifiers.has(specifier),
-            ),
-        staticSpecifiers = directStaticSpecifiers.concat([...eagerHelperSpecifiers]),
-        resolveSpecifier = (/** @type {string} */ specifier) => {
-            // Resolve specifier
-            return specifier.startsWith('.') ? resolve(dirname(path), specifier) : specifier;
-        };
-    directStaticSpecifiers
-        .filter(
-            // Select matching items
-            (specifier) => specifier.startsWith('.'),
-        )
-        .forEach(
-            // Track suffix-unsafe browser module edges
-            (specifier) => relativeStaticImports.add(`${relative(process.cwd(), path)} -> ${specifier}`),
-        );
-    graph.set(resolve(path), {
-        source,
-        static: staticSpecifiers.map(resolveSpecifier),
-        dynamic: [...dynamicSpecifiers].map(resolveSpecifier),
-        external: [...staticSpecifiers, ...dynamicSpecifiers].filter(
-            // Select matching items
-            (specifier) => !specifier.startsWith('.'),
-        ),
+    builtins = new Set([...builtinModules, ...builtinModules.map((name) => `node:${name}`)]);
+// Consume the same structural graph used by offline and preload generation
+for (const [path, node] of Object.entries(moduleGraph.nodes)) {
+    const absolute = resolve(root, path);
+    graph.set(absolute, {
+        source: await readFile(absolute, 'utf8'),
+        // Measure each module response independently
+        static: node.eager.map((target) => resolve(root, target)),
+        // Measure each module response independently
+        dynamic: node.deferred.map((target) => resolve(root, target)),
+        external: node.external,
     });
+    // Measure each module response independently
+    node.staticRelative.forEach((target) => relativeStaticImports.add(`${path} -> ${target}`));
 }
+/** @type {Map<string, { readableGzip: number, readableBrotli: number, minifiedGzip: number, minifiedBrotli: number }>} */
+const compression = new Map();
+await Promise.all(
+    [...graph].map(async ([path, node]) => {
+        // Compress each response independently so shared dictionary savings are not invented
+        const minified = await readFile(path.replace(/\.js$/, '.min.js'));
+        compression.set(path, {
+            readableGzip: gzipSync(node.source).byteLength,
+            readableBrotli: brotliCompressSync(node.source).byteLength,
+            minifiedGzip: gzipSync(minified).byteLength,
+            minifiedBrotli: brotliCompressSync(minified).byteLength,
+        });
+    }),
+);
+/** @type {{ entries: Record<string, { initial: number, full: number }>, sharedGraph: number }} */
+const measured = {
+    entries: {},
+    sharedGraph: 0,
+};
+/** @type {Record<string, unknown>} */
+
+const delivery = {};
 
 /**
  * @param {string} entryPath
@@ -157,18 +139,8 @@ const closure = (entryPath, includeDynamic) => {
         visit(resolve(entryPath));
         return seen;
     },
-    gzip = (/** @type {Iterable<string>} */ paths) => {
-        // Run the gzip operation
-        return gzipSync(
-            [...paths]
-                .sort()
-                .map(
-                    // Transform the current item
-                    (path) => graph.get(path)?.source || '',
-                )
-                .join('\n'),
-        ).byteLength;
-    };
+    gzip = (/** @type {Iterable<string>} */ paths) =>
+        [...paths].reduce((total, path) => total + (compression.get(path)?.readableGzip || 0), 0);
 
 /** @type {Map<string, Set<string>>} */
 const reachability = new Map(),
@@ -178,6 +150,10 @@ const reachability = new Map(),
 for (const [name, config] of Object.entries(entries)) {
     const initial = closure(config.path, false),
         full = closure(config.path, true);
+    config.initialRoots?.forEach((path) => {
+        // Measure the basic inline component closure verified by browser request tests
+        closure(path, false).forEach((module) => initial.add(module));
+    });
     closures.set(name, {
         initial,
         full,
@@ -188,13 +164,14 @@ for (const [name, config] of Object.entries(entries)) {
     );
 }
 
-let failed = false;
+let failed = false,
+    structuralFailed = false;
 // Calculate one stable absolute-or-relative growth allowance
 /** @param {number} baseline */
 const limitFor = (baseline) => baseline + Math.max(64, Math.ceil(baseline * 0.05));
 if (relativeStaticImports.size) {
     process.stderr.write(`Package-relative static browser imports:\n${[...relativeStaticImports].join('\n')}\n`);
-    failed = true;
+    failed = structuralFailed = true;
 }
 // Process each entry
 for (const [name, config] of Object.entries(entries)) {
@@ -233,6 +210,37 @@ for (const [name, config] of Object.entries(entries)) {
     process.stdout.write(
         `${name}: initial ${initialBytes}/${initialLimit} (owned ${initialOwnedBytes}), full ${fullBytes}/${fullLimit} (owned ${fullOwnedBytes}), entry ${entryBytes}, shared ${sharedBytes} gzip bytes (${status})\n`,
     );
+    measured.entries[name] = {
+        initial: initialBytes,
+        full: fullBytes,
+    };
+    delivery[name] = Object.fromEntries(
+        [
+            ['initial', initial],
+            ['full', full],
+        ].map(([label, paths]) => {
+            // Report all compression variants and actual module counts for each closure
+            const selected = /** @type {Set<string>} */ (paths);
+            return [
+                String(label),
+                {
+                    requests: selected.size,
+                    ...Object.fromEntries(
+                        // Measure each module response independently
+                        ['readableGzip', 'readableBrotli', 'minifiedGzip', 'minifiedBrotli'].map((key) => [
+                            key,
+                            [...selected].reduce(
+                                // Measure each module response independently
+                                (sum, path) =>
+                                    sum + (compression.get(path)?.[/** @type {'readableGzip'} */ (key)] || 0),
+                                0,
+                            ),
+                        ]),
+                    ),
+                },
+            ];
+        }),
+    );
     failed ||= status !== 'ok';
 }
 
@@ -255,7 +263,7 @@ if (orphans.length) {
             )
             .join('\n')}\n`,
     );
-    failed = true;
+    failed = structuralFailed = true;
 }
 
 const nodeImports = [...reachable].flatMap(
@@ -273,7 +281,7 @@ const nodeImports = [...reachable].flatMap(
 );
 if (nodeImports.length) {
     process.stderr.write(`Unexpected Node imports in browser entries:\n${nodeImports.join('\n')}\n`);
-    failed = true;
+    failed = structuralFailed = true;
 }
 
 /** @type {Map<string, string[]>} */
@@ -306,7 +314,7 @@ if (duplicates.length) {
             )
             .join('\n')}\n`,
     );
-    failed = true;
+    failed = structuralFailed = true;
 }
 
 const sharedChunks = [...reachability].filter(
@@ -321,4 +329,33 @@ process.stdout.write(
     `Shared graph: ${sharedGraphBytes}/${sharedGraphLimit} gzip bytes (${sharedGraphStatus}); shared chunks: ${sharedChunks.length}; reachable chunks: ${reachable.size}; orphaned chunks: ${orphans.length}.\n`,
 );
 failed ||= sharedGraphStatus !== 'ok';
-if (failed) process.exitCode = 1;
+measured.sharedGraph = sharedGraphBytes;
+process.stdout.write(`${JSON.stringify(delivery, null, 2)}\n`);
+if (structuralFailed) throw new Error('Invalid browser module distribution');
+if (process.argv.includes('--update')) {
+    await writeFile(new URL('./size-baselines.json', import.meta.url), `${JSON.stringify(measured, null, 4)}\n`);
+    await writeFile(new URL('./delivery-baselines.json', import.meta.url), `${JSON.stringify(delivery, null, 4)}\n`);
+} else {
+    const expected = JSON.parse(await readFile(new URL('./delivery-baselines.json', import.meta.url), 'utf8'));
+    // Measure each module response independently
+    for (const [name, measurements] of Object.entries(delivery)) {
+        // Gate independently delivered variants with the same reviewed growth allowance
+        for (const [phase, values] of Object.entries(
+            /** @type {Record<string, Record<string, number>>} */ (measurements),
+        )) {
+            // Measure each module response independently
+            for (const [metric, value] of Object.entries(values)) {
+                const baseline = expected[name]?.[phase]?.[metric];
+                if (!Number.isFinite(baseline)) {
+                    failed = true;
+                    continue;
+                }
+                if (value > (metric === 'requests' ? baseline : limitFor(baseline))) {
+                    process.stderr.write(`${name} ${phase} ${metric} exceeds delivery budget\n`);
+                    failed = true;
+                }
+            }
+        }
+    }
+    if (failed) process.exitCode = 1;
+}

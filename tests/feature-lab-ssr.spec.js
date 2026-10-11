@@ -119,7 +119,7 @@ test('SSR feature lab hydrates in place, fetches data, projects slots, and becom
     await expect(page.locator('#hydrated-count')).toHaveText('22');
     await expect(page.locator('#template-request-count')).toHaveText('0');
     await expect(page.locator('#registered-count')).toHaveText('17');
-    await expect(page.locator('#feature-count')).toHaveText('9');
+    await expect(page.locator('#feature-count')).toHaveText('11');
     expect(templates).toEqual([]);
     expect(packageRequests.length).toBeGreaterThan(8);
     expect(
@@ -211,4 +211,34 @@ test('SSR feature lab isolates a revision mismatch to one safe client fallback',
     await expect(page.locator('#event-counter').locator('button')).toHaveText('Count 2');
     await expect(page.locator('#lab-hero')).toHaveAttribute('data-acl-hydrated', '');
     expect(templates).toEqual(['/components/lab-counter-card.html']);
+});
+
+test('SSR stream controls preserve order, bound work, cancel, and isolate parsed-template reuse', async ({
+    page,
+    request,
+}) => {
+    // Exercise the HTTP streaming surface and its real browser consumer
+    await page.goto(baseUrl);
+    await expect(page.locator('html')).toHaveAttribute('data-acl-ready', 'true');
+    await page.locator('#stream-concurrency').fill('3');
+    await page.locator('#run-stream').click();
+    await expect(page.locator('#stream-results > article')).toHaveCount(12);
+    // Read ordered streaming diagnostics
+    const streamed = await page.evaluate(() => window.streamDemoResult);
+    // Read ordered streaming diagnostics
+    expect(streamed.yielded).toEqual(Array.from({ length: 12 }, (_, index) => index));
+    expect(streamed.peak).toBeLessThanOrEqual(3);
+    expect(streamed.completed[0]).not.toBe(0);
+    await page.locator('#run-batch').click();
+    await expect(page.locator('#stream-summary')).toContainText('"mode": "batch"');
+    await expect(page.locator('#stream-results > article')).toHaveCount(12);
+    await page.locator('#run-stream').click();
+    await expect(page.locator('#stream-results > article').first()).toBeVisible();
+    await page.locator('#cancel-stream').click();
+    await expect(page.locator('#stream-summary')).toContainText('Canceled');
+    expect(await page.locator('#stream-results > article').count()).toBeGreaterThan(0);
+    expect(await page.locator('#stream-results > article').count()).toBeLessThan(12);
+    await page.locator('#run-reuse').click();
+    await expect(page.locator('#reuse-results')).toContainText('"isolated": true');
+    expect((await request.get(baseUrl + '/demo-stream?concurrency=0')).status()).toBe(400);
 });

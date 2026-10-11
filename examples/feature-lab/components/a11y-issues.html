@@ -70,7 +70,7 @@
     }
 
     .icon-button::before {
-        content: "?";
+        content: '?';
     }
 
     a {
@@ -82,10 +82,12 @@
     <p>This component deliberately contains several common mistakes for the development scanner to report.</p>
     <div class="profile-row">
         <!-- Intentionally missing alt text. -->
-        <img class="avatar"
-            src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' rx='32' fill='%23f59e0b'/%3E%3Ccircle cx='32' cy='24' r='11' fill='%23783f04'/%3E%3Cpath d='M13 57c2-13 10-20 19-20s17 7 19 20' fill='%23783f04'/%3E%3C/svg%3E">
+        <img
+            class="avatar"
+            src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' rx='32' fill='%23f59e0b'/%3E%3Ccircle cx='32' cy='24' r='11' fill='%23783f04'/%3E%3Cpath d='M13 57c2-13 10-20 19-20s17 7 19 20' fill='%23783f04'/%3E%3C/svg%3E"
+        />
         <!-- A placeholder is not a label. -->
-        <input type="text" placeholder="Display name">
+        <input type="text" placeholder="Display name" />
     </div>
     <div class="actions">
         <!-- The visible question mark is CSS-only, leaving this button unnamed. -->

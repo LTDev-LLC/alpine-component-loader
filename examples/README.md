@@ -6,19 +6,20 @@ Build once before running repository-local examples:
 npm run build
 ```
 
-| Example                                      | Run                                        | What it demonstrates                                                                                                              |
-| -------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+Shared controls are authored in `scripts/example-controls.css`. The build embeds them in each example stylesheet.
+
+| Example                                      | Run                                        | What it demonstrates                                                                                                                      |
+| -------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | [Feature lab](feature-lab/README.md)         | `npm run example:feature-lab`              | Complete browser runtime, JavaScript inline definitions, `x-acl` discovery, manifests, persistence, observability, security, and tooling. |
-| [SSR example](ssr/README.md)                 | `npm run example:ssr`                      | Declarative Shadow DOM, `dataResolver`/`dataPolicy`, progressive hydration modes, slots, and revision fallback.                   |
-| [SSR feature lab](feature-lab-ssr/README.md) | `npm run example:feature-lab:ssr`          | Larger SSR gallery, batch rendering, events, sanitizer parity, debugging, and accessibility.                                      |
-| [HMR](hmr/README.md)                         | `npm run example:hmr`                      | Injected SSE development client, `/auto` late-template observation, and state-preserving targeted reloads.                        |
-| [Offline](offline/README.md)                 | `npm run example:offline`                  | Generated precache graph, navigation policy, bounded runtime caching, storage diagnostics, and offline reload.                    |
-| [Accessibility](a11y/README.md)              | `npm run example:a11y`                     | In-page audits, scanner UI, debugger integration, headless audit baselines, and expiring suppressions.                            |
-| [Playground](playground/README.md)           | `npm run example:playground` or open Pages | ACL-powered four-source editor, themed dashboard, incremental HMR, unified accessibility auditing, diagnostics, and local drafts. |
+| [SSR feature lab](feature-lab-ssr/README.md) | `npm run example:feature-lab:ssr`          | Ordered streaming, bounded batches, abort, parsed-tree reuse, hydration, and sanitizer parity.                                            |
+| [HMR](hmr/README.md)                         | `npm run example:hmr`                      | Injected SSE client, state-preserving reloads, styles/slots/scripts, and cancellation during pending loads.                               |
+| [Offline](offline/README.md)                 | `npm run example:offline`                  | Generated root/core workers, offline reload, late capability activation, and self-hosted polyfill assets.                                 |
+| [Accessibility](a11y/README.md)              | `npm run example:a11y`                     | On-demand audits/scanner/debugger, focus and cleanup, headless baselines, and expiring suppressions.                                      |
+| [Playground](playground/README.md)           | `npm run example:playground` or open Pages | Four-source editor with core, transformations, scheduled and isolated-loader projects, polyfill preview, and module diagnostics.          |
 
 ## Integrated starter workflows
 
-The starters copied by `alpine-component-loader create` are the smallest end-to-end examples of the new project/runtime integration:
+`alpine-component-loader create` copies these starters:
 
 | Starter                                  | Create                                                      | Integrated path                                                                                                                                                                                             |
 | ---------------------------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -27,18 +28,35 @@ The starters copied by `alpine-component-loader create` are the smallest end-to-
 
 For focused source examples:
 
-- [`starters/vite/acl.config.mjs`](../starters/vite/acl.config.mjs) shows one configuration shared by the CLI and Vite plugin.
-- [`starters/vite/src/router.js`](../starters/vite/src/router.js) registers exact route keys from the virtual route module with base-aware client navigation.
-- [`starters/vite/public/components/quantity-field.acl.json`](../starters/vite/public/components/quantity-field.acl.json) shows the JSON-safe form mapping.
-- [`ssr/server.mjs`](ssr/server.mjs) keeps separate, mutually exclusive `dataResolver` and `dataPolicy` renderers.
-- [`a11y/acl-a11y-baseline.json`](a11y/acl-a11y-baseline.json) and [`a11y/acl-a11y-suppressions.json`](a11y/acl-a11y-suppressions.json) are ready-to-run audit policy artifacts.
+- [Shared project config](../starters/vite/acl.config.mjs) for CLI and Vite.
+- [Route registration](../starters/vite/src/router.js) with base-aware navigation.
+- [Form mapping](../starters/vite/public/components/quantity-field.acl.json) in a JSON sidecar.
+- [SSR rendering](feature-lab-ssr/server.mjs) with typed props, slots, and revision fallback.
+- [Audit baseline](a11y/acl-a11y-baseline.json) and [suppressions](a11y/acl-a11y-suppressions.json).
+
+## Choose a startup entry
+
+| Example or starter             | Entry                                  | Reason                                                                                  |
+| ------------------------------ | -------------------------------------- | --------------------------------------------------------------------------------------- |
+| Accessibility, SSR feature lab | `/core`                                | Explicit component/manifest registration; hydration and optional tools remain available |
+| Feature lab, Playground        | Root                                   | Declarative discovery and root-only factories are part of the demos                     |
+| HMR                            | `/auto`                                | Automatic late-template observation is the feature being demonstrated                   |
+| Offline                        | Root or `/core`                        | Matching generated worker for each entry                                                |
+| Vanilla starter                | Root by default; `?entry=core` variant | Same manifest, with explicit boundary registration in core mode                         |
+| Vite starter                   | Root by default; `?entry=core` variant | Route registration and boundary ownership are already explicit                          |
+
+Import maps include core and polyfills without activating them. See [core startup](../docs/core.md) for discovery and
+readiness.
+
+The [vanilla](../starters/vanilla/README.md#startup-variants) and
+[Vite](../starters/vite/README.md#optional-web-components-polyfills) variants load optional polyfills before
+Alpine/application imports. Native browsers skip upstream scripts; native ESM/ES2022 is still required. See
+[polyfill setup](../docs/polyfills.md) for CSP, self-hosting, and offline assets.
 
 ## Static deployment artifacts
 
-`npm run stage` builds ACL and replaces `_site` with a standalone Playground
-artifact. `npm run staging` is an equivalent alias. Both commands check/install
-the Playwright Chromium browser used for responsive skeleton capture. Pass one
-or more backend-free example names to select them:
+`npm run staging` (alias `stage`) builds all four static examples in `_site`: Accessibility, Feature Lab, Offline, and
+Playground. It installs/checks Chromium for responsive skeleton capture. Select a subset with:
 
 ```bash
 npm run stage -- feature-lab
@@ -48,44 +66,30 @@ npm run stage -- playground feature-lab
 npm run stage -- a11y offline playground
 ```
 
-Selected pages remain at `/examples/<name>/index.html`, share one generated
-`/dist/*.min.js` runtime family, and receive static import maps without
-development-server routes. One distinct selection retains the root redirect.
-Two or more distinct selections generate a dependency-free root catalog styled
-like the Feature Lab, with application and README links for every bundled
-example. The small catalog stylesheet is embedded in the root document so a
-stale generic `/styles.css` cache or static-host rewrite cannot leave the entry
-page unstyled; the same generated CSS remains available as `_site/styles.css`
-for inspection. Each staged example page also receives a canonical
-`/examples/<name>/index.html` document base, keeping relative styles, scripts,
-and component templates inside the selected example even when a static host
-serves a clean URL without a trailing slash.
+Staged pages keep `/examples/<name>/index.html`, a canonical document base, and shared `/dist/*.min.js` imports. One
+selection creates a root redirect; multiple selections create an ordered catalog. Catalog CSS is embedded and also saved
+as `_site/styles.css`.
 
-Each selected example receives a responsive standalone stylesheet at
-`_site/examples/<name>/skeletons/acl-skeletons.css`. The staged copy of its
-`index.html` links that generated stylesheet after the authored page styles and
-before executable scripts, so component geometry is reserved and painted while
-the runtime starts. Source example files are not changed, and the generated
-catalog or single-example redirect does not receive an application skeleton.
+Each page links its generated `skeletons/acl-skeletons.css` before scripts to reserve loading geometry. Staging leaves
+source pages unchanged; catalogs and redirects need no skeleton.
 
-Selectors are validated as a complete list before staging starts. Repeated
-names are silently deduplicated in their first command-line order, which also
-controls catalog card order. Unknown, unsafe, HMR, or SSR selectors abort the
-whole command and leave the previous `_site` artifact in place. Skeleton
-capture failures use the same atomic behavior. There is no special `all`
-selector; request all four static examples explicitly.
+Names are deduplicated in command-line order. Invalid selectors or capture failures preserve the previous `_site`.
+HMR/SSR require backends and cannot be staged. There is no `all` selector.
 
-Every staged example loads Alpine 3.15.12 from the pinned jsDelivr URL instead
-of copying an Alpine package. A first visit therefore needs network access. The
-Offline example caches that remote response after a successful install and
-regenerates its route-scoped service worker whenever it is included. Its final
-page and generated skeleton stylesheet are both included in the staged
-precache.
+Staged pages use the Alpine pin from `alpinejs-pinned` in `package.json`, served through jsDelivr. First visits need
+network access. The Offline worker caches it after installation and precaches the final page and skeleton CSS.
 
-The HMR and two SSR examples are intentionally rejected by `stage` because
-their defining behavior requires a development or rendering backend. Playground
-remains the no-argument default used by the GitHub Pages workflow, so the
-published default artifact still opens directly through the single-example
-redirect.
+The default artifact opens a catalog linking all four examples.
 
-The maintained [vanilla](../starters/vanilla/README.md) and [Vite](../starters/vite/README.md) starters are copied by `alpine-component-loader create`. Automated Playwright fixture usage is executable in [`tests/testing-integrations.spec.js`](../tests/testing-integrations.spec.js), while the complete test-runner contracts are documented in [Testing utilities](../docs/testing.md).
+The [Playwright fixture example](../tests/testing-integrations.spec.js) demonstrates automatic cleanup; see
+[testing utilities](../docs/testing.md) for runner contracts.
+
+## Interactive capability experiments
+
+Experiments open in fresh same-origin iframes and release loader resources when closed. The Feature Lab covers core
+startup, polyfills, transformations, cancellation, limits, prefetch, scheduling, pooling, isolated loaders,
+sanitization, and preload generation.
+
+Other pages select relevant experiments. Polyfill variants use self-hosted scripts; Playground applies them only to
+previews. SSR reports hydration and scheduling. Staging copies shared demos and upstream bundles; Offline precaches
+matching root/core graphs for late capability activation.

@@ -77,7 +77,14 @@ Project options:
   --json                   Print machine-readable command results
   --force                  Allow replacing existing generated files
 
+Preload options:
+  --entry-url <url>        Runtime index.js or index.min.js URL
+  --tag / --group <name>   Select initial manifest roots (repeatable)
+  --feature <name>         Include an imperative runtime capability (repeatable)
+
 Offline options:
+  --runtime-entry <url>    Expand the runtime module graph
+  --runtime-feature <name> Include an imperative runtime capability (repeatable)
   --group <name>           Include a named manifest group (repeatable)
   --asset <path-or-url>    Include a static file, directory, or URL (repeatable)
   --minify-js              Publish local explicit JavaScript assets as virtual .min.js URLs
@@ -161,6 +168,7 @@ const parseCLIArgumentsInternal = (
             'routes',
             'watch',
             'offline',
+            'preload',
             'types',
             'schema',
         ].includes(command)
@@ -451,6 +459,46 @@ const parseCLIArgumentsInternal = (
         };
     }
 
+    if (command === 'preload') {
+        const options = {
+            command,
+            tags: [],
+            groups: [],
+            features: [],
+            force: false,
+            dryRun: false,
+            json: false,
+        };
+        // Process queued work in a bounded deterministic order
+        for (let position = 0; position < args.length; position++) {
+            const argument = args[position],
+                flag = ['--entry-url', '--tag', '--group', '--feature', '--out'].find(
+                    // Resolve this operation and preserve independent ownership
+                    (name) => argument === name || argument.startsWith(`${name}=`),
+                );
+            if (argument === '--help' || argument === '-h')
+                return {
+                    command,
+                    help: true,
+                };
+            if (flag) {
+                const result = readFlagValue(args, position, flag);
+                position += result.consumed;
+                if (flag === '--entry-url') options.entryUrl = result.value;
+                else if (flag === '--out') options.out = resolve(invocationDirectory, result.value);
+                else options[flag === '--tag' ? 'tags' : flag === '--group' ? 'groups' : 'features'].push(result.value);
+            } else if (argument === '--force') options.force = true;
+            else if (argument === '--dry-run') options.dryRun = true;
+            else if (argument === '--json') options.json = true;
+            else if (argument.startsWith('-')) throw new TypeError(`Unknown option: ${argument}`);
+            else if (options.manifestFile) throw new TypeError('Only one preload manifest may be supplied');
+            else options.manifestFile = resolve(invocationDirectory, argument);
+        }
+        if (!options.manifestFile || !options.entryUrl)
+            throw new TypeError('preload requires a manifest and --entry-url');
+        return options;
+    }
+
     if (command === 'offline') {
         let manifestFile = null,
             outDir = resolve(invocationDirectory, 'offline'),
@@ -462,7 +510,9 @@ const parseCLIArgumentsInternal = (
             dryRun = false,
             json = false;
         const groups = [],
-            assets = [];
+            assets = [],
+            features = [];
+        let runtimeEntry = null;
         // Iterate over the indexed values
         for (let position = 0; position < args.length; position++) {
             const argument = args[position];
@@ -471,14 +521,25 @@ const parseCLIArgumentsInternal = (
                     command,
                     help: true,
                 };
-            const valueOption = ['--group', '--asset', '--out-dir', '--base-url', '--namespace', '--config'].find(
+            const valueOption = [
+                '--group',
+                '--asset',
+                '--out-dir',
+                '--base-url',
+                '--namespace',
+                '--config',
+                '--runtime-entry',
+                '--runtime-feature',
+            ].find(
                 // Find the matching item
                 (name) => argument === name || argument.startsWith(`${name}=`),
             );
             if (valueOption) {
                 const result = readFlagValue(args, position, valueOption);
                 position += result.consumed;
-                if (valueOption === '--group') groups.push(result.value);
+                if (valueOption === '--runtime-entry') runtimeEntry = result.value;
+                else if (valueOption === '--runtime-feature') features.push(result.value);
+                else if (valueOption === '--group') groups.push(result.value);
                 else if (valueOption === '--asset') assets.push(result.value);
                 else if (valueOption === '--out-dir') outDir = resolve(invocationDirectory, result.value);
                 else if (valueOption === '--base-url') baseUrl = result.value;
@@ -502,6 +563,14 @@ const parseCLIArgumentsInternal = (
             outDir,
             groups,
             assets,
+            ...(runtimeEntry
+                ? {
+                      runtime: {
+                          entryUrl: runtimeEntry,
+                          features,
+                      },
+                  }
+                : {}),
             baseUrl,
             namespace,
             configFile,
@@ -948,6 +1017,7 @@ export const applyProjectConfiguration = // Run this operation
             if (!next.target)
                 throw new TypeError('The skeleton command requires a configured URL, directory, or HTML target.');
         } else if (options.command === 'offline') {
+            next.runtime = options.runtime || config.offline?.runtime;
             next.manifestFile = options.manifestFile || config.offline?.manifest || config.components?.manifest;
             if (
                 !options.rawArguments?.some(
@@ -978,7 +1048,15 @@ export const applyProjectConfiguration = // Run this operation
                 next.directory = config.components.directory;
             next.manifestFile = options.manifestFile || config.components?.manifest;
         } else if (options.command === 'serve') {
-            if (!options.target && config.root) next.root = config.root;
+            if (
+                !options.target &&
+                config.root &&
+                !options.rawArguments?.some(
+                    // Preserve an explicit serve root ahead of the configured default
+                    (argument) => argument === '--root' || argument.startsWith('--root='),
+                )
+            )
+                next.root = config.root;
         }
         if (options.command === 'types' && !next.manifestFile)
             throw new TypeError('The types command requires a configured component manifest or argument.');
@@ -1100,6 +1178,20 @@ export const runCLI = async (argv = process.argv.slice(2)) => {
                 `[ACL Routes] ${result.dryRun ? 'Planned' : 'Created'} ${Object.keys(result.index.routes).length} route manifest(s).\n`,
             );
         }
+        return result;
+    }
+    if (options.command === 'preload') {
+        const { readFile } = await import('node:fs/promises'),
+            { generateModulePreloads } = await import('../server/module-preloads.mjs'),
+            { writeProjectFile } = await import('../server/file-writer.mjs');
+
+        const result = await generateModulePreloads({
+            ...options,
+            manifest: JSON.parse(await readFile(options.manifestFile, 'utf8')),
+        });
+        if (options.out && !options.dryRun)
+            await writeProjectFile(options.out, `${result.html}\n`, { force: options.force });
+        process.stdout.write(options.json ? `${JSON.stringify(result, null, 2)}\n` : `${result.html}\n`);
         return result;
     }
     if (options.command === 'offline') {

@@ -16,6 +16,14 @@
     }
 </style>
 <button
-    onclick="this.dispatchEvent(new CustomEvent('internal-save', { bubbles: true, detail: { message: 'Received public-save from mapped event' } }))">
+    onclick="
+        this.dispatchEvent(
+            new CustomEvent('internal-save', {
+                bubbles: true,
+                detail: { message: 'Received public-save from mapped event' },
+            }),
+        )
+    "
+>
     Dispatch internal-save
 </button>

@@ -1,3 +1,4 @@
+export { generateModulePreloads } from './module-preloads.mjs';
 import { access } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -28,6 +29,7 @@ const CONFIG_NAME = 'acl.config.mjs',
             'namespace',
             'config',
             'minifyJavaScriptAssets',
+            'runtime',
         ]),
         watch: new Set(['tasks', 'debounce', 'pollInterval']),
         audit: new Set([
@@ -44,7 +46,7 @@ const CONFIG_NAME = 'acl.config.mjs',
             'suppressions',
             'updateBaseline',
         ]),
-        vite: new Set(['moduleDelivery', 'moduleDirectory', 'moduleBase', 'routeDirectory', 'generate']),
+        vite: new Set(['moduleDelivery', 'moduleDirectory', 'moduleBase', 'routeDirectory', 'generate', 'preload']),
         skeleton: new Set([
             'root',
             'target',

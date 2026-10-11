@@ -1,27 +1,14 @@
 import { expect, test } from './fixtures/test.js';
 import { createServer } from 'node:http';
-import { cp, mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, extname, join, relative, resolve } from 'node:path';
+import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { generateOfflineBundle } from '../server/offline-generator.mjs';
 
 // Build a temporary dependency graph that is isolated from checked-in examples
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 let projectRoot, server, baseUrl;
-
-// Expand built runtime assets for explicit service worker precaching
-const walk = async (directory) => {
-    // Walk
-    const files = [];
-    // Process each entry
-    for (const entry of await readdir(directory, { withFileTypes: true })) {
-        const path = join(directory, entry.name);
-        if (entry.isDirectory()) files.push(...(await walk(path)));
-        else if (entry.isFile()) files.push(path);
-    }
-    return files;
-};
 
 test.beforeAll(async () => {
     // Prepare the test group
@@ -32,6 +19,10 @@ test.beforeAll(async () => {
         join(projectRoot, 'components', 'offline-child.html'),
         '<section><offline-base></offline-base><p data-child>Child offline</p></section>',
     );
+    await writeFile(
+        join(projectRoot, 'components', 'offline-transform.html'),
+        '<style>p { color: rgb(1, 2, 3); }</style><slot><p>Fallback</p></slot><script>window.__offlineScript = true;</script>',
+    );
     const manifest = {
         version: 1,
         basePath: '/components/',
@@ -41,17 +32,28 @@ test.beforeAll(async () => {
                 source: 'offline-child.html',
                 dependencies: ['offline-base'],
             },
+            'offline-visible': {
+                source: 'offline-base.html',
+                options: { hydrate: 'visible' },
+            },
+            'offline-transform': {
+                source: 'offline-transform.html',
+                options: {
+                    sanitize: false,
+                    executeScripts: true,
+                },
+            },
         },
-        groups: { critical: ['offline-child'] },
+        groups: { critical: ['offline-child', 'offline-visible', 'offline-transform'] },
     };
     await writeFile(join(projectRoot, 'acl-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
     await writeFile(
         join(projectRoot, 'index.html'),
         `<!doctype html><html lang="en"><title>ACL offline</title><body>
-        <script defer src="/node_modules/alpinejs-315/dist/cdn.min.js"></script>
+        <script defer src="/node_modules/alpinejs-pinned/dist/cdn.min.js"></script>
         <script type="module">
-            import Loader from '/src/index.js';
-            import { registerOfflineWorker } from '/src/offline.js';
+            import Loader from '/dist/core.js';
+            import { registerOfflineWorker } from '/dist/offline.js';
             const manifest = await (await fetch('/acl-manifest.json')).json();
             await Loader.registerManifest(manifest);
             await Loader.start();
@@ -67,28 +69,23 @@ test.beforeAll(async () => {
     );
 
     await cp(resolve(repositoryRoot, 'dist'), join(projectRoot, 'dist'), { recursive: true });
-    await cp(resolve(repositoryRoot, 'src'), join(projectRoot, 'src'), { recursive: true });
-    await mkdir(join(projectRoot, 'node_modules', 'alpinejs-315', 'dist'), { recursive: true });
+    await mkdir(join(projectRoot, 'node_modules', 'alpinejs-pinned', 'dist'), { recursive: true });
     await cp(
-        resolve(repositoryRoot, 'node_modules', 'alpinejs-315', 'dist', 'cdn.min.js'),
-        join(projectRoot, 'node_modules', 'alpinejs-315', 'dist', 'cdn.min.js'),
+        resolve(repositoryRoot, 'node_modules', 'alpinejs-pinned', 'dist', 'cdn.min.js'),
+        join(projectRoot, 'node_modules', 'alpinejs-pinned', 'dist', 'cdn.min.js'),
     );
 
-    const distAssets = (await walk(resolve(repositoryRoot, 'dist'))).map(
-            // Transform the current item
-            (path) => relative(repositoryRoot, path),
-        ),
-        sourceAssets = (await walk(resolve(repositoryRoot, 'src'))).map(
-            // Transform the current item
-            (path) => relative(repositoryRoot, path),
-        ),
-        alpineAsset = 'node_modules/alpinejs-315/dist/cdn.min.js';
+    const alpineAsset = 'node_modules/alpinejs-pinned/dist/cdn.min.js';
     // Generate the exact worker users receive from the offline command
     await generateOfflineBundle({
         manifestFile: join(projectRoot, 'acl-manifest.json'),
         outDir: projectRoot,
         groups: ['critical'],
-        assets: ['index.html', 'acl-manifest.json', alpineAsset, ...distAssets, ...sourceAssets],
+        assets: ['index.html', 'acl-manifest.json', alpineAsset],
+        runtime: {
+            entryUrl: '/dist/core.js',
+            features: ['offline', 'environment'],
+        },
     });
 
     server = createServer(async (request, response) => {
@@ -153,5 +150,44 @@ test('generated service worker renders a selected dependency graph after an offl
     await page.reload();
     await expect(page.locator('offline-child [data-child]')).toHaveText('Child offline');
     await expect(page.locator('offline-base [data-base]')).toHaveText('Base offline');
+    await page.evaluate(async () => {
+        // Activate both manifest-selected visible hydration and imperative lazy loading offline
+        const inert = document.createElement('template');
+        inert.innerHTML =
+            '<offline-visible data-acl-ssr="1" data-acl-revision=""><p data-visible>Server</p></offline-visible>';
+        const visible = inert.content.firstElementChild,
+            lazy = document.createElement('offline-base'),
+            transformation = document.createElement('offline-transform'),
+            projected = document.createElement('p'),
+            hosts = [visible, lazy, transformation],
+            ready = hosts.map(
+                (host) =>
+                    new Promise((resolve, reject) => {
+                        // Await actual initialization with networking disabled
+                        host.addEventListener('acl:loadend', resolve, { once: true });
+                        // Inspect the controlled fixture and its completion
+                        host.addEventListener('acl:error', (event) => reject(event.detail.error), { once: true });
+                    }),
+            );
+        lazy.setAttribute('loading', 'lazy');
+        projected.textContent = 'Projected offline';
+        transformation.append(projected);
+        document.body.append(...hosts);
+        await Promise.all(ready);
+    });
+    await expect(page.locator('offline-visible')).toHaveAttribute('data-acl-hydrated', '');
+    await expect(page.locator('offline-transform p')).toHaveText('Projected offline');
+    expect(
+        await page.evaluate(() => {
+            // Verify all content-dependent groups activated without networking
+            return {
+                scripts: window.__offlineScript,
+                color: getComputedStyle(document.querySelector('offline-transform p')).color,
+            };
+        }),
+    ).toEqual({
+        scripts: true,
+        color: 'rgb(1, 2, 3)',
+    });
     await context.setOffline(false);
 });

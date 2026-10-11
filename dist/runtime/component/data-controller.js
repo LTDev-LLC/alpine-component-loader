@@ -1,17 +1,42 @@
 // @license AlpineComponentLoader
-// Copyright (c) LTDev LLC
+// Copyright (c) LouisT
 // Licensed under the MIT license in the repository root
 
-const moduleSuffix = new URL(import.meta.url).pathname.endsWith('.min.js') ? '.min.js' : '.js', importLocalModule = (specifier)=>import(/* @vite-ignore */ specifier.replace(/\.js$/, moduleSuffix)), [{ VALID_RESPONSE_TYPES }, { ACLLoadError, delayWithSignal, getRetryAfterMs, raceWithSignal, toACLLoadError }, { cloneRuntimeValue, mergeFetchOptions, parseJson, toSearchParamsDeep, toUrlValue }, { dataFetchCache, getDataCacheKey, normalizeRequestForCache, parseBodyValue, pruneDataFetchCache }, { readBooleanAttribute, readNumberAttribute }] = await Promise.all([
+const moduleSuffix = new URL(import.meta.url).pathname.endsWith('.min.js') ? '.min.js' : '.js', importLocalModule = (specifier)=>import(/* @vite-ignore */ specifier.replace(/\.js$/, moduleSuffix)), [{ VALID_RESPONSE_TYPES, readBooleanAttribute, readNumberAttribute }, { ACLLoadError, delayWithSignal, getRetryAfterMs, raceWithSignal, toACLLoadError }, { cloneRuntimeValue, mergeFetchOptions, parseJson, toSearchParamsDeep, toUrlValue }] = await Promise.all([
     importLocalModule('../config.js'),
     importLocalModule('../errors.js'),
-    importLocalModule('../values.js'),
-    importLocalModule('../fetch-cache.js'),
-    importLocalModule('../data-options.js')
+    importLocalModule('../values.js')
 ]);
 // Private custom-element controller with definition context supplied by the facade
 export const withComponentData = (Base, { AlpineComponentLoader, settings, tagName, contentSource })=>{
+    const { dataFetchCache, pruneDataFetchCache, getDataCacheKey, normalizeRequestForCache, parseBodyValue } = AlpineComponentLoader._dataRuntime;
     return class extends Base {
+        _startPolling() {
+            this._stopPolling();
+            const interval = parseInt(this.getAttribute('data-fetch-poll') || settings.data.poll);
+            if (isNaN(interval) || interval <= 0) {
+                this._detachPollingSignals();
+                return;
+            }
+            if (!this.isConnected) return;
+            if (!this._attachPollingSignals()) return;
+            if (AlpineComponentLoader._environment?.isPollingPaused(this)) return;
+            // Start the next polling interval only while every pause condition is clear
+            this._pollTimer = setTimeout(async ()=>{
+                // Run the scheduled delayed task
+                if (!this.isConnected) return;
+                // Fetch data again
+                const src = this.getAttribute('data-src') || settings.data.src;
+                if (src && this._state === 'ready' && !this.$props.$loading && !AlpineComponentLoader._environment?.isPollingPaused(this)) await this._fetchData(src, true);
+                // Schedule next tick
+                this._startPolling();
+            }, interval);
+        }
+        _attachPollingSignals() {
+            if (this._pollSignalCleanups?.length) return true;
+            if (!this._getPollingPauseSetting('pause-polling-when-hidden', 'pauseWhenHidden') && !this._getPollingPauseSetting('pause-polling-when-offline', 'pauseWhenOffline') && !this._getPollingPauseSetting('pause-polling-when-offscreen', 'pauseWhenOffscreen')) return true;
+            return this._useEnvironment(true, (module)=>module.installPollingSignals(this));
+        }
         _getFetchContext() {
             return {
                 el: this,
@@ -79,10 +104,6 @@ export const withComponentData = (Base, { AlpineComponentLoader, settings, tagNa
         }
         _getPollingPauseSetting(attributeName, groupName) {
             return readBooleanAttribute(this, attributeName, settings.data[groupName]);
-        }
-        _isPollingPaused() {
-            const pauseWhenHidden = this._getPollingPauseSetting('pause-polling-when-hidden', 'pauseWhenHidden'), pauseWhenOffline = this._getPollingPauseSetting('pause-polling-when-offline', 'pauseWhenOffline'), pauseWhenOffscreen = this._getPollingPauseSetting('pause-polling-when-offscreen', 'pauseWhenOffscreen');
-            return pauseWhenHidden && document.hidden || pauseWhenOffline && navigator.onLine === false || pauseWhenOffscreen && !this._pollIsIntersecting;
         }
         _getDataTarget() {
             return this.getAttribute('data-target') || settings.data.target || '$data';

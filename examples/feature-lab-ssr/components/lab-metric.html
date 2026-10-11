@@ -17,21 +17,25 @@
     strong {
         display: block;
         color: var(--metric-color, #4338ca);
-        font: 750 1.65rem/1 system-ui, sans-serif;
-        letter-spacing: -.03em;
+        font:
+            750 1.65rem/1 system-ui,
+            sans-serif;
+        letter-spacing: -0.03em;
     }
 
     p {
-        margin: .55rem 0 0;
+        margin: 0.55rem 0 0;
         color: #475569;
-        font: .82rem/1.45 system-ui, sans-serif;
+        font:
+            0.82rem/1.45 system-ui,
+            sans-serif;
     }
 
-    :host([tone="cyan"]) article {
+    :host([tone='cyan']) article {
         --metric-color: #0e7490;
     }
 
-    :host([tone="green"]) article {
+    :host([tone='green']) article {
         --metric-color: #15803d;
     }
 </style>

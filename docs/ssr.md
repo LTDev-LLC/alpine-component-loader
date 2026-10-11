@@ -1,16 +1,13 @@
 # Static SSR and hydration
 
-The Node-only `alpine-component-loader/ssr` entry renders manifest-defined components with parse5. It does not execute Alpine, launch a browser, or serialize application stores. Shadow components are emitted as Declarative Shadow DOM and can hydrate in place in the browser. An application may opt into bounded initial data with either `dataResolver` or an explicit `dataPolicy`, and may opt Light DOM definitions into structural server rendering.
+The Node-only `/ssr` entry uses parse5 to render manifest components without executing Alpine or serializing application
+stores. Shadow components use Declarative Shadow DOM for browser hydration. Light DOM rendering and bounded initial data
+(`dataResolver` or `dataPolicy`) are opt-in.
 
-Static SSR consumes URL-backed definitions from a component manifest.
-Browser-only JavaScript `{ template }` definitions, selector-backed templates,
-and `template[x-acl]`/`template[acl-component]` declarations are registered by
-the browser loader and are not inputs to the Node renderer or generated
-precache graph. Move a template to a URL-backed manifest source when the same
-component must be server-rendered or precached for offline startup.
+SSR and generated precache graphs require URL-backed manifest definitions. Inline JavaScript templates, selector
+sources, and browser template declarations are browser-only; move shared templates to files referenced by the manifest.
 
-`parse5` is an optional dependency that npm installs by default. A lean
-`npm install --omit=optional` must install it before using SSR:
+`parse5` is optional and installed by default. After `npm install --omit=optional`, install it before using SSR:
 
 ```bash
 npm install parse5
@@ -25,9 +22,7 @@ Start with `components/profile-card.html`:
     <slot name="avatar"></slot>
     <h2 x-text="$props.name"></h2>
     <p><slot>Profile details</slot></p>
-    <button type="button" @click="count++">
-        Visits: <span x-text="count"></span>
-    </button>
+    <button type="button" @click="count++">Visits: <span x-text="count"></span></button>
 </article>
 ```
 
@@ -38,27 +33,28 @@ npx alpine-component-loader manifest components --out acl-manifest.json
 npx alpine-component-loader validate acl-manifest.json
 ```
 
-The generator adds the source and a SHA-256 `templateRevision`, but it cannot infer Shadow DOM or props. Put those authored fields in the adjacent `components/profile-card.acl.json` sidecar:
+The generator adds the source and SHA-256 `templateRevision`. Declare Shadow DOM and props in the adjacent
+`components/profile-card.acl.json` sidecar:
 
 ```json
 {
-  "$schema": "../acl-component.schema.json",
-  "version": 1,
-  "groups": ["profile"],
-  "options": {
-    "shadow": true,
-    "attributes": {
-      "name": { "type": "String", "required": true },
-      "count": { "type": "Number", "default": 0 }
+    "$schema": "../acl-component.schema.json",
+    "version": 1,
+    "groups": ["profile"],
+    "options": {
+        "shadow": true,
+        "attributes": {
+            "name": { "type": "String", "required": true },
+            "count": { "type": "Number", "default": 0 }
+        }
+    },
+    "metadata": {
+        "description": "A server-rendered profile summary.",
+        "slots": {
+            "default": { "description": "Profile details." },
+            "avatar": { "description": "Profile avatar." }
+        }
     }
-  },
-  "metadata": {
-    "description": "A server-rendered profile summary.",
-    "slots": {
-      "default": { "description": "Profile details." },
-      "avatar": { "description": "Profile avatar." }
-    }
-  }
 }
 ```
 
@@ -69,39 +65,40 @@ npx alpine-component-loader schema --kind component --out acl-component.schema.j
 npx alpine-component-loader manifest components --out acl-manifest.json --update
 ```
 
-The generated manifest combines the content-owned source/revision with the sidecar-owned options, metadata, dependencies, and groups:
+The manifest combines generated source/revision fields with sidecar options, metadata, dependencies, and groups:
 
 ```json
 {
-  "version": 1,
-  "components": {
-    "profile-card": {
-      "source": "components/profile-card.html",
-      "dependencies": [],
-      "options": {
-        "shadow": true,
-        "attributes": {
-          "name": { "type": "String", "required": true },
-          "count": { "type": "Number", "default": 0 }
-        },
-        "templateRevision": "sha256-..."
-      },
-      "metadata": {
-        "description": "A server-rendered profile summary.",
-        "slots": {
-          "default": { "description": "Profile details." },
-          "avatar": { "description": "Profile avatar." }
+    "version": 1,
+    "components": {
+        "profile-card": {
+            "source": "components/profile-card.html",
+            "dependencies": [],
+            "options": {
+                "shadow": true,
+                "attributes": {
+                    "name": { "type": "String", "required": true },
+                    "count": { "type": "Number", "default": 0 }
+                },
+                "templateRevision": "sha256-..."
+            },
+            "metadata": {
+                "description": "A server-rendered profile summary.",
+                "slots": {
+                    "default": { "description": "Profile details." },
+                    "avatar": { "description": "Profile avatar." }
+                }
+            }
         }
-      }
+    },
+    "groups": {
+        "profile": ["profile-card"]
     }
-  },
-  "groups": {
-    "profile": ["profile-card"]
-  }
 }
 ```
 
-Use `manifest --update` whenever templates or sidecars change. It refreshes generated source/revision fields, preserves fields not owned by a sidecar, and retains missing components with a warning. Add `--prune` only when missing components should be deleted. See [Manifests, generated contracts, and CLI tooling](manifests-and-cli.md) for ownership rules.
+`manifest --update` refreshes templates and sidecars, preserves other authored fields, and warns about missing
+components. Add `--prune` to delete missing entries. See [manifest ownership rules](manifests-and-cli.md).
 
 ## Create the server renderer
 
@@ -129,34 +126,35 @@ const html = await renderer.render('profile-card', {
 
 Renderer construction options are:
 
-| Option | Default | Contract |
-| --- | --- | --- |
-| `manifest` | required | Parsed version-one component manifest. |
-| `root` | required for local sources | Project boundary used for local template resolution and traversal checks. |
-| `fetch` | `globalThis.fetch` | Fetch implementation for remote templates. |
-| `resolver` | none | Application source resolver that runs before local/remote loading. |
-| `timeout` | `10000` | Positive remote-template request deadline in milliseconds. |
-| `maxTemplateBytes` | 1 MiB | Positive local or remote template byte limit. |
-| `maxDataBytes` | 256 KiB | Positive serialized initial-data byte limit. |
-| `maxRedirects` | `5` | Non-negative remote-template redirect bound. |
-| `renderLightDom` | `false` | Default opt-in for rendering non-shadow definitions on the server. |
-| `dataResolver` | none | Application callback for bounded JSON-safe initial data. |
-| `dataPolicy` | none | Declarative, origin-bounded component request policy; mutually exclusive with `dataResolver`. |
-| `security` | `{}` | SSR URL-policy override applied with built-in sanitization. |
+| Option             | Default                    | Contract                                                                                      |
+| ------------------ | -------------------------- | --------------------------------------------------------------------------------------------- |
+| `manifest`         | required                   | Parsed version-one component manifest.                                                        |
+| `root`             | required for local sources | Project boundary used for local template resolution and traversal checks.                     |
+| `fetch`            | `globalThis.fetch`         | Fetch implementation for remote templates.                                                    |
+| `resolver`         | none                       | Application source resolver that runs before local/remote loading.                            |
+| `timeout`          | `10000`                    | Positive remote-template request deadline in milliseconds.                                    |
+| `maxTemplateBytes` | 1 MiB                      | Positive local or remote template byte limit.                                                 |
+| `maxDataBytes`     | 256 KiB                    | Positive serialized initial-data byte limit.                                                  |
+| `maxRedirects`     | `5`                        | Non-negative remote-template redirect bound.                                                  |
+| `renderLightDom`   | `false`                    | Default opt-in for rendering non-shadow definitions on the server.                            |
+| `dataResolver`     | none                       | Application callback for bounded JSON-safe initial data.                                      |
+| `dataPolicy`       | none                       | Declarative, origin-bounded component request policy; mutually exclusive with `dataResolver`. |
+| `security`         | `{}`                       | SSR URL-policy override applied with built-in sanitization.                                   |
 
-The renderer exposes `render(tagName, options)`, `renderMany(requests)`, and `clearCache()`. Rendering is asynchronous; cache clearing synchronously removes only this renderer's in-memory template cache.
+The renderer exposes asynchronous `render()`, `renderMany()`, and `renderStream()`. Synchronous `clearCache()` clears
+this renderer’s template and parsed-tree caches.
 
 Per-render options are:
 
-| Option | Default | Contract |
-| --- | --- | --- |
-| `props` | `{}` | Declared component props serialized to host attributes. |
-| `attributes` | `{}` | Additional safe host attributes. |
-| `slots` | `{}` | Default string or default/named slot values. |
-| `resolveData` | `true` | Run the configured resolver/policy for this render. |
-| `lightDom` | renderer default | Override Light DOM SSR for this request. |
-| `hydrate` | definition or `eager` | `eager`, `visible`, `idle`, `interaction`, or `media`. |
-| `hydrateMedia` | definition value | Required media query for `hydrate: "media"`. |
+| Option         | Default               | Contract                                                |
+| -------------- | --------------------- | ------------------------------------------------------- |
+| `props`        | `{}`                  | Declared component props serialized to host attributes. |
+| `attributes`   | `{}`                  | Additional safe host attributes.                        |
+| `slots`        | `{}`                  | Default string or default/named slot values.            |
+| `resolveData`  | `true`                | Run the configured resolver/policy for this render.     |
+| `lightDom`     | renderer default      | Override Light DOM SSR for this request.                |
+| `hydrate`      | definition or `eager` | `eager`, `visible`, `idle`, `interaction`, or `media`.  |
+| `hydrateMedia` | definition value      | Required media query for `hydrate: "media"`.            |
 
 The result contains the host, hydration markers, a serializable declarative shadow template, and sanitized slot content:
 
@@ -171,11 +169,12 @@ The result contains the host, hydration markers, a serializable declarative shad
 >
     <template data-acl-ssr-shadow shadowrootmode="open" shadowrootserializable>…</template>
     <p>Maintainer and reviewer.</p>
-    <span slot="avatar" data-acl-ssr-slot><img src="/avatars/ada.webp" alt=""></span>
+    <span slot="avatar" data-acl-ssr-slot><img src="/avatars/ada.webp" alt="" /></span>
 </profile-card>
 ```
 
-Prop keys must exist in `options.attributes`. Booleans become presence attributes, arrays and objects are serialized as JSON, and unknown props throw. Ordinary host attributes are escaped; inline handlers and reserved ACL hydration attributes are rejected.
+Props must be declared in `options.attributes`. Booleans become presence attributes; arrays and objects become JSON.
+Unknown props, inline handlers, and reserved ACL hydration attributes are rejected. Other host attributes are escaped.
 
 ## Batch rendering and cache control
 
@@ -196,7 +195,8 @@ const [primary, secondary] = await renderer.renderMany([
 ]);
 ```
 
-Template loads are cached by resolved source and revision for the renderer lifetime. Clear the cache after templates change in a long-running development process:
+Templates are cached by resolved source and revision. Clear the cache after changing templates in a long-running
+process:
 
 ```js
 renderer.clearCache();
@@ -208,7 +208,7 @@ Serve the same `acl-manifest.json` to the browser, register it before startup, a
 
 ```js
 import Alpine from 'alpinejs';
-import AlpineComponentLoader from 'alpine-component-loader';
+import AlpineComponentLoader from 'alpine-component-loader/core';
 
 window.Alpine = Alpine;
 
@@ -222,6 +222,11 @@ Alpine.start();
 await loaderStart;
 ```
 
+Explicit manifest registration lets `/core` skip discovery and load hydration support on demand. Register any boundary,
+dynamic, or declarative built-ins before startup; the root entry can discover them. See [explicit startup](core.md). For
+Web Components fallback, await [`loadPolyfills()` in a separate bootstrap](polyfills.md) before importing this client.
+Polyfills still require ESM/ES2022 support and matching SSR markers and revisions.
+
 Shadow hydration is selected only when all of these conditions hold:
 
 - The registered definition uses `shadow: true`.
@@ -229,15 +234,22 @@ Shadow hydration is selected only when all of these conditions hold:
 - The shadow root contains rendered content.
 - `data-acl-revision` exactly matches the client definition's `templateRevision`, including the empty-string case.
 
-On a match, the client skips the component-template request but still initializes external assets, component data, persistence, event forwarding, Alpine, hooks, and polling once. It emits `acl:hydrationstart` and `acl:hydrationend` around that work.
+Matching markup skips the template request. Assets, data, persistence, event forwarding, Alpine, hooks, and polling
+initialize once between `acl:hydrationstart` and `acl:hydrationend`.
 
-The renderer accepts `hydrate: "eager" | "visible" | "idle" | "interaction" | "media"` and `hydrateMedia` per render; these override manifest defaults. Progressive modes apply only to valid SSR markup. The host exposes `data-acl-hydration-state`, and all trigger resources are released after hydration or teardown.
+Per-render `hydrate` (`eager`, `visible`, `idle`, `interaction`, or `media`) and `hydrateMedia` override manifest
+defaults. Deferred modes require valid SSR markup. `data-acl-hydration-state` reports progress; hydration or teardown
+releases trigger resources.
 
-The runnable [SSR example](../examples/ssr/README.md) exposes `?hydrate=interaction`, `?hydrate=visible`, `?hydrate=idle`, and `?hydrate=media` variations while retaining the default eager path for direct comparison.
+The [SSR Feature Lab](../examples/feature-lab-ssr/README.md) demonstrates in-place hydration and revision-mismatch
+fallback.
 
-Malformed markup or a revision mismatch remains visible until ordinary client rendering replaces it. The client then fetches the template and follows the normal loading/fallback path. This is intentional protection against hydrating stale or incompatible content.
+Malformed markup or a revision mismatch stays visible until normal client rendering replaces it through the
+template-loading and fallback path.
 
-For an opted-in Light DOM render, the host must also carry the matching revision and Light DOM hydration marker. The client sanitizes the existing structure, restores slot ownership, and initializes Alpine without requesting the template. A mismatch retains the server content until normal client rendering succeeds.
+Light DOM hydration also requires matching revision and hydration markers. The client sanitizes existing content,
+restores slots, and initializes Alpine without fetching the template. A mismatch stays visible until client rendering
+succeeds.
 
 ## Roots, base paths, and local files
 
@@ -247,13 +259,16 @@ For a relative component source, the renderer resolves:
 root + manifest.basePath + component.source
 ```
 
-For example, a root of `/srv/app`, a `basePath` of `public`, and a source of `components/profile-card.html` resolve to `/srv/app/public/components/profile-card.html`.
+For example, a root of `/srv/app`, a `basePath` of `public`, and a source of `components/profile-card.html` resolve to
+`/srv/app/public/components/profile-card.html`.
 
-The renderer resolves symlinks and requires the final file to remain beneath `root`. It rejects the root itself, directories, missing files, unsupported schemes, inline selectors, and paths that escape the project. `root` is required when a rendered Shadow component has a local source.
+Local Shadow sources require `root`. Resolved symlinks must remain beneath it; directories, missing files, unsupported
+schemes, selectors, and escaping paths are rejected.
 
 ## Remote templates and application resolvers
 
-Built-in remote loading accepts HTTPS only. It rejects credentials and private/reserved destinations, applies the configured timeout, response-size limit, and redirect limit, and validates every redirect target:
+Built-in remote loading allows HTTPS only, rejects credentials and private/reserved destinations, and enforces timeout,
+byte, and redirect limits. Each redirect is validated:
 
 ```js
 const renderer = createSSRRenderer({
@@ -265,7 +280,8 @@ const renderer = createSSRRenderer({
 });
 ```
 
-Supplying `fetch` or `resolver` opts into application-controlled private or authenticated retrieval. The application is then responsible for authorization, destination validation, and tenant isolation:
+Custom `fetch` or `resolver` enables application-controlled private or authenticated retrieval. The application owns
+authorization, destination validation, and tenant isolation:
 
 ```js
 const renderer = createSSRRenderer({
@@ -275,11 +291,11 @@ const renderer = createSSRRenderer({
 });
 ```
 
-A resolver returns a local path or HTTPS URL; the normal loading, size, and revision checks still apply to the resolved source.
+Resolvers return a local path or HTTPS URL. Loading, size, and revision checks still apply.
 
 ## Opt-in initial data resolution
 
-Provide `dataResolver` to populate the configured data target (by default `$props.$data`) without executing Alpine or allowing the renderer to follow a component `data.src`:
+`dataResolver` fills the configured target (default `$props.$data`) without executing Alpine or following `data.src`:
 
 ```js
 const renderer = createSSRRenderer({
@@ -292,11 +308,14 @@ const renderer = createSSRRenderer({
 });
 ```
 
-Resolved values must be JSON-serializable and fit `maxDataBytes`. They are escaped into a non-executable JSON script, parsed before client loading, and suppress the component's first configured data request. Resolver errors reject rendering. Set per-render `resolveData: false` when a route should retain client-only data loading.
+Values must be JSON-serializable and fit `maxDataBytes`. ACL escapes them into an inert JSON script, parses them before
+client loading, and skips the first configured data request. Resolver errors reject rendering. Per-render
+`resolveData: false` keeps data loading on the client.
 
 ## Explicit SSR data-request policy
 
-`dataPolicy` is mutually exclusive with `dataResolver`. It follows JSON-safe manifest `options.data` only after the application supplies a base URL and either exact allowed origins or an authorization callback:
+`dataPolicy` and `dataResolver` are mutually exclusive. To follow JSON-safe manifest `options.data`, provide a base URL
+and exact allowed origins or an authorization callback:
 
 ```js
 const renderer = createSSRRenderer({
@@ -320,15 +339,17 @@ const renderer = createSSRRenderer({
 });
 ```
 
-GET and HEAD are the only default methods; unsafe methods require `allowUnsafeMethods: true`. Credential-bearing URLs, private/reserved destinations, unauthorized origins, and unauthorized redirects are rejected. Redirects are validated one at a time. Sensitive authorization/cookie headers are removed unless `allowSensitiveHeaders` is explicit. Time, redirect, and byte limits remain enforced even with a caller-supplied fetch.
+Methods default to GET/HEAD; others require `allowUnsafeMethods: true`. Credential URLs, private/reserved destinations,
+and unauthorized origins or redirects are rejected. Each redirect is checked. Sensitive authorization/cookie headers
+require `allowSensitiveHeaders`. Timeout, redirect, and byte limits also apply with custom fetch.
 
-Only JSON responses become initial data. The policy does not run browser hooks, DOM callbacks, polling, streaming/blob behavior, or browser cache semantics. Per-render `resolveData: false` suppresses both resolver and policy data work.
-
-The runnable [SSR example](../examples/ssr/README.md) keeps separate resolver and policy renderers and selects the policy path with `?data=policy`, making the construction-time mutual exclusion explicit.
+Only JSON responses become initial data. Browser hooks, DOM callbacks, polling, streaming/blob responses, and browser
+cache behavior are excluded. `resolveData: false` skips resolver and policy work.
 
 ## Opt-in Light DOM SSR
 
-Set `renderLightDom: true` on the renderer or `lightDom: true` for one render to emit the sanitized component template for a Light DOM definition:
+Set `renderLightDom: true` on the renderer or `lightDom: true` for one render to emit the sanitized component template
+for a Light DOM definition:
 
 ```js
 const renderer = createSSRRenderer({
@@ -345,13 +366,17 @@ const html = await renderer.render('account-summary', {
 });
 ```
 
-The renderer structurally projects default and named consumer nodes into transparent slot anchors without executing the template. The output carries revision and hydration markers, and the browser re-sanitizes it before Alpine starts. The default remains the client-fallback host for backward compatibility, so applications choose which Light DOM contracts are safe and useful to render on the server.
+Default and named consumer nodes are projected into transparent slot anchors without executing the template. Output
+includes revision and hydration markers; the browser sanitizes it before Alpine starts. Light DOM defaults to a
+client-fallback host, so server rendering requires opt-in.
 
 ## Revision and security guarantees
 
-When `templateRevision` starts with `sha256-`, the renderer hashes the loaded template and rejects a mismatch. Regenerate the revision whenever template bytes change. Revisions also partition browser template cache keys and make stale server markup fall back safely on the client.
+`sha256-` revisions are checked against template bytes; mismatches reject rendering. Regenerate revisions after template
+changes. They also partition browser caches and prevent hydration of stale markup.
 
-The SSR sanitizer removes scripts, inline event handlers, executable URLs, `<base>`, refresh metadata, and `srcdoc` from component and slot markup. Supply a stricter URL policy when the application has an allowlist:
+SSR sanitization removes scripts, inline handlers, executable URLs, `<base>`, refresh metadata, and `srcdoc` from
+templates and slots. Applications can supply a stricter URL policy:
 
 ```js
 const renderer = createSSRRenderer({
@@ -365,24 +390,46 @@ const renderer = createSSRRenderer({
 });
 ```
 
-The browser sanitizes hydrated content again before Alpine initialization. The server cannot restore content already rejected by built-in policy, and callers cannot override ACL-owned host attributes.
+The browser sanitizes again before Alpine starts. Custom policies cannot restore rejected content or override ACL-owned
+host attributes.
 
 ## Troubleshooting
 
 ### The browser requests the component template
 
-Confirm `shadow: true`, the same parsed manifest on server and client, a direct `data-acl-ssr-shadow` template, and an exact `data-acl-revision` match. Check that HTML middleware has not removed declarative shadow attributes.
+Confirm `shadow: true`, the same parsed manifest on server and client, a direct `data-acl-ssr-shadow` template, and an
+exact `data-acl-revision` match. Check that HTML middleware has not removed declarative shadow attributes.
 
 ### SSR returns an empty custom-element host
 
-The definition is probably Light DOM and `renderLightDom` was not enabled. This client-fallback behavior remains the default.
+The definition is probably Light DOM and `renderLightDom` was not enabled. This client-fallback behavior remains the
+default.
 
 ### Rendering reports an unknown prop
 
-Add the prop to `options.attributes` using a JSON-safe serialized type such as `"String"`, then regenerate contracts if needed.
+Add the prop to `options.attributes` using a JSON-safe serialized type such as `"String"`, then regenerate contracts if
+needed.
 
 ### The revision fails after a template edit
 
-Generate a fresh manifest to a temporary path, copy the new `templateRevision` into the enriched manifest, and restart or clear the renderer cache.
+Generate a fresh manifest to a temporary path, copy the new `templateRevision` into the enriched manifest, and restart
+or clear the renderer cache.
 
-See the [focused SSR example](../examples/ssr/README.md), the broader [SSR feature lab](../examples/feature-lab-ssr/README.md), and [Security and Trusted Types](security.md).
+See the [SSR Feature Lab](../examples/feature-lab-ssr/README.md) and [Security and Trusted Types](security.md).
+
+## Ordered batches and streaming
+
+`concurrency` defaults to eight. `renderMany(requests, { concurrency, signal })` and
+`renderStream(requests, { concurrency, signal })` share a bounded engine. The stream yields HTML in input order and
+starts at most one concurrency window ahead of consumption, even when an early render is slow. Abort, iterator closure,
+or the first failure stops new work and releases batch-owned template subscriptions; yielded HTML remains delivered.
+Individual render options also accept `signal`; resolver/data callbacks receive it for cooperative cancellation.
+
+```js
+for await (const html of renderer.renderStream(requests, { concurrency: 8, signal })) {
+    response.write(html);
+}
+```
+
+Source and unsanitized parsed trees are cached, then cloned and secured per render. Props, slots, and mutations stay
+isolated. `clearCache()` invalidates both caches and pending writes.

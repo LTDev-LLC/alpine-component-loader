@@ -1,8 +1,8 @@
 // @license AlpineComponentLoader
-// Copyright (c) LTDev LLC
+// Copyright (c) LouisT
 // Licensed under the MIT license in the repository root
 
-const moduleSuffix = new URL(import.meta.url).pathname.endsWith('.min.js') ? '.min.js' : '.js', importLocalModule = (specifier)=>import(/* @vite-ignore */ specifier.replace(/\.js$/, moduleSuffix)), { parseJson } = await importLocalModule('./values.js');
+const moduleSuffix = new URL(import.meta.url).pathname.endsWith('.min.js') ? '.min.js' : '.js', importLocalModule = (specifier)=>import(/* @vite-ignore */ specifier.replace(/\.js$/, moduleSuffix)), { importSharedImplementation } = await importLocalModule('./context.js'), importSharedModule = (specifier)=>importSharedImplementation(new URL(specifier.replace(/\.js$/, moduleSuffix), import.meta.url).href), { parseJson } = await importSharedModule('./values.js');
 const typeMap = {
     String,
     Number,

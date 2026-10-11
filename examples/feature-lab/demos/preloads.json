@@ -1,0 +1,90 @@
+{
+    "manifest": {
+        "version": 1,
+        "components": {
+            "preload-basic": {
+                "source": "#plain"
+            },
+            "preload-visible": {
+                "source": "#visible",
+                "options": {
+                    "hydrate": "visible"
+                },
+                "dependencies": [
+                    "preload-basic"
+                ]
+            }
+        },
+        "groups": {
+            "visible": [
+                "preload-visible"
+            ]
+        }
+    },
+    "variants": {
+        "basic": {
+            "urls": [
+                "/dist/acl-load-error.min.js",
+                "/dist/core.min.js",
+                "/dist/inline-templates.min.js",
+                "/dist/runtime/component/lifecycle-controller.min.js",
+                "/dist/runtime/config.min.js",
+                "/dist/runtime/context.min.js",
+                "/dist/runtime/contracts.min.js",
+                "/dist/runtime/errors.min.js",
+                "/dist/runtime/lifecycle.min.js",
+                "/dist/runtime/loader.min.js",
+                "/dist/runtime/props.min.js",
+                "/dist/runtime/registry.min.js",
+                "/dist/runtime/rendering.min.js",
+                "/dist/runtime/values.min.js"
+            ],
+            "html": "<link rel=\"modulepreload\" href=\"/dist/acl-load-error.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/core.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/inline-templates.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/component/lifecycle-controller.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/config.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/context.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/contracts.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/errors.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/lifecycle.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/loader.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/props.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/registry.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/rendering.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/values.min.js\">"
+        },
+        "visible": {
+            "urls": [
+                "/dist/acl-load-error.min.js",
+                "/dist/core.min.js",
+                "/dist/inline-templates.min.js",
+                "/dist/runtime/component/hydration.min.js",
+                "/dist/runtime/component/lifecycle-controller.min.js",
+                "/dist/runtime/component/triggers.min.js",
+                "/dist/runtime/config.min.js",
+                "/dist/runtime/context.min.js",
+                "/dist/runtime/contracts.min.js",
+                "/dist/runtime/environment.min.js",
+                "/dist/runtime/errors.min.js",
+                "/dist/runtime/lifecycle.min.js",
+                "/dist/runtime/loader.min.js",
+                "/dist/runtime/props.min.js",
+                "/dist/runtime/registry.min.js",
+                "/dist/runtime/rendering.min.js",
+                "/dist/runtime/values.min.js"
+            ],
+            "html": "<link rel=\"modulepreload\" href=\"/dist/acl-load-error.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/core.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/inline-templates.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/component/hydration.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/component/lifecycle-controller.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/component/triggers.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/config.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/context.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/contracts.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/environment.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/errors.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/lifecycle.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/loader.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/props.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/registry.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/rendering.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/values.min.js\">"
+        },
+        "transforms": {
+            "urls": [
+                "/dist/acl-load-error.min.js",
+                "/dist/core.min.js",
+                "/dist/inline-templates.min.js",
+                "/dist/runtime/caches.min.js",
+                "/dist/runtime/component/lifecycle-controller.min.js",
+                "/dist/runtime/component/scripts.min.js",
+                "/dist/runtime/component/slots.min.js",
+                "/dist/runtime/component/styles.min.js",
+                "/dist/runtime/config.min.js",
+                "/dist/runtime/context.min.js",
+                "/dist/runtime/contracts.min.js",
+                "/dist/runtime/errors.min.js",
+                "/dist/runtime/lifecycle.min.js",
+                "/dist/runtime/loader.min.js",
+                "/dist/runtime/props.min.js",
+                "/dist/runtime/registry.min.js",
+                "/dist/runtime/rendering.min.js",
+                "/dist/runtime/values.min.js"
+            ],
+            "html": "<link rel=\"modulepreload\" href=\"/dist/acl-load-error.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/core.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/inline-templates.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/caches.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/component/lifecycle-controller.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/component/scripts.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/component/slots.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/component/styles.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/config.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/context.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/contracts.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/errors.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/lifecycle.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/loader.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/props.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/registry.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/rendering.min.js\">\n<link rel=\"modulepreload\" href=\"/dist/runtime/values.min.js\">"
+        }
+    }
+}

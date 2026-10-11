@@ -1,5 +1,5 @@
 // @license AlpineComponentLoader
-// Copyright (c) LTDev LLC
+// Copyright (c) LouisT
 // Licensed under the MIT license in the repository root
 
 const CONTRACT_TYPES = new Set(['string', 'number', 'integer', 'boolean', 'object', 'array', 'null', 'unknown']),

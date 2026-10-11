@@ -1,7 +1,10 @@
+import { generateModuleGraph } from '../server/module-graph.mjs';
+import { minifyJavaScript } from '../server/javascript-minifier.mjs';
 import { transform } from '@swc/core';
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { prepareAlpineRuntime } from './prepare-alpine-runtime.mjs';
 
 // Resolve build paths and compiler settings once for every source artifact
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..'),
@@ -12,10 +15,12 @@ const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..'),
     versionIdentifier = '__ACL_BUILD_VERSION__',
     licenseHeader =
         '// @license AlpineComponentLoader\n' +
-        '// Copyright (c) LTDev LLC\n' +
+        '// Copyright (c) LouisT\n' +
         '// Licensed under the MIT license in the repository root\n';
 
 if (!packageVersion) throw new TypeError('package.json must contain a non-empty version string.');
+
+await prepareAlpineRuntime(projectRoot);
 
 // Recursively collect JavaScript source files in stable directory order
 const walk = async (directory) => {
@@ -31,7 +36,7 @@ const walk = async (directory) => {
     return files;
 };
 
-// Stamp the package version and compile one source module to readable ES2022
+// Stamp the package version and emit matching readable and minified ES2022 modules
 const compile = async (sourcePath, outputPath) => {
     // Compile
     let source = await readFile(sourcePath, 'utf8');
@@ -39,7 +44,7 @@ const compile = async (sourcePath, outputPath) => {
         throw new Error(`Missing AlpineComponentLoader license header in ${relative(sourceRoot, sourcePath)}.`);
     source = source.slice(licenseHeader.length);
     // Replace the development-safe identifier only in its owning facade and runtime config modules
-    if (['index.js', join('runtime', 'config.js')].includes(relative(sourceRoot, sourcePath))) {
+    if (['index.js', 'core.js', join('runtime', 'config.js')].includes(relative(sourceRoot, sourcePath))) {
         const occurrences = source.split(versionIdentifier).length - 1;
         if (occurrences !== 2)
             throw new Error(
@@ -53,6 +58,16 @@ const compile = async (sourcePath, outputPath) => {
             isModule: true,
             jsc: {
                 target: 'es2022',
+                // Generated facade explanations stay in source templates; preserve bundler directives
+                ...(['index.js', 'core.js'].includes(relative(sourceRoot, sourcePath))
+                    ? {
+                          minify: {
+                              compress: false,
+                              mangle: false,
+                              format: { comments: { regex: '@vite-ignore|@license' } },
+                          },
+                      }
+                    : {}),
                 parser: { syntax: 'ecmascript' },
             },
             module: { type: 'es6' },
@@ -62,6 +77,7 @@ const compile = async (sourcePath, outputPath) => {
         throw new Error(`Unresolved ${versionIdentifier} in ${relative(sourceRoot, sourcePath)}.`);
     await mkdir(dirname(outputPath), { recursive: true });
     await writeFile(outputPath, code);
+    await writeFile(outputPath.replace(/\.js$/, '.min.js'), await minifyJavaScript(code));
 };
 
 // Replace the previous output tree so removed source modules cannot survive a build
@@ -84,5 +100,7 @@ await Promise.all(
 );
 
 process.stdout.write(
-    `Built ${builds.length} readable JavaScript artifacts for alpine-component-loader ${packageVersion} (ES2022).\n`,
+    `Built ${builds.length} readable and ${builds.length} minified JavaScript artifacts for alpine-component-loader ${packageVersion} (ES2022).\n`,
 );
+
+await generateModuleGraph(outputRoot, packageVersion);

@@ -1,3 +1,4 @@
+import { generateModulePreloads } from './module-preloads.mjs';
 import { cp, mkdir, readFile, stat } from 'node:fs/promises';
 import { dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +14,8 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..'),
     virtualRoutes = '\0virtual:alpine-component-loader/routes',
     publicEntries = Object.freeze({
         'alpine-component-loader': 'index.js',
+        'alpine-component-loader/core': 'core.js',
+        'alpine-component-loader/polyfills': 'polyfills.js',
         'alpine-component-loader/auto': 'auto.js',
         'alpine-component-loader/dev': 'dev.js',
         'alpine-component-loader/debugger': 'debugger.js',
@@ -83,12 +86,16 @@ const contentType = // Run this operation
               : 'application/octet-stream';
 
 const createStaticMiddleware =
-    (prefix, root) =>
+    (prefix, root, base = '/') =>
     // Serve package files without allowing paths to escape the package root
     async (request, response, next) => {
-        const pathname = new URL(request.url || '/', 'http://localhost').pathname;
-        if (!pathname.startsWith(prefix)) return next();
-        const relativePath = decodeURIComponent(pathname.slice(prefix.length)).replace(/^\/+/, ''),
+        const pathname = new URL(request.url || '/', 'http://localhost').pathname,
+            matchedPrefix = [joinUrl(base, prefix) + '/', prefix].find(
+                // Accept requests before or after Vite strips its configured base
+                (candidatePrefix) => pathname.startsWith(candidatePrefix),
+            );
+        if (!matchedPrefix) return next();
+        const relativePath = decodeURIComponent(pathname.slice(matchedPrefix.length)).replace(/^\/+/, ''),
             candidate = resolve(root, relativePath);
         if (candidate !== root && !candidate.startsWith(`${root}${sep}`)) return next();
         const info = await exists(candidate);
@@ -200,7 +207,7 @@ export const alpineComponentLoader = // Run this operation
                 await loadOptions(applicationRoot);
                 return {
                     optimizeDeps: {
-                        exclude: ['alpine-component-loader'],
+                        exclude: Object.keys(publicEntries),
                     },
                     server: {
                         fs: {
@@ -226,6 +233,11 @@ export const alpineComponentLoader = // Run this operation
             resolveId(id) {
                 if (id === 'virtual:alpine-component-loader/client') return virtualClient;
                 if (id === 'virtual:alpine-component-loader/routes') return virtualRoutes;
+                if (resolvedConfig?.command === 'serve' && publicEntries[id])
+                    return {
+                        id: `/@acl/${publicEntries[id]}`,
+                        external: true,
+                    };
                 return null;
             },
             // Run this operation
@@ -243,7 +255,7 @@ if (import.meta.hot) {
                     const base = resolvedConfig?.base || '/',
                         indexUrl =
                             resolvedConfig?.command === 'serve'
-                                ? '/@acl-routes/acl-routes.json'
+                                ? joinUrl(base, '@acl-routes/acl-routes.json')
                                 : joinUrl(base, options.routeDirectory, 'acl-routes.json');
                     return `
 import AlpineComponentLoader from 'alpine-component-loader';
@@ -257,9 +269,13 @@ export default registerRoute;
             },
             // Run this operation
             configureServer(server) {
-                server.middlewares.use(createStaticMiddleware('/@acl/', resolve(packageRoot, 'dist')));
+                server.middlewares.use(
+                    createStaticMiddleware('/@acl/', resolve(packageRoot, 'dist'), resolvedConfig?.base),
+                );
                 if (project.routes?.outDir)
-                    server.middlewares.use(createStaticMiddleware('/@acl-routes/', project.routes.outDir));
+                    server.middlewares.use(
+                        createStaticMiddleware('/@acl-routes/', project.routes.outDir, resolvedConfig?.base),
+                    );
             },
             // Run this operation
             async handleHotUpdate(context) {
@@ -270,7 +286,12 @@ export default registerRoute;
                 )
                     await runGenerators();
                 if (/\.html?$/i.test(context.file)) {
-                    const source = `/${context.file.slice(resolvedConfig.root.length).replaceAll(sep, '/').replace(/^\/+/, '')}`;
+                    const publicRoot = resolvedConfig.publicDir,
+                        sourceRoot =
+                            publicRoot && context.file.startsWith(`${publicRoot}${sep}`)
+                                ? publicRoot
+                                : resolvedConfig.root,
+                        source = `/${context.file.slice(sourceRoot.length).replaceAll(sep, '/').replace(/^\/+/, '')}`;
                     context.server.ws.send({
                         type: 'custom',
                         event: 'acl:template-changed',
@@ -281,7 +302,7 @@ export default registerRoute;
                 return undefined;
             },
             // Run this operation
-            transformIndexHtml(html, context) {
+            async transformIndexHtml(html, context) {
                 const development = Boolean(context.server),
                     base = resolvedConfig?.base || '/',
                     imports = Object.fromEntries(
@@ -290,7 +311,7 @@ export default registerRoute;
                             ([specifier, file]) => [
                                 specifier,
                                 development
-                                    ? `/@acl/${file}`
+                                    ? joinUrl(base, '@acl', file)
                                     : options.moduleDelivery === 'external' && options.moduleBase
                                       ? joinUrl(options.moduleBase, file)
                                       : joinUrl(base, options.moduleDirectory, file),
@@ -298,8 +319,26 @@ export default registerRoute;
                         ),
                     );
                 let output = mergeImportMap(html, imports);
+                if (options.preload) {
+                    if (options.preload.entry && !['default', 'core'].includes(options.preload.entry))
+                        throw new TypeError('ACL preload.entry must be default or core');
+                    const manifestFile = project.components?.manifest || project.routes?.manifest;
+                    if (!manifestFile) throw new TypeError('Vite preload requires a configured component manifest');
+                    await runGenerators();
+                    const hints = await generateModulePreloads({
+                        manifest: JSON.parse(await readFile(manifestFile, 'utf8')),
+                        entryUrl:
+                            imports[
+                                options.preload.entry === 'core'
+                                    ? 'alpine-component-loader/core'
+                                    : 'alpine-component-loader'
+                            ],
+                        ...options.preload,
+                    });
+                    output = output.replace(/<\/head>/i, `${hints.html}\n</head>`);
+                }
                 if (development) {
-                    const client = '<script type="module" src="/@id/virtual:alpine-component-loader/client"></script>';
+                    const client = `<script type="module" src="${joinUrl(base, '@id/__x00__virtual:alpine-component-loader/client')}"></script>`;
                     output = /<\/head>/i.test(output)
                         ? output.replace(/<\/head>/i, `${client}\n</head>`)
                         : `${client}\n${output}`;
@@ -308,13 +347,13 @@ export default registerRoute;
             },
             // Run this operation
             async writeBundle() {
-                if (options.moduleDelivery !== 'copy') return;
                 const outputRoot = resolve(resolvedConfig.root, resolvedConfig.build.outDir);
                 await mkdir(outputRoot, { recursive: true });
-                await cp(resolve(packageRoot, 'dist'), resolve(outputRoot, options.moduleDirectory), {
-                    recursive: true,
-                    force: true,
-                });
+                if (options.moduleDelivery === 'copy')
+                    await cp(resolve(packageRoot, 'dist'), resolve(outputRoot, options.moduleDirectory), {
+                        recursive: true,
+                        force: true,
+                    });
                 if (project.routes?.outDir && (await exists(project.routes.outDir)))
                     await cp(project.routes.outDir, resolve(outputRoot, options.routeDirectory), {
                         recursive: true,

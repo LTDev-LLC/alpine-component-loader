@@ -416,7 +416,7 @@ test('adaptive prefetch expands groups, handles focus and dynamic targets, skips
             const calls = [], skips = [];
             const original = RuntimeLoader.prefetchGraph;
             RuntimeLoader.prefetchGraph = async (tags, options) => {
-                calls.push({ tags, options });
+                calls.push({ tags, options: { concurrency: options.concurrency, signal: options.signal instanceof AbortSignal } });
                 return Object.fromEntries(tags.map(tag => [tag, { status: 'fulfilled', value: '<p>ok</p>' }]));
             };
             document.addEventListener('acl:prefetchskip', event => skips.push(event.detail));
@@ -448,7 +448,10 @@ test('adaptive prefetch expands groups, handles focus and dynamic targets, skips
     expect(result.calls).toEqual([
         {
             tags: ['prefetch-alpha', 'prefetch-beta'],
-            options: { concurrency: 1 },
+            options: {
+                concurrency: 1,
+                signal: true,
+            },
         },
     ]);
     expect(
@@ -578,7 +581,7 @@ test('public testing utilities mount, update, record, abort mock fetches, and cl
 }) => {
     // Exercise the test scenario
     await page.goto(`${baseUrl}/blank`);
-    await page.addScriptTag({ url: `${baseUrl}/node_modules/alpinejs-315/dist/cdn.min.js` });
+    await page.addScriptTag({ url: `${baseUrl}/node_modules/alpinejs-pinned/dist/cdn.min.js` });
     await page.waitForFunction(
         // Check whether the expected browser state is ready
         () => window.Alpine,
@@ -1237,7 +1240,7 @@ test('matching SSR markup hydrates without a template request and mismatch prese
     requestCounts.set('/templates/hydrate.html', 0);
     requestCounts.set('/api/hydrate', 0);
     await page.goto(`${baseUrl}/blank`);
-    await page.addScriptTag({ url: `${baseUrl}/node_modules/alpinejs-315/dist/cdn.min.js` });
+    await page.addScriptTag({ url: `${baseUrl}/node_modules/alpinejs-pinned/dist/cdn.min.js` });
     await page.waitForFunction(
         // Check whether the expected browser state is ready
         () => window.Alpine,

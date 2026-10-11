@@ -102,6 +102,32 @@ export const test = base.extend({
                 // Handle the HTTP request
                 const url = new URL(req.url, `http://${req.headers.host}`);
 
+                if (
+                    /^\/node_modules\/@webcomponents\/webcomponentsjs\/(?:webcomponents-(?:loader|bundle)\.js|bundles\/webcomponents-(?:sd|ce|sd-ce|sd-ce-pf)\.js)$/.test(
+                        url.pathname,
+                    )
+                ) {
+                    // Serve only the real test dependency's named browser bundles
+                    send(res, 200, await readFile(join(projectRoot, url.pathname), 'utf8'), 'text/javascript');
+                    return;
+                }
+
+                if (url.pathname.startsWith('/__acl_hmr/examples/')) {
+                    const path = url.pathname.slice('/__acl_hmr/examples/'.length);
+                    // Verify the browser behavior at this boundary
+                    try {
+                        send(
+                            res,
+                            200,
+                            await readFile(join(projectRoot, 'examples/feature-lab/demos', path)),
+                            mimeTypes[extname(path)],
+                        );
+                    } catch {
+                        send(res, 404, 'not found');
+                    }
+                    return;
+                }
+
                 if (url.pathname === '/blank') {
                     send(res, 200, '<!doctype html><title>blank</title>', 'text/html');
                     return;
@@ -338,6 +364,7 @@ export const test = base.extend({
                     url.pathname.startsWith('/dist/') ||
                     url.pathname.startsWith('/__acl_hmr/modules/') ||
                     url.pathname === '/examples/feature-lab/styles.css' ||
+                    url.pathname === '/examples/feature-lab/app.js' ||
                     url.pathname.startsWith('/examples/feature-lab/components/') ||
                     url.pathname.startsWith('/examples/feature-lab/skeletons/')
                 ) {
@@ -347,11 +374,7 @@ export const test = base.extend({
                             packagePath = requestedPath.startsWith('/__acl_hmr/modules/')
                                 ? `/dist/${requestedPath.slice('/__acl_hmr/modules/'.length)}`
                                 : requestedPath,
-                            readablePath =
-                                packagePath.startsWith('/dist/') && packagePath.endsWith('.min.js')
-                                    ? packagePath.replace(/\.min\.js$/, '.js')
-                                    : packagePath,
-                            filePath = join(projectRoot, readablePath.slice(1)),
+                            filePath = join(projectRoot, packagePath.slice(1)),
                             ext = extname(filePath);
                         if (
                             (requestedPath.startsWith('/dist/') || requestedPath.startsWith('/__acl_hmr/modules/')) &&

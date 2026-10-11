@@ -1,24 +1,25 @@
+import { prepareOfflineVariant } from './prepare-offline-variants.mjs';
 import { mkdtemp, readFile, readdir, rename, rm, stat, writeFile, cp, mkdir } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parse } from 'parse5';
 import { createMinifiedJavaScriptReader } from '../server/javascript-minifier.mjs';
-import { generateOfflineBundle } from '../server/offline-generator.mjs';
 import { generateSkeletons } from '../server/skeleton-generator.mjs';
+import { alpineRuntime, resolveAlpineFile } from './alpine-runtime.mjs';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..'),
     defaultOutputRoot = resolve(projectRoot, '_site'),
-    alpineUrl = 'https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js',
+    alpineUrl = alpineRuntime.cdnUrl,
     fontAwesomeUrl = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
     confettiUrl = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js',
-    repositoryUrl = 'https://github.com/LTDev-LLC/alpine-component-loader',
+    repositoryUrl = 'https://github.com/LouisT/alpine-component-loader',
     exampleCatalog = new Map([
         [
             'a11y',
             {
                 title: 'Accessibility Auditing',
                 purpose:
-                    'Run component audits, inspect scanner results, and exercise accessibility debugger integration.',
+                    'Run component audits, inspect scanner results, and activate auditing/debugger modules on demand.',
             },
         ],
         [
@@ -26,7 +27,7 @@ const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..'),
             {
                 title: 'Feature Lab',
                 purpose:
-                    'Explore the browser runtime, manifests, persistence, observability, security, and optional tooling.',
+                    'Explore the browser runtime, manifests, persistence, observability, security, and isolated capability activation experiments.',
             },
         ],
         [
@@ -34,7 +35,7 @@ const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..'),
             {
                 title: 'Offline Application',
                 purpose:
-                    'Test a generated precache graph, navigation fallback, runtime caching, and resilient offline reloads.',
+                    'Test a generated precache graph, navigation fallback, runtime caching, and late capability activation through matching default/core workers.',
             },
         ],
         [
@@ -42,7 +43,7 @@ const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..'),
             {
                 title: 'ACL Playground',
                 purpose:
-                    'Edit a complete ACL dashboard with incremental HMR, diagnostics, themes, and accessibility auditing.',
+                    'Edit a complete ACL dashboard with incremental HMR, diagnostics, themes, and editable core/transform/scheduled/isolated-loader projects.',
             },
         ],
     ]),
@@ -50,31 +51,7 @@ const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..'),
     backendExamples = new Map([
         ['feature-lab-ssr', 'requires its SSR server'],
         ['hmr', 'requires the development HMR server'],
-        ['ssr', 'requires its SSR server'],
-    ]),
-    offlineRuntimeFiles = [
-        'index.min.js',
-        'acl-load-error.min.js',
-        'offline.min.js',
-        'runtime/loader.min.js',
-        'runtime/config.min.js',
-        'runtime/errors.min.js',
-        'runtime/values.min.js',
-        'runtime/props.min.js',
-        'runtime/data-options.min.js',
-        'runtime/registry.min.js',
-        'runtime/contracts.min.js',
-        'runtime/component/factory.min.js',
-        'runtime/component/lifecycle-controller.min.js',
-        'runtime/component/loading-controller.min.js',
-        'runtime/component/data-gate-controller.min.js',
-        'runtime/component/render-controller.min.js',
-        'runtime/component/state-controller.min.js',
-        'runtime/lifecycle.min.js',
-        'runtime/caches.min.js',
-        'runtime/template-cache.min.js',
-        'runtime/rendering.min.js',
-    ];
+    ]);
 
 const pathExists = async (path) => {
     // Guard the path probe against expected missing files
@@ -279,7 +256,11 @@ const validateAlpineRuntime = (source, name) => {
                 ({ name: key, value }) => [key, value],
             ),
         );
-        if (attributes.src === alpineUrl && 'defer' in attributes) matches.push(node);
+        if (
+            (attributes.src === alpineUrl && 'defer' in attributes) ||
+            ('data-acl-bootstrap' in attributes && attributes['data-alpine'] === alpineUrl)
+        )
+            matches.push(node);
     });
     if (matches.length !== 1)
         throw new TypeError(
@@ -287,10 +268,10 @@ const validateAlpineRuntime = (source, name) => {
         );
 };
 
-// Copy the readable distribution tree into virtual minified browser identities
-const stageDistribution = async (sourceRoot, destinationRoot, minifiedFiles) => {
+// Copy the prebuilt minified distribution without requiring transformations during staging
+const stageDistribution = async (sourceRoot, destinationRoot) => {
     await mkdir(destinationRoot, { recursive: true });
-    // Materialize every readable distribution module at its virtual minified identity
+    // Preserve the native module directory layout and minified URL family
     for (const entry of (await readdir(sourceRoot, { withFileTypes: true })).sort(
         // Compare entries by their stable file names
         (left, right) => left.name.localeCompare(right.name),
@@ -298,11 +279,11 @@ const stageDistribution = async (sourceRoot, destinationRoot, minifiedFiles) => 
         const sourcePath = join(sourceRoot, entry.name),
             destinationPath = join(destinationRoot, entry.name);
         if (entry.isDirectory()) {
-            await stageDistribution(sourcePath, destinationPath, minifiedFiles);
+            await stageDistribution(sourcePath, destinationPath);
             continue;
         }
-        if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
-        await writeFile(destinationPath.replace(/\.js$/, '.min.js'), await minifiedFiles.read(sourcePath));
+        if (!entry.isFile() || !entry.name.endsWith('.min.js')) continue;
+        await cp(sourcePath, destinationPath);
     }
 };
 
@@ -408,7 +389,7 @@ ${cards}
                 <div class="meta">
                     <div><strong>AlpineComponentLoader</strong> - A lightweight, build-free component loader for
                         Alpine.js.</div>
-                    <div>&copy; 2026 LTDev LLC · MIT License</div>
+                    <div>&copy; 2026 LouisT · MIT License</div>
                 </div>
                 <nav aria-label="Footer">
                     <a href="${repositoryUrl}" target="_blank" rel="noreferrer">GitHub</a>
@@ -791,35 +772,18 @@ const stageOfflineArtifacts = async (root, minifiedFiles, { includeSkeletons = f
     const exampleRoot = resolve(root, 'examples/offline'),
         applicationPath = resolve(exampleRoot, 'app.js');
     await writeFile(resolve(exampleRoot, 'app.min.js'), await minifiedFiles.read(applicationPath));
-    await generateOfflineBundle({
-        manifestFile: resolve(exampleRoot, 'acl-manifest.json'),
-        outDir: exampleRoot,
-        groups: ['offline-demo'],
-        assets: [
-            'index.html',
-            'app.js',
-            'styles.css',
-            'acl-manifest.json',
-            ...(includeSkeletons ? ['skeletons/acl-skeletons.css'] : []),
-            ...offlineRuntimeFiles.map(
-                // Resolve each published runtime module from the nested example
-                (path) => `../../dist/${path}`,
-            ),
-            alpineUrl,
-        ],
-        baseUrl: '/examples/offline',
-        namespace: 'example',
-        configFile: resolve(exampleRoot, 'acl-offline.json'),
-        minifyJavaScriptAssets: true,
-        force: true,
+    await prepareOfflineVariant(root, {
+        includeSkeletons,
+        entry: 'index',
     });
+    await prepareOfflineVariant(root, { includeSkeletons });
 };
 
 // Fulfill staging-only third-party resources locally so capture output is reproducible
 const createStagedPagePreparation = (root, additionalPreparation) => {
     let alpineSource = null;
     return async (page, context) => {
-        alpineSource ||= await readFile(resolve(root, 'node_modules/alpinejs-315/dist/cdn.min.js'), 'utf8');
+        alpineSource ||= await readFile(resolveAlpineFile(root), 'utf8');
         await page.route(alpineUrl, (route) =>
             route.fulfill({
                 body: alpineSource,
@@ -874,7 +838,7 @@ export const validateExampleName = (value = 'playground') => {
 // Validate and deduplicate static example selectors while retaining their first order
 export const normalizeExampleNames = (values = []) => {
     if (!Array.isArray(values)) throw new TypeError('Stage example selections must be an array.');
-    const candidates = values.length === 0 ? ['playground'] : values,
+    const candidates = values.length === 0 ? [...supportedExamples] : values,
         normalized = [],
         selected = new Set();
     // Validate the complete list before staging and retain each first occurrence
@@ -913,14 +877,20 @@ export const stageExamples = async (
     // Clean an incomplete temporary artifact after any staging failure
     try {
         await mkdir(resolve(temporaryRoot, 'examples'), { recursive: true });
-        await stageDistribution(builtRoot, resolve(temporaryRoot, 'dist'), minifiedFiles);
+        await stageDistribution(builtRoot, resolve(temporaryRoot, 'dist'));
+        const demoAssets = resolve(root, 'examples/feature-lab/demos');
+        if (await pathExists(demoAssets))
+            await cp(demoAssets, resolve(temporaryRoot, 'examples/feature-lab/demos'), { recursive: true });
         // Copy and transform each selected example in command-line order
         for (const name of exampleNames) {
             const exampleRoot = resolve(root, 'examples', name),
                 stagedExampleRoot = resolve(temporaryRoot, 'examples', name),
                 entryPath = resolve(stagedExampleRoot, 'index.html');
             await cp(exampleRoot, stagedExampleRoot, { recursive: true });
-            const source = await readFile(entryPath, 'utf8');
+            const source = (await readFile(entryPath, 'utf8')).replaceAll(
+                '/__acl_hmr/examples/',
+                '/examples/feature-lab/demos/',
+            );
             validateAlpineRuntime(source, name);
             await writeFile(entryPath, updateStagedImportMap(updateStagedBaseHref(source, name), packageImports));
             if (name === 'offline') await stageOfflineArtifacts(temporaryRoot, minifiedFiles);

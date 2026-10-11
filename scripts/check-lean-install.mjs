@@ -50,6 +50,11 @@ const app = await startACLDevServer({ root: ${JSON.stringify(applicationRoot)}, 
 try {
   const readable = await fetch(new URL('/app.js', app.origin));
   if (!readable.ok || !(await readable.text()).includes('ready')) throw new Error('Readable JavaScript serving failed.');
+  for (const path of ['index.min.js', 'core.min.js', 'polyfills.min.js', 'runtime/component/lifecycle-controller.min.js']) {
+    const built = await fetch(new URL('/__acl_hmr/modules/' + path, app.origin));
+    if (!built.ok || !(await built.text()).includes('@license AlpineComponentLoader'))
+      throw new Error('Prebuilt minified package serving failed: ' + path);
+  }
   const generated = await fetch(new URL('/app.min.js', app.origin));
   const message = await generated.text();
   if (generated.status !== 500 || !message.includes('@swc/core') || !message.includes('--omit=optional'))

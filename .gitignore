@@ -143,3 +143,9 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
 examples/acl-next/
+benchmarks/*
+!benchmarks/runtime-capabilities-before.json
+!benchmarks/runtime-capabilities-after.json
+!benchmarks/delivery-capabilities-before.json
+!benchmarks/delivery-capabilities-after.json
+examples/feature-lab/demos/vendor/

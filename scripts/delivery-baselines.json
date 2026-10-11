@@ -1,0 +1,226 @@
+{
+    "core": {
+        "initial": {
+            "requests": 3,
+            "readableGzip": 7593,
+            "readableBrotli": 6588,
+            "minifiedGzip": 5468,
+            "minifiedBrotli": 4839
+        },
+        "full": {
+            "requests": 40,
+            "readableGzip": 107703,
+            "readableBrotli": 91780,
+            "minifiedGzip": 65991,
+            "minifiedBrotli": 57894
+        }
+    },
+    "explicitCore": {
+        "initial": {
+            "requests": 3,
+            "readableGzip": 6747,
+            "readableBrotli": 5842,
+            "minifiedGzip": 4888,
+            "minifiedBrotli": 4302
+        },
+        "full": {
+            "requests": 40,
+            "readableGzip": 107703,
+            "readableBrotli": 91780,
+            "minifiedGzip": 65991,
+            "minifiedBrotli": 57894
+        }
+    },
+    "basicReady": {
+        "initial": {
+            "requests": 12,
+            "readableGzip": 46540,
+            "readableBrotli": 39537,
+            "minifiedGzip": 29026,
+            "minifiedBrotli": 25549
+        },
+        "full": {
+            "requests": 40,
+            "readableGzip": 107703,
+            "readableBrotli": 91780,
+            "minifiedGzip": 65991,
+            "minifiedBrotli": 57894
+        }
+    },
+    "debugger": {
+        "initial": {
+            "requests": 3,
+            "readableGzip": 12656,
+            "readableBrotli": 10837,
+            "minifiedGzip": 7620,
+            "minifiedBrotli": 6692
+        },
+        "full": {
+            "requests": 4,
+            "readableGzip": 15240,
+            "readableBrotli": 13056,
+            "minifiedGzip": 9684,
+            "minifiedBrotli": 8468
+        }
+    },
+    "auto": {
+        "initial": {
+            "requests": 4,
+            "readableGzip": 8420,
+            "readableBrotli": 7272,
+            "minifiedGzip": 5996,
+            "minifiedBrotli": 5263
+        },
+        "full": {
+            "requests": 41,
+            "readableGzip": 108530,
+            "readableBrotli": 92464,
+            "minifiedGzip": 66519,
+            "minifiedBrotli": 58318
+        }
+    },
+    "dev": {
+        "initial": {
+            "requests": 4,
+            "readableGzip": 10958,
+            "readableBrotli": 9434,
+            "minifiedGzip": 7358,
+            "minifiedBrotli": 6476
+        },
+        "full": {
+            "requests": 41,
+            "readableGzip": 111057,
+            "readableBrotli": 94616,
+            "minifiedGzip": 67869,
+            "minifiedBrotli": 59520
+        }
+    },
+    "offline": {
+        "initial": {
+            "requests": 1,
+            "readableGzip": 1200,
+            "readableBrotli": 986,
+            "minifiedGzip": 826,
+            "minifiedBrotli": 686
+        },
+        "full": {
+            "requests": 1,
+            "readableGzip": 1200,
+            "readableBrotli": 986,
+            "minifiedGzip": 826,
+            "minifiedBrotli": 686
+        }
+    },
+    "a11y": {
+        "initial": {
+            "requests": 1,
+            "readableGzip": 4720,
+            "readableBrotli": 3953,
+            "minifiedGzip": 3075,
+            "minifiedBrotli": 2644
+        },
+        "full": {
+            "requests": 1,
+            "readableGzip": 4720,
+            "readableBrotli": 3953,
+            "minifiedGzip": 3075,
+            "minifiedBrotli": 2644
+        }
+    },
+    "scanner": {
+        "initial": {
+            "requests": 4,
+            "readableGzip": 10383,
+            "readableBrotli": 8707,
+            "minifiedGzip": 6572,
+            "minifiedBrotli": 5650
+        },
+        "full": {
+            "requests": 5,
+            "readableGzip": 13371,
+            "readableBrotli": 11307,
+            "minifiedGzip": 9043,
+            "minifiedBrotli": 7807
+        }
+    },
+    "testing": {
+        "initial": {
+            "requests": 6,
+            "readableGzip": 15739,
+            "readableBrotli": 13536,
+            "minifiedGzip": 10215,
+            "minifiedBrotli": 9018
+        },
+        "full": {
+            "requests": 41,
+            "readableGzip": 112319,
+            "readableBrotli": 95741,
+            "minifiedGzip": 68681,
+            "minifiedBrotli": 60294
+        }
+    },
+    "testingPlaywright": {
+        "initial": {
+            "requests": 1,
+            "readableGzip": 1029,
+            "readableBrotli": 882,
+            "minifiedGzip": 708,
+            "minifiedBrotli": 609
+        },
+        "full": {
+            "requests": 1,
+            "readableGzip": 1029,
+            "readableBrotli": 882,
+            "minifiedGzip": 708,
+            "minifiedBrotli": 609
+        }
+    },
+    "testingVitest": {
+        "initial": {
+            "requests": 7,
+            "readableGzip": 16401,
+            "readableBrotli": 14083,
+            "minifiedGzip": 10660,
+            "minifiedBrotli": 9389
+        },
+        "full": {
+            "requests": 42,
+            "readableGzip": 112981,
+            "readableBrotli": 96288,
+            "minifiedGzip": 69126,
+            "minifiedBrotli": 60665
+        }
+    },
+    "observabilityExporters": {
+        "initial": {
+            "requests": 1,
+            "readableGzip": 2330,
+            "readableBrotli": 2002,
+            "minifiedGzip": 1673,
+            "minifiedBrotli": 1480
+        },
+        "full": {
+            "requests": 1,
+            "readableGzip": 2330,
+            "readableBrotli": 2002,
+            "minifiedGzip": 1673,
+            "minifiedBrotli": 1480
+        }
+    },
+    "polyfills": {
+        "initial": {
+            "requests": 3,
+            "readableGzip": 4747,
+            "readableBrotli": 3951,
+            "minifiedGzip": 2793,
+            "minifiedBrotli": 2408
+        },
+        "full": {
+            "requests": 3,
+            "readableGzip": 4747,
+            "readableBrotli": 3951,
+            "minifiedGzip": 2793,
+            "minifiedBrotli": 2408
+        }
+    }
+}

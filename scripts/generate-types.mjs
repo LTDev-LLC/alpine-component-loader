@@ -1,3 +1,7 @@
+import './generate-options.mjs';
+await import('./generate-data-contract.mjs');
+await import('./generate-facade.mjs');
+import { runtimeCapabilities } from '../server/module-graph.mjs';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,7 +16,12 @@ await mkdir(outputRoot, { recursive: true });
 // Copy declaration templates into the publishable type directory
 for (const entry of await readdir(templateRoot, { withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith('.d.ts')) continue;
-    const source = await readFile(join(templateRoot, entry.name), 'utf8');
+    let source = await readFile(join(templateRoot, entry.name), 'utf8');
+    if (entry.name === 'project.d.ts')
+        source += `\nexport type ACLRuntimeCapability = ${Object.keys(runtimeCapabilities)
+            // Resolve this operation and preserve independent ownership
+            .map((name) => JSON.stringify(name))
+            .join(' | ')};\n`;
     await writeFile(join(outputRoot, entry.name), `${banner}${source}`);
 }
 

@@ -1,12 +1,7 @@
 # Feature lab
 
-This page exercises the loader's complete browser-facing feature set, including
-JavaScript inline definition objects, concise `template[x-acl]` discovery,
-lifecycle cleanup, revision-aware template caching, manifest dependency graphs
-and metadata, adaptive prefetch, localStorage, sessionStorage, IndexedDB and
-custom persistence adapters, structured observability, Trusted Types and URL
-policies, browser testing helpers, diagnostics, accessibility auditing, and
-optional development/offline entry points.
+Exercises ACL's browser features: templates/discovery, lifecycle, caching, manifests, prefetch, persistence,
+observability, security, testing, and optional tools.
 
 Build the package, then serve the feature-lab directory as static files:
 
@@ -15,14 +10,8 @@ npm run build
 npm run example:feature-lab
 ```
 
-Open <http://127.0.0.1:4173/>. The page's import map selects
-`/__acl_hmr/modules/index.min.js`, and the development server synthesizes that
-minified package family in memory from the repository build. Optional public
-entries and deferred runtime capabilities are fetched only when this page
-imports or exercises them. File-backed component templates remain rooted in the
-local `components/` directory. No application API, SSR renderer, or other
-dynamic backend is required; the data examples use browser-side fetch
-interception.
+Open <http://127.0.0.1:4173/>. The page uses minified native modules, local `components/` templates, and intercepted
+browser fetches; no API or SSR backend is needed. Optional capabilities load on activation.
 
 Create a plain static-host artifact with:
 
@@ -30,28 +19,21 @@ Create a plain static-host artifact with:
 npm run stage -- feature-lab
 ```
 
-The command builds the current package, copies this example beneath
-`_site/examples/feature-lab/`, and replaces its development import-map entries
-with direct `/dist/*.min.js` URLs. Alpine remains the exact pinned jsDelivr
-3.15.12 script and is not copied into the artifact. Add other static names after
-`feature-lab` to bundle them with one shared runtime and an ordered root catalog.
+Staging copies the page to `_site/examples/feature-lab/` with direct minified imports and the repository's pinned CDN
+Alpine. Additional static selections share one runtime and catalog.
 
 The focused examples cover workflows that need their own server or service-worker behavior:
 
-- [`../ssr/`](../ssr/) demonstrates safe `dataResolver` output, Declarative Shadow DOM hydration, and skipped initial data/template requests.
-- [`../feature-lab-ssr/`](../feature-lab-ssr/) is the larger SSR-first counterpart covering typed server output, batch rendering, slots, data, events, sanitizer parity, observability, and revision fallback.
-- [`../a11y/`](../a11y/) demonstrates automatic/manual audits, custom rules, debugger integration, and headless console/JSON/JUnit/SARIF reporting.
-- [`../hmr/`](../hmr/) demonstrates state-preserving template reloads.
-- [`../offline/`](../offline/) demonstrates generated offline assets, navigation policy, bounded runtime caching, quota diagnostics, and explicit service-worker registration.
-- [`../playground/`](../playground/) demonstrates `createLoader()`, per-instance metrics/configuration, and deterministic disposal.
+- [SSR Feature Lab](../feature-lab-ssr/): batch rendering, slots, sanitizer parity, and revision fallback.
+- [Accessibility](../a11y/): audits, custom rules, debugger, and CI reports.
+- [HMR](../hmr/): state-preserving reloads.
+- [Offline](../offline/): worker generation and bounded caching.
+- [Playground](../playground/): isolated loaders and disposal.
 
-The lab keeps observability local so the live record and metrics panels remain self-contained. Production applications can connect the same already-redacted subscription to a bounded, demand-loaded exporter without adding transport or a vendor SDK to the core graph:
+The lab keeps observability local. Production can send its redacted records through a demand-loaded exporter:
 
 ```js
-import {
-    connectExporter,
-    createBeaconExporter,
-} from 'alpine-component-loader/observability-exporters';
+import { connectExporter, createBeaconExporter } from 'alpine-component-loader/observability-exporters';
 
 const connection = connectExporter(
     AlpineComponentLoader,
@@ -69,4 +51,21 @@ window.addEventListener('pagehide', () => connection.flush(), { once: true });
 
 OpenTelemetry and Sentry adapters accept caller-owned clients; ACL does not install or import either SDK.
 
-For runner-owned cleanup, the repository's [`tests/testing-integrations.spec.js`](../../tests/testing-integrations.spec.js) executes the packaged Playwright fixture. The [runtime efficiency guide](../../docs/performance.md) describes parsed-template caching and distribution-size gates.
+The [Playwright fixture example](../../tests/testing-integrations.spec.js) demonstrates runner-owned cleanup.
+
+## Startup entry and fallback APIs
+
+Root startup demonstrates discovery and exposes the persistence-adapter factory. Core/polyfill mappings alone download
+nothing. Switching to core requires [explicit registration](../../docs/core.md).
+
+For fallback APIs, load polyfills before dynamically importing the application or `/auto`. See
+[polyfill usage](../../docs/polyfills.md).
+
+## Runtime capability experiments
+
+Section 39 isolates capability experiments in same-origin documents. Closing a demo releases its subscriptions. These
+developer demos are not sandboxes for untrusted code.
+
+`?polyfills=1` loads the self-hosted suite before Alpine and `app.js`; `&fallback=1` forces ShadyDOM in the demo. The
+startup panel separates registration from readiness. Builds copy vendor scripts and generate preload JSON; no browser
+parser is needed.

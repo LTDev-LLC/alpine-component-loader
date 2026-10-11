@@ -44,7 +44,8 @@
         font-size: 0.9rem;
     }
 </style>
-<div x-data="{
+<div
+    x-data="{
     status: 'Changes save automatically',
     async flush() {
         const pending = this.$props.$persistence.$save();
@@ -56,13 +57,16 @@
         await this.$props.$persistence.$clear();
         this.status = `Cleared ${this.$props.storage || 'custom adapter'} record`;
     }
-}">
+}"
+>
     <h3><span x-text="$props.storage || 'Custom adapter'"></span> note</h3>
-    <input x-model="$props.note" aria-label="Persistent note">
+    <input x-model="$props.note" aria-label="Persistent note" />
     <div class="actions">
         <button @click="$props.count = ($props.count || 0) + 1">Count <span x-text="$props.count || 0"></span></button>
         <button @click="flush()" :aria-label="`Flush ${$props.storage || 'custom adapter'}`">Flush now</button>
-        <button @click="clear()" :aria-label="`Clear ${$props.storage || 'custom adapter'}`">Clear stored record</button>
+        <button @click="clear()" :aria-label="`Clear ${$props.storage || 'custom adapter'}`">
+            Clear stored record
+        </button>
     </div>
     <output aria-live="polite" x-text="status"></output>
 </div>

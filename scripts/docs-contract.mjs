@@ -81,6 +81,16 @@ export const createDocumentationContracts = ({ declarations, packageJson }) => {
                 members: extractClassStaticMembers(index, 'AlpineComponentLoader'),
             },
             {
+                name: 'polyfill options',
+                document: 'docs/polyfills.md',
+                members: extractInterfaceMembers(declarations['polyfills.d.ts'] || '', 'ACLPolyfillOptions'),
+            },
+            {
+                name: 'polyfill functions',
+                document: 'docs/polyfills.md',
+                members: extractRuntimeExports(declarations['polyfills.d.ts'] || ''),
+            },
+            {
                 name: 'component options',
                 document: 'docs/api.md',
                 members: extractInterfaceMembers(index, 'ACLComponentOptions'),

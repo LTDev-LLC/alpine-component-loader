@@ -16,7 +16,6 @@ const run = promisify(execFile),
             path.startsWith('tests/') ||
             path.startsWith('scripts/') ||
             path.startsWith('components/') ||
-            path.endsWith('.min.js') ||
             [
                 'dist/AlpineComponentLoader.js',
                 'dist/ACLDebugger.js',
@@ -26,7 +25,7 @@ const run = promisify(execFile),
                 'dist/runtime/component-loading-controller.js',
                 'dist/runtime/component-render-controller.js',
                 'dist/runtime/component-state-controller.js',
-            ].includes(path) ||
+            ].includes(path.replace(/\.min\.js$/, '.js')) ||
             path.endsWith('.map') ||
             path === 'index.html',
     ),
@@ -47,12 +46,7 @@ const run = promisify(execFile),
         'dist/runtime/component/form-controller.js',
         'dist/elements/boundary.js',
         'dist/runtime/component/data-controller.js',
-        'dist/runtime/component/data-gate-controller.js',
-        'dist/runtime/component/factory.js',
         'dist/runtime/component/lifecycle-controller.js',
-        'dist/runtime/component/loading-controller.js',
-        'dist/runtime/component/render-controller.js',
-        'dist/runtime/component/state-controller.js',
         'dist/runtime/overlay-utils.js',
         'dist/runtime/debugger-panel.js',
         'dist/runtime/a11y-scanner-dialog.js',
@@ -65,6 +59,12 @@ const run = promisify(execFile),
         'server/ssr.mjs',
         'server/skeleton-generator.mjs',
         'types/index.d.ts',
+        'types/core.d.ts',
+        'dist/core.js',
+        'dist/polyfills.js',
+        'dist/module-graph.json',
+        'types/polyfills.d.ts',
+        'dist/runtime/context.js',
         'types/auto.d.ts',
         'types/debugger.d.ts',
         'types/offline.d.ts',
@@ -94,7 +94,15 @@ const run = promisify(execFile),
         'MIGRATION.md',
         'LICENSE',
     ],
-    missing = required.filter(
+    distribution = paths.filter(
+        // Select both browser module families published in the package
+        (path) => path.startsWith('dist/') && path.endsWith('.js'),
+    ),
+    counterparts = distribution.map(
+        // Require every public and internal module in both delivery families
+        (path) => (path.endsWith('.min.js') ? path.replace(/\.min\.js$/, '.js') : path.replace(/\.js$/, '.min.js')),
+    ),
+    missing = [...new Set([...required, ...counterparts])].filter(
         // Select matching items
         (path) => !paths.includes(path),
     );

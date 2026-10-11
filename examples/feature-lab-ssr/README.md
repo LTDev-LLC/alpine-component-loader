@@ -1,8 +1,9 @@
 # SSR Feature Lab
 
-This is the server-rendered counterpart to [`../feature-lab/`](../feature-lab/). It uses the same white feature cards, blue overview panel, status metrics, jump control, expandable usage panels, floating debugger, and accessibility tooling as the original lab.
+The [Feature Lab](../feature-lab/) rendered on the server, with matching controls, debugger, and accessibility tools.
 
-The dependency-free Node server reads the page shell from [`index.html.tmpl`](index.html.tmpl), renders all named component placeholders, and never embeds the document HTML in `server.mjs`. The version-one manifest now includes 17 component contracts and the page contains 22 server-rendered component instances covering:
+`server.mjs` renders placeholders from [index.html.tmpl](index.html.tmpl). Its v1 manifest defines 17 contracts across
+22 instances covering:
 
 - Verified local templates and `renderMany()`
 - Typed primitive, nullable, array, and object props
@@ -22,25 +23,48 @@ npm run build
 npm run example:feature-lab:ssr
 ```
 
-Open <http://127.0.0.1:4175/>. The page uses the CSP Alpine build. Disable JavaScript to confirm that the overview, explanations, metrics, slots, all 22 component instances, and their server fallbacks remain visible.
+Open <http://127.0.0.1:4175/>. The page uses CSP Alpine. Disable JavaScript to inspect all 22 server-rendered instances,
+slots, and fallbacks.
 
-With JavaScript enabled, matching revisions hydrate without requesting any component template. Data and polling begin, store instances synchronize, persisted props become editable, event mapping activates, and the diagnostics section summarizes bounded local observability records.
+Matching revisions hydrate without template requests. JavaScript enables data/polling, stores, persistence, events, and
+local diagnostics.
 
-The browser entries use `/dist/*.min.js`. The custom Node server synthesizes a
-missing minified sibling in memory after checking for a physical file, matching
-the local development-server contract while preserving on-demand runtime
-imports.
+The server serves physical `/dist/*.min.js` files first, generating missing siblings in memory.
 
-Use **Debug Mode** or **Open debugger** to inspect hydrated SSR hosts. Use **Open A11y Audit** to scan every active component, or **Audit intentional issues** to run a focused audit against the deliberately inaccessible fixture inherited from the original feature lab.
+**Debug Mode**/**Open debugger** inspect hydrated hosts. **Open A11y Audit** scans active components; **Audit
+intentional issues** targets the inaccessible fixture.
 
-Open <http://127.0.0.1:4175/?mismatch=1> to corrupt one server revision marker. The other components still hydrate in place while the counter keeps its server content visible until ordinary client rendering completes from one template request.
+`?mismatch=1` corrupts one revision marker. Other hosts hydrate; the counter keeps SSR content until a single client
+template request completes.
 
-The intentionally unsafe markup in `lab-security-card.html` demonstrates SSR/client sanitizer parity. Neither side executes it, and the final component contains no executable URL, inline event handler, or script.
+`lab-security-card.html` verifies sanitizer parity: executable URLs, inline handlers, and scripts are removed on both
+sides.
 
-For focused `dataResolver` and explicit `dataPolicy` flows, including proof that hydration skips the initial API request, run the smaller [`../ssr/`](../ssr/) example. Its query controls also demonstrate `visible`, `idle`, `interaction`, and `media` hydration while leaving ordinary client-only loading unchanged. Light DOM definitions can be structurally rendered with `renderLightDom: true` or per-render `lightDom: true`; this larger lab keeps Shadow DOM as its baseline so its Declarative Shadow DOM and revision-fallback comparisons remain direct.
+See the [SSR guide](../../docs/ssr.md) for `dataResolver`, `dataPolicy`, progressive modes, and Light DOM. This lab uses
+Shadow DOM for direct hydration/fallback comparisons.
 
 ## Template flow
 
-`server.mjs` reads the current `index.html.tmpl` for every full render. Each `{{NAME}}` token must have an explicit render result or controlled text value; missing values fail the request instead of producing an incomplete document. The raw template returns `404` over HTTP.
+Each render rereads the shell. Every `{{NAME}}` needs a result or controlled text value; missing values fail the
+request. The raw template returns HTTP 404.
 
-The server shares the repository development HMR channel. Component-template edits invalidate the SSR renderer cache and update matching hydrated instances in place. Content-only edits inside stable inline ACL templates are pulled as bounded template revisions; page markup and template-contract changes fall back to a full page reload.
+HMR invalidates SSR caches and updates matching hydrated hosts. Stable inline-template content receives bounded
+revisions; markup or contract changes reload the page.
+
+## Startup entry and fallback APIs
+
+The core client explicitly registers its manifest and definitions, then starts without discovery. Hydration and tools
+remain available in the same module family. See [core startup](../../docs/core.md).
+
+Await polyfills before dynamically importing `client.js`. Hydration still needs valid revisions and native ESM/ES2022.
+See [bootstrap and CSP](../../docs/polyfills.md).
+
+## Ordered streaming and parsed-tree reuse
+
+**Render ordered stream** uses `renderStream()` over NDJSON for twelve renders, including a slow first item. Choose
+concurrency 1-8 and compare completion with delivery order. Socket backpressure bounds work; **Cancel stream** aborts
+callbacks while retaining delivered output. **Render complete batch** runs the same requests through `renderMany()`.
+
+**Verify parsed-tree isolation and cache clearing** changes slots, clears the cache, and renders again. Cached
+unsanitized trees are cloned per render. `?scheduler=1` enables scheduling; `?polyfills=1&fallback=1` demonstrates
+self-hosted ShadyDOM under the existing CSP.

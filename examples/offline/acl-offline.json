@@ -3,9 +3,7 @@
     "activation": "immediate",
     "navigation": {
         "fallback": "index.html",
-        "allow": [
-            "/examples/offline/"
-        ],
+        "allow": ["/examples/offline/"],
         "strategy": "network-first"
     },
     "runtimeRoutes": [

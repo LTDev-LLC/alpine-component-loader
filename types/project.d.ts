@@ -37,6 +37,7 @@ export interface ACLProjectConfig {
         offlineSchema?: string;
     };
     offline?: {
+        runtime?: { entryUrl: string; features?: ACLRuntimeCapability[] };
         manifest?: string;
         outDir?: string;
         groups?: string[];
@@ -71,6 +72,7 @@ export interface ACLProjectConfig {
         moduleBase?: string;
         routeDirectory?: string;
         generate?: boolean;
+        preload?: { entry?: 'default' | 'core'; tags?: string[]; groups?: string[]; features?: ACLRuntimeCapability[] };
     };
     skeleton?: {
         root?: string;
@@ -100,3 +102,7 @@ export function loadProjectConfig(options?: {
 }>;
 
 export default defineConfig;
+
+export function generateModulePreloads(options: { manifest: import('./index.d.ts').ACLManifest; entryUrl: string; tags?: string[]; groups?: string[]; features?: ACLRuntimeCapability[] }): Promise<{ urls: string[]; html: string }>;
+
+export type ACLRuntimeCapability = "component" | "templates" | "cache" | "manifest" | "data" | "persistence" | "assets" | "form" | "hydration" | "triggers" | "styles" | "slots" | "scripts" | "scheduler" | "environment" | "polyfills" | "hmr" | "observability" | "adaptivePrefetch" | "dynamic" | "boundary" | "declarative" | "offline" | "debugger" | "scanner";

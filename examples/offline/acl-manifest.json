@@ -5,14 +5,10 @@
         "offline-demo-status": "offline-status.html",
         "offline-demo-shell": {
             "source": "offline-shell.html",
-            "dependencies": [
-                "offline-demo-status"
-            ]
+            "dependencies": ["offline-demo-status"]
         }
     },
     "groups": {
-        "offline-demo": [
-            "offline-demo-shell"
-        ]
+        "offline-demo": ["offline-demo-shell"]
     }
 }

@@ -22,7 +22,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run check:format:js
+      - run: npm run check:format
       - run: npm run check:javascript-style
       - run: npm run build
       - run: npm run playwright:install:ci -- chromium
@@ -30,6 +30,7 @@ jobs:
       - run: npm run test:types
       - run: npm run test:implementation-types
       - run: npm run check:size
+      - run: npm run benchmark
       - run: npm run security:static
       - run: npm run security:audit
       - run: npm run check:docs
@@ -41,7 +42,23 @@ jobs:
         uses: actions/upload-artifact@v7.0.1
         with:
           name: dist
-          path: dist
+          path: |
+            dist
+            test-results/benchmark.json
+
+  vite-compatibility:
+    name: Vite compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run playwright:install:ci -- chromium
+      - run: npm run test:vite-matrix
 
   coverage:
     name: Main coverage and Chromium
@@ -98,6 +115,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs:
       - static
+      - vite-compatibility
       - coverage
       - node-compatibility
       - browsers

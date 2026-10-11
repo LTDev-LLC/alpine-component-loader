@@ -24,7 +24,7 @@
         <p>Loading request...</p>
     </template>
     <template x-if="$props.$error">
-        <p style="color:#b91c1c" x-text="$props.$error"></p>
+        <p style="color: #b91c1c" x-text="$props.$error"></p>
     </template>
     <pre x-text="JSON.stringify($props.audit || {}, null, 2)"></pre>
 </div>

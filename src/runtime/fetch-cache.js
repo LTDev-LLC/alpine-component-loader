@@ -1,5 +1,5 @@
 // @license AlpineComponentLoader
-// Copyright (c) LTDev LLC
+// Copyright (c) LouisT
 // Licensed under the MIT license in the repository root
 
 const moduleSuffix = new URL(import.meta.url).pathname.endsWith('.min.js') ? '.min.js' : '.js',
@@ -9,7 +9,8 @@ const moduleSuffix = new URL(import.meta.url).pathname.endsWith('.min.js') ? '.m
         importLocalModule('./values.js'),
     ]);
 
-export const dataFetchCache = new Map();
+const { getContext } = await importLocalModule('./context.js');
+export const dataFetchCache = (getContext().dataEntries ||= new Map());
 
 // Remove non-semantic request fields and canonicalize headers for cache identity
 export const normalizeRequestForCache = (options = {}) => {
@@ -148,6 +149,119 @@ export const parseBodyValue = (value) => {
 };
 
 // Evict only settled data entries until the configured cache bound is satisfied
+// Construct cache storage and pruning for one loader owner
+export const createDataCache = (AlpineComponentLoader) => {
+    const dataFetchCache = (AlpineComponentLoader._context.dataEntries ||= new Map());
+    // Prune the owning loader data cache using effective limits
+    const pruneDataFetchCache = (settings = null) => {
+        const max = Number(settings?.cacheMax ?? 100);
+        if (!Number.isFinite(max)) return;
+        const limit = Math.max(0, Math.floor(max));
+        let overflow = dataFetchCache.size - limit;
+        if (overflow <= 0) return;
+        // Process each entry
+        for (const [key, entry] of dataFetchCache) {
+            if (overflow <= 0) break;
+            if (entry.settled !== false) {
+                dataFetchCache.delete(key);
+                overflow--;
+            }
+        }
+    };
+
+    class Management {
+        static clearDataCache(finalUrlOrKey = null) {
+            // Evict shared lookup ownership while allowing active subscribers to finish safely
+            const dataFetchCache = AlpineComponentLoader._dataRuntime?.dataFetchCache;
+            if (!dataFetchCache) return finalUrlOrKey == null;
+            // Mark or abort one detached cache entry according to subscriber ownership
+            const evict = (entry) => {
+                if (!entry) return;
+                // Keep evicted in-flight entries available only to consumers that already subscribed
+                if ((entry.subscribers || 0) === 0) {
+                    entry.invalidated = true;
+                }
+                if (entry.invalidated && entry.settled === false) entry.controller?.abort('Cache cleared');
+            };
+            if (!finalUrlOrKey) {
+                dataFetchCache.forEach(evict);
+                AlpineComponentLoader._detachedDataEntries.forEach(evict);
+                dataFetchCache.clear();
+                AlpineComponentLoader._detachedDataEntries.clear();
+                return true;
+            }
+            const exactEntry = dataFetchCache.get(finalUrlOrKey);
+            evict(exactEntry);
+            let cleared = dataFetchCache.delete(finalUrlOrKey);
+            dataFetchCache.forEach((entry, key) => {
+                // Process the current item
+                if (entry.finalUrl === finalUrlOrKey) {
+                    evict(entry);
+                    dataFetchCache.delete(key);
+                    cleared = true;
+                }
+            });
+            AlpineComponentLoader._detachedDataEntries.forEach((entry) => {
+                // Process the current item
+                if (entry.cacheKey === finalUrlOrKey || entry.finalUrl === finalUrlOrKey) {
+                    evict(entry);
+                    cleared = true;
+                }
+            });
+            return cleared;
+        }
+
+        static getDataCacheInfo(finalUrlOrKey = null) {
+            // Inspect redacted data cache metadata for one or every request
+            const dataFetchCache = AlpineComponentLoader._dataRuntime?.dataFetchCache;
+            if (!dataFetchCache)
+                return finalUrlOrKey
+                    ? null
+                    : {
+                          size: 0,
+                          keys: [],
+                      };
+            if (!finalUrlOrKey)
+                return {
+                    size: dataFetchCache.size,
+                    keys: Array.from(dataFetchCache.keys()),
+                };
+            let entry = dataFetchCache.get(finalUrlOrKey),
+                cacheKey = finalUrlOrKey;
+            if (!entry) {
+                // Process each entry
+                for (const [key, value] of dataFetchCache.entries()) {
+                    if (value.finalUrl === finalUrlOrKey) {
+                        entry = value;
+                        cacheKey = key;
+                        break;
+                    }
+                }
+            }
+            if (!entry) return null;
+            return {
+                key: cacheKey,
+                finalUrl: entry.finalUrl,
+                target: entry.target,
+                strategy: entry.strategy,
+                expiresAt: entry.expiresAt,
+                lastAccess: entry.lastAccess,
+                pending: entry.settled === false,
+                subscribers: entry.subscribers || 0,
+            };
+        }
+    }
+    return {
+        dataFetchCache,
+        getDataCacheKey,
+        normalizeRequestForCache,
+        parseBodyValue,
+        pruneDataFetchCache,
+        clearDataCache: Management.clearDataCache,
+        getDataCacheInfo: Management.getDataCacheInfo,
+    };
+};
+// Retain compatibility pruning for the default-context cache
 export const pruneDataFetchCache = (settings = null) => {
     const max = Number(settings?.cacheMax ?? 100);
     if (!Number.isFinite(max)) return;

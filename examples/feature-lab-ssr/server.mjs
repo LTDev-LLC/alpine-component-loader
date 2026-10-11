@@ -1,7 +1,9 @@
+import { streamDemo } from './stream-demo.mjs';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { dirname, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import AlpineComponentLoader from '../../dist/core.js';
 import { createACLDevHMR } from '../../server/dev-server.mjs';
 import { createMinifiedJavaScriptReader } from '../../server/javascript-minifier.mjs';
 import { createSSRRenderer } from '../../server/ssr.mjs';
@@ -56,7 +58,7 @@ const renderLab = async (mismatch) => {
                     id: 'lab-hero',
                 },
                 slots: {
-                    eyebrow: 'ACL v1.1.0 · Node + Declarative Shadow DOM',
+                    eyebrow: `ACL v${AlpineComponentLoader.version} · Node + Declarative Shadow DOM`,
                     default: 'This sentence and every component below remain meaningful when JavaScript is disabled',
                     actions: 'Matching revisions hydrate without requesting component templates',
                 },
@@ -286,6 +288,7 @@ const renderLab = async (mismatch) => {
 
     return renderPageTemplate(pageTemplate, {
         ...components,
+        LOADER_VERSION: AlpineComponentLoader.version,
         REGISTERED_COUNT: registeredCount,
         INSTANCE_COUNT: requests.length,
         MISMATCH_HREF: mismatch ? '/' : '/?mismatch=1',
@@ -327,6 +330,46 @@ const server = createServer(async (request, response) => {
         response.setHeader('x-content-type-options', 'nosniff');
         if (await hmr.handleRequest(request, response)) return;
 
+        if (url.pathname === '/demo-stream') {
+            await streamDemo(request, response, {
+                manifest,
+                root: exampleRoot,
+                url,
+            });
+            return;
+        }
+        if (url.pathname === '/demo-reuse') {
+            const first = await renderer.render('lab-slot-panel', {
+                    slots: {
+                        title: 'First title',
+                        default: '<p>First slot</p>',
+                    },
+                }),
+                second = await renderer.render('lab-slot-panel', {
+                    slots: {
+                        title: 'Second title',
+                        default: '<p>Second slot</p>',
+                    },
+                });
+            renderer.clearCache();
+            const fresh = await renderer.render('lab-slot-panel', {
+                slots: {
+                    title: 'Fresh title',
+                    default: '<p>Fresh slot</p>',
+                },
+            });
+            response.setHeader('content-type', 'application/json');
+            response.end(
+                JSON.stringify({
+                    isolated: !second.includes('First slot') && !first.includes('Second slot'),
+                    cacheCleared: fresh.includes('Fresh slot') && !fresh.includes('First slot'),
+                    first,
+                    second,
+                    fresh,
+                }),
+            );
+            return;
+        }
         if (url.pathname === '/') {
             response.setHeader('content-type', 'text/html; charset=utf-8');
             response.setHeader('cache-control', 'no-store');

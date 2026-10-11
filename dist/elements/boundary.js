@@ -1,5 +1,5 @@
 // @license AlpineComponentLoader
-// Copyright (c) LTDev LLC
+// Copyright (c) LouisT
 // Licensed under the MIT license in the repository root
 
 export const createErrorBoundary = ()=>class ACLErrorBoundary extends HTMLElement {

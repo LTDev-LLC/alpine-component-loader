@@ -369,3 +369,32 @@ test('playground edits, reruns, diagnoses, persists, and resets a complete ACL p
     ).toEqual([]);
     expect(sandboxWarnings).toEqual([]);
 });
+
+test('complete capability projects select their runtime and survive saved-draft reload', async ({ page }) => {
+    // Replace the four sources only through the workbench's explicit confirmation
+    test.slow();
+    // Accept explicit source replacement
+    page.on('dialog', (dialog) => dialog.accept());
+    await page.goto(application.origin + '/examples/playground/index.html');
+    await expect(page.locator('#status')).toHaveText(/Ready · Full render/);
+    // Each project runs in a fresh preview realm, including root-only factories
+    for (const [key, heading] of [
+        ['core', 'Minimal ACL application'],
+        ['transformations', 'Optional styles and slots'],
+        ['scheduled', 'Scheduled component group'],
+        ['isolated', 'Two isolated loader owners'],
+    ]) {
+        await page.locator('#capability-sample').selectOption(key);
+        await page.getByRole('button', { name: 'Load selected sample' }).click();
+        await expect(page.frameLocator('#preview').locator('h1')).toHaveText(heading);
+        await expect(page.locator('#status')).toHaveText(/Ready · Full render/);
+        await expect(page.locator('#metrics')).toContainText('moduleRequests');
+        if (key === 'scheduled') await expect(page.frameLocator('#preview').locator('sample-card')).toHaveCount(100);
+    }
+    await page.locator('#preview-polyfills').check();
+    await expect(page.locator('#status')).toHaveText(/Ready · Full render/);
+    await page.reload();
+    await expect(page.locator('#preview-polyfills')).toBeChecked();
+    await expect(page.frameLocator('#preview').locator('first-sample')).toContainText('Explicit component ready');
+    await expect(page.frameLocator('#preview').locator('second-sample')).toContainText('Explicit component ready');
+});

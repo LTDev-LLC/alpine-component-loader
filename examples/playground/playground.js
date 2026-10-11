@@ -1,3 +1,4 @@
+import CAPABILITY_SAMPLES from './capability-samples.js';
 import DEFAULT_SOURCES from './sample-sources.js';
 import AlpineComponentLoader from 'alpine-component-loader';
 import { mountAccessibilityScanner } from 'alpine-component-loader/a11y-scanner';
@@ -111,6 +112,7 @@ const waitForWorkbench = () =>
     });
 
 await waitForWorkbench();
+await import(document.body.dataset.runtimeDemosUrl);
 
 const workbenchScanner = mountAccessibilityScanner({
         root: document,
@@ -132,9 +134,11 @@ const workbenchScanner = mountAccessibilityScanner({
     runtimeUrl = new URL('../../dist/index.min.js', location.href).href,
     devRuntimeUrl = new URL('../../dist/dev.min.js', location.href).href,
     a11yScannerUrl = new URL('../../dist/a11y-scanner.min.js', location.href).href,
-    alpineUrl = 'https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js';
+    alpineUrl = 'https://cdn.jsdelivr.net/npm/alpinejs@3.17.4/dist/cdn.min.js';
 
-let runSequence = 0,
+let selectedSampleEntry = 'default',
+    previewPolyfills = false,
+    runSequence = 0,
     activeRun = 0,
     activeEditorKey = 'page',
     autoRunTimer = null,
@@ -163,6 +167,8 @@ const readSavedState = () => {
         if (Object.values(savedSources).some((value) => value == null)) return null;
         return {
             autoRun: parsed.autoRun !== false,
+            entry: parsed.entry === 'core' ? 'core' : 'default',
+            polyfills: parsed.polyfills === true,
             sources: savedSources,
         };
     } catch {
@@ -178,6 +184,8 @@ const saveState = () => {
             STORAGE_KEY,
             JSON.stringify({
                 autoRun: playgroundStore.autoRun,
+                entry: selectedSampleEntry,
+                polyfills: previewPolyfills,
                 sources: Object.fromEntries(sourceKeys.map((key) => [key, editors[key].value])),
             }),
         );
@@ -303,7 +311,7 @@ const disposeHotContext = async context => {
 };
 
 globalThis.__aclPlaygroundReady = (async () => {
-  const packageModule = await import(${JSON.stringify(runtimeUrl)});
+  const packageModule = await import(${JSON.stringify(selectedSampleEntry === 'core' ? runtimeUrl.replace('index.min.js', 'core.min.js') : runtimeUrl)});
   const devModule = await import(${JSON.stringify(devRuntimeUrl)});
   globalThis.AlpineComponentLoader = packageModule.default;
   globalThis.createLoader = packageModule.createLoader;
@@ -419,7 +427,8 @@ globalThis.__aclPlaygroundReady = (async () => {
         version: loader.version,
         registeredTags: loader.getRegisteredTags(),
         metrics: loader.getMetrics(),
-        update: { mode, sources: updatedSources }
+        update: { mode, sources: updatedSources },
+        moduleRequests: performance.getEntriesByType('resource').filter(entry => entry.name.includes('/dist/') || entry.name.includes('/__acl_hmr/modules/')).map(entry => new URL(entry.name).pathname)
       });
       send('ready', {
         duration,
@@ -523,6 +532,30 @@ const bootPreview = async (runId, sources, startedAt) => {
     previewStyle.textContent = sources.css;
     previewDocument.head.append(previewStyle);
     previewDocument.body.innerHTML = `${sources.page}\n${sources.components}`;
+    if (previewPolyfills) {
+        const polyfillUrl = runtimeUrl.replace('index.min.js', 'polyfills.min.js'),
+            bootstrap = previewDocument.createElement('script'),
+            source =
+                'const { loadPolyfills } = await import(' + JSON.stringify(polyfillUrl) + '); await loadPolyfills();';
+
+        const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
+        bootstrap.type = 'module';
+        bootstrap.src = url;
+        const completed = Promise.race([
+            once(bootstrap, 'load'),
+            // Settle feature activation and allow a clean retry
+            once(bootstrap, 'error').then(() => {
+                throw new Error('Preview polyfill bootstrap failed');
+            }),
+        ]);
+        previewDocument.head.append(bootstrap);
+        // Complete the current demonstration operation
+        try {
+            await completed;
+        } finally {
+            URL.revokeObjectURL(url);
+        }
+    }
     await loadAlpine(previewDocument);
     if (runId !== activeRun) return;
 
@@ -658,6 +691,9 @@ const applySources = (sources) => {
 const savedState = readSavedState();
 applySources(savedState?.sources || cloneDefaultSources());
 playgroundStore.autoRun = savedState?.autoRun !== false;
+selectedSampleEntry = savedState?.entry || 'default';
+previewPolyfills = savedState?.polyfills === true;
+document.querySelector('#preview-polyfills').checked = previewPolyfills;
 
 document.querySelectorAll('[data-editor-tab]').forEach((tab) => {
     // Retain native tab-list key navigation around Alpine-owned selection state
@@ -726,9 +762,34 @@ document.addEventListener('playground:auto-run', () => {
     else clearTimeout(autoRunTimer);
 });
 
+document.addEventListener('playground:sample', () => {
+    // Replace all editors only after explicit selection and confirmation
+    const key = document.querySelector('#capability-sample').value;
+    if (!key || !confirm('Replace the current editors with the selected complete sample?')) return;
+    const sample = CAPABILITY_SAMPLES[key];
+    selectedSampleEntry = sample.entry;
+    applySources({ ...sample.sources });
+    pendingSources.clear();
+    saveState();
+    void runPreview({
+        forcedKey: 'page',
+        forceFull: true,
+    });
+});
+document.addEventListener('playground:polyfills', () => {
+    // Platform readiness belongs to each newly created preview document
+    previewPolyfills = document.querySelector('#preview-polyfills').checked;
+    saveState();
+    void runPreview({
+        forcedKey: 'page',
+        forceFull: true,
+    });
+});
+
 document.addEventListener('playground:reset', () => {
     // Confirm before replacing every locally authored source
     if (!confirm('Reset all four editors to the Northstar dashboard sample?')) return;
+    selectedSampleEntry = 'default';
     applySources(cloneDefaultSources());
     playgroundStore.autoRun = true;
     saveState();

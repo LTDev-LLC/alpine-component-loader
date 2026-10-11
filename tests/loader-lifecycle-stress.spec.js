@@ -1,3 +1,4 @@
+import { installResourceLedger } from './fixtures/resource-ledger.js';
 import { expect, test, preparePage, alpineStubSource, projectRoot, featureLabPath } from './fixtures/loader.js';
 import AxeBuilder from '@axe-core/playwright';
 import { readFile } from 'node:fs/promises';
@@ -21,88 +22,7 @@ test.describe('isolated lifecycle stress coverage', () => {
         // Exercise the test scenario
         test.slow();
         await preparePage(page);
-        await page.evaluate(() => {
-            // Read the browser state
-            const resources = (window.__aclResourceLedger = {
-                    timers: new Set(),
-                    frames: new Set(),
-                    mutationObservers: 0,
-                    resizeObservers: 0,
-                    intersectionObservers: 0,
-                }),
-                nativeSetTimeout = window.setTimeout.bind(window),
-                nativeClearTimeout = window.clearTimeout.bind(window),
-                nativeRequestAnimationFrame = window.requestAnimationFrame.bind(window),
-                nativeCancelAnimationFrame = window.cancelAnimationFrame.bind(window);
-            window.setTimeout = (callback, delay, ...args) => {
-                // Read the browser state
-                let id = null;
-                id = nativeSetTimeout(() => {
-                    // Run the original timer callback
-                    resources.timers.delete(id);
-                    callback(...args);
-                }, delay);
-                resources.timers.add(id);
-                return id;
-            };
-            window.clearTimeout = (id) => {
-                // Read the browser state
-                resources.timers.delete(id);
-                return nativeClearTimeout(id);
-            };
-            window.requestAnimationFrame = (callback) => {
-                // Read the browser state
-                let id = null;
-                id = nativeRequestAnimationFrame((timestamp) => {
-                    // Run the original animation callback
-                    resources.frames.delete(id);
-                    callback(timestamp);
-                });
-                resources.frames.add(id);
-                return id;
-            };
-            window.cancelAnimationFrame = (id) => {
-                // Read the browser state
-                resources.frames.delete(id);
-                return nativeCancelAnimationFrame(id);
-            };
-
-            const trackObserver = (name, NativeObserver, key) => {
-                // Run the track observer operation
-                Object.defineProperty(window, name, {
-                    configurable: true,
-                    writable: true,
-                    value: class TrackingObserver extends NativeObserver {
-                        constructor(callback, options) {
-                            // Initialize class state
-                            super(callback, options);
-                            this.__aclActive = false;
-                        }
-
-                        observe(...args) {
-                            // Count the fixture observer when it becomes active
-                            if (!this.__aclActive) {
-                                this.__aclActive = true;
-                                resources[key]++;
-                            }
-                            return super.observe(...args);
-                        }
-
-                        disconnect() {
-                            // Remove the fixture observer from the active count
-                            if (this.__aclActive) {
-                                this.__aclActive = false;
-                                resources[key]--;
-                            }
-                            return super.disconnect();
-                        }
-                    },
-                });
-            };
-            trackObserver('MutationObserver', window.MutationObserver, 'mutationObservers');
-            trackObserver('ResizeObserver', window.ResizeObserver, 'resizeObservers');
-            trackObserver('IntersectionObserver', window.IntersectionObserver, 'intersectionObservers');
-        });
+        await page.evaluate(installResourceLedger);
         await page.addScriptTag({
             type: 'module',
             content: `

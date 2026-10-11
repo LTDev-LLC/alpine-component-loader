@@ -1,4 +1,8 @@
-import AlpineComponentLoader from 'alpine-component-loader';
+const { default: AlpineComponentLoader } = await import(
+    new URLSearchParams(location.search).get('entry') === 'core'
+        ? 'alpine-component-loader/core'
+        : 'alpine-component-loader'
+);
 import { getOfflineStatus, registerOfflineWorker } from 'alpine-component-loader/offline';
 
 const serviceWorkerStatus = document.querySelector('#service-worker-status'),
@@ -82,7 +86,10 @@ try {
     demoRoot.replaceChildren(shell);
     await loaded;
 
-    const registration = await registerOfflineWorker('./acl-sw.js', { scope: './' });
+    const registration = await registerOfflineWorker(
+        new URLSearchParams(location.search).get('entry') === 'core' ? './acl-sw-core.js' : './acl-sw.js',
+        { scope: './' },
+    );
     await navigator.serviceWorker.ready;
     await waitForControl();
     const runtimeMessage = await fetch('./runtime-message.json?example=1').then((response) => {

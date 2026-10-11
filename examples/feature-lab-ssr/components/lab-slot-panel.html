@@ -16,7 +16,7 @@
         align-items: center;
         justify-content: space-between;
         gap: 1rem;
-        padding: .9rem 1.1rem;
+        padding: 0.9rem 1.1rem;
         background: #f8fafc;
     }
 
@@ -31,19 +31,24 @@
     .content {
         padding: 1.1rem;
         color: #334155;
-        font: .95rem/1.6 system-ui, sans-serif;
+        font:
+            0.95rem/1.6 system-ui,
+            sans-serif;
     }
 
-    ::slotted([slot="badge"]) {
-        padding: .25rem .55rem;
+    ::slotted([slot='badge']) {
+        padding: 0.25rem 0.55rem;
         border-radius: 999px;
         color: #166534;
         background: #dcfce7;
-        font: 700 .72rem system-ui, sans-serif;
+        font:
+            700 0.72rem system-ui,
+            sans-serif;
     }
 </style>
 <article>
-    <header><strong>
+    <header>
+        <strong>
             <slot name="title">Named slots</slot>
         </strong>
         <slot name="badge"></slot>

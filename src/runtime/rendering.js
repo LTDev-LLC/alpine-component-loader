@@ -1,5 +1,5 @@
 // @license AlpineComponentLoader
-// Copyright (c) LTDev LLC
+// Copyright (c) LouisT
 // Licensed under the MIT license in the repository root
 
 const moduleSuffix = new URL(import.meta.url).pathname.endsWith('.min.js') ? '.min.js' : '.js',
@@ -93,31 +93,18 @@ export const cloneParsedFragment = (html, settings = {}) => {
 
 // Enumerate descendants while following inert template content fragments
 const collectElements = (rootNode) => {
+    // Visit each node exactly once including inert template fragments
     const elements = [],
-        visit = (root) => {
-            // Visit
-            if (root?.nodeType === 1) elements.push(root);
-            root?.querySelectorAll?.('*').forEach(
-                // Visit
-                (element) => elements.push(element),
-            );
-            elements.slice().forEach((element) => {
-                // Process the current item
-                if (element.localName === 'template' && element.content && !element.__aclTemplateVisited) {
-                    Object.defineProperty(element, '__aclTemplateVisited', {
-                        value: true,
-                        configurable: true,
-                    });
-                    visit(element.content);
-                }
-            });
-        };
-    visit(rootNode);
-    elements.forEach((element) => {
-        // Process the current item
-        if (element.__aclTemplateVisited) delete element.__aclTemplateVisited;
-    });
-    return [...new Set(elements)];
+        stack = [rootNode];
+    // Process queued work in a bounded deterministic order
+    while (stack.length) {
+        const node = stack.pop();
+        if (node?.nodeType === 1) elements.push(node);
+        const children = node?.localName === 'template' && node.content ? node.content.childNodes : node?.childNodes;
+        // Process queued work in a bounded deterministic order
+        if (children) for (let index = children.length - 1; index >= 0; index--) stack.push(children[index]);
+    }
+    return elements;
 };
 
 // Remove executable elements handlers navigation sinks and unsafe URLs
@@ -187,97 +174,4 @@ export const applySanitizer = async (rootNode, settings, context) => {
         return rootNode;
     }
     return sanitizeNodeTree(rootNode, settings, context);
-};
-
-// Split a selector list only at top-level commas outside quotes, brackets, and functions
-const splitSelectorList = (selectorText) => {
-    const selectors = [];
-    let current = '',
-        depth = 0,
-        quote = null,
-        escaped = false;
-    // Process each character
-    for (const character of selectorText) {
-        if (escaped) {
-            current += character;
-            escaped = false;
-            continue;
-        }
-        if (character === '\\') {
-            current += character;
-            escaped = true;
-            continue;
-        }
-        if (quote) {
-            current += character;
-            if (character === quote) quote = null;
-            continue;
-        }
-        if (character === '"' || character === "'") {
-            quote = character;
-            current += character;
-            continue;
-        }
-        if (character === '(' || character === '[') depth++;
-        else if (character === ')' || character === ']') depth = Math.max(0, depth - 1);
-        if (character === ',' && depth === 0) {
-            selectors.push(current.trim());
-            current = '';
-        } else current += character;
-    }
-    if (current.trim()) selectors.push(current.trim());
-    return selectors;
-};
-
-// Rewrite one selector list so every branch is anchored to the component scope
-export const scopeSelectorText = (selectorText, scopeSelector) =>
-    splitSelectorList(selectorText)
-        .map((selector) => {
-            // Transform the current item
-            let scoped = selector
-                .replace(/:host\s*\(([^)]+)\)/g, `${scopeSelector}$1`)
-                .replace(/:host\b/g, scopeSelector)
-                .replace(/:scope\b/g, scopeSelector)
-                .replace(/^\s*(?:html|body|:root)\b/, scopeSelector);
-            if (!scoped.includes(scopeSelector)) scoped = `${scopeSelector} ${scoped}`;
-            return scoped;
-        })
-        .join(', ');
-
-// Parse and recursively scope ordinary CSS rules while leaving keyframes untouched
-export const scopeLightDomCss = (cssText, scopeSelector) => {
-    let sheet,
-        temporaryStyle = null;
-    // Guard the scope light dom css operation against runtime failures
-    try {
-        if (typeof CSSStyleSheet === 'function' && CSSStyleSheet.prototype.replaceSync) {
-            sheet = new CSSStyleSheet();
-            sheet.replaceSync(cssText);
-        } else {
-            temporaryStyle = document.createElement('style');
-            temporaryStyle.textContent = cssText;
-            document.head.appendChild(temporaryStyle);
-            sheet = temporaryStyle.sheet;
-        }
-        // Descend through grouping rules but never rewrite animation keyframe selectors
-        const rewriteRules = (rules) =>
-            Array.from(rules || []).forEach((rule) => {
-                // Process the current item
-                if (typeof CSSStyleRule !== 'undefined' && rule instanceof CSSStyleRule) {
-                    rule.selectorText = scopeSelectorText(rule.selectorText, scopeSelector);
-                    return;
-                }
-                if (rule.cssRules && !(typeof CSSKeyframesRule !== 'undefined' && rule instanceof CSSKeyframesRule))
-                    rewriteRules(rule.cssRules);
-            });
-        rewriteRules(sheet?.cssRules);
-        return Array.from(sheet?.cssRules || [])
-            .map(
-                // Transform the current item
-                (rule) => rule.cssText,
-            )
-            .join('\n');
-    } finally {
-        temporaryStyle?.remove();
-    }
 };

@@ -87,7 +87,7 @@
             "options": {
                 "shadow": true,
                 "sanitize": true,
-                "templateRevision": "sha256-VZJLU_s54DcPg3y2riMS5OOpP1pgY5_-YCI_Y_o3w2Y",
+                "templateRevision": "sha256-lmo9tVyFf0iZb9EACsNR75w1ZT4WxXY42Cq_BT2tHBc",
                 "attributes": {
                     "heading": {
                         "type": "String",
@@ -109,7 +109,7 @@
             "options": {
                 "shadow": true,
                 "sanitize": true,
-                "templateRevision": "sha256-EugqB4opH4jFb9nYFpnc746Bxea1UGF1UFu3H-ZjXeQ",
+                "templateRevision": "sha256-KyLhIqRJcenmAUC6tS5MHNMus-KKFLA64D263uGT89U",
                 "attributes": {
                     "label": {
                         "type": "String",
@@ -141,9 +141,7 @@
                                     "type": "number"
                                 }
                             },
-                            "required": [
-                                "count"
-                            ]
+                            "required": ["count"]
                         }
                     }
                 }
@@ -295,9 +293,7 @@
                                     "type": "string"
                                 }
                             },
-                            "required": [
-                                "message"
-                            ]
+                            "required": ["message"]
                         }
                     }
                 }
@@ -350,10 +346,7 @@
                 "attributes": {
                     "mode": {
                         "type": "String",
-                        "options": [
-                            "compact",
-                            "comfortable"
-                        ],
+                        "options": ["compact", "comfortable"],
                         "default": "comfortable",
                         "reflect": true
                     },

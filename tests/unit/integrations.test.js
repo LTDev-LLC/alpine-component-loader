@@ -126,6 +126,12 @@ test('starter generator copies maintained templates with dry-run and overwrite p
         );
         assert.ok(
             dryRun.files.some(
+                // Keep the documented optional bootstrap available in generated Vite projects
+                (path) => path.endsWith('/src/bootstrap-polyfills.js'),
+            ),
+        );
+        assert.ok(
+            dryRun.files.some(
                 // Locate the checked-in audit baseline
                 (path) => path.endsWith('/.acl/a11y-baseline.json'),
             ),

@@ -1,5 +1,5 @@
 // @license AlpineComponentLoader
-// Copyright (c) LTDev LLC
+// Copyright (c) LouisT
 // Licensed under the MIT license in the repository root
 
 const DEFAULTS = Object.freeze({
@@ -83,7 +83,9 @@ export const createAdaptivePrefetchController = (loaderClass, supplied = {}) => 
         return [...new Set(tags)];
     };
 
-    const prefetch = async (target) => {
+    const ownership = new AbortController();
+
+    const prefetch = async (target, { signal } = {}) => {
         // Prefetch
         if (disconnected) return {};
         const reason = connectionSkipReason(options);
@@ -102,7 +104,23 @@ export const createAdaptivePrefetchController = (loaderClass, supplied = {}) => 
             (tag) => completed.add(tag),
         );
         dispatch('prefetchstart', { tags: pending });
-        const results = await loaderClass.prefetchGraph(pending, { concurrency: options.concurrency });
+        const request = new AbortController(),
+            // Resolve this operation and preserve independent ownership
+            abort = () => request.abort(signal?.aborted ? signal.reason : ownership.signal.reason);
+        if (signal?.aborted || ownership.signal.aborted) abort();
+        signal?.addEventListener('abort', abort, { once: true });
+        ownership.signal.addEventListener('abort', abort, { once: true });
+        let results;
+        // Release resources on both success and failure
+        try {
+            results = await loaderClass.prefetchGraph(pending, {
+                concurrency: options.concurrency,
+                signal: request.signal,
+            });
+        } finally {
+            signal?.removeEventListener('abort', abort);
+            ownership.signal.removeEventListener('abort', abort);
+        }
         Object.entries(results).forEach(([tag, result]) => {
             // Process the current item
             if (result.status === 'rejected') completed.delete(tag);
@@ -247,6 +265,7 @@ export const createAdaptivePrefetchController = (loaderClass, supplied = {}) => 
             // Run the disconnect operation
             if (disconnected) return;
             disconnected = true;
+            ownership.abort('Adaptive prefetch disconnected');
             root.removeEventListener('pointerover', onPointerOver);
             root.removeEventListener('pointerout', onPointerOut);
             root.removeEventListener('focusin', onFocus);

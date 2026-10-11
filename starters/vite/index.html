@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="description" content="Route-aware Alpine Component Loader starter powered by the ACL Vite plugin" />
         <title>ACL Vite application</title>
-        <script type="module" src="/src/main.js"></script>
+        <script type="module" src="/src/bootstrap.js"></script>
     </head>
     <body>
         <div class="app-shell">
@@ -18,6 +18,13 @@
             </header>
 
             <main>
+                <nav aria-label="Startup variants">
+                    <a href="?">Root startup</a> · <a href="?entry=core">Core startup</a> ·
+                    <a href="?polyfills=1">Polyfill bootstrap</a> ·
+                    <a href="?entry=core&amp;polyfills=1">Core with polyfills</a>
+                </nav>
+                <p id="startup-status" role="status">Preparing startup</p>
+                <button id="retry-startup" type="button" hidden>Reload to retry startup</button>
                 <div class="route-heading">
                     <div>
                         <p class="eyebrow">Independent route manifests</p>

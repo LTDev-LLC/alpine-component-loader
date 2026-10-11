@@ -1,9 +1,5 @@
 export type ACLPropConstructor =
-    | StringConstructor
-    | NumberConstructor
-    | BooleanConstructor
-    | ArrayConstructor
-    | ObjectConstructor;
+    StringConstructor | NumberConstructor | BooleanConstructor | ArrayConstructor | ObjectConstructor;
 
 export type ACLSerializedPropType = 'String' | 'Number' | 'Boolean' | 'Array' | 'Object';
 
@@ -294,7 +290,10 @@ export interface ACLAdaptivePrefetchOptions {
 }
 
 export interface ACLAdaptivePrefetchController {
-    prefetch(target: string | Element | string[]): Promise<Record<string, ACLPrefetchResult>>;
+    prefetch(
+        target: string | Element | string[],
+        options?: { signal?: AbortSignal },
+    ): Promise<Record<string, ACLPrefetchResult>>;
     disconnect(): void;
 }
 
@@ -362,6 +361,10 @@ export interface ACLComponentOptions<TProps extends ACLProps = ACLProps> {
               state?: string | null;
               disabled?: string | null;
           };
+    templateTimeout?: number;
+    templateMaxBytes?: number;
+    prefetchConcurrency?: number;
+    hydrationScheduler?: false | { budgetMs?: number; maxTasksPerTurn?: number };
 }
 
 export type ACLInlineComponentDefinition<TProps extends ACLProps = ACLProps> = ACLComponentOptions<TProps> & {
@@ -515,14 +518,17 @@ export default class AlpineComponentLoader {
     static getDefinition(tagName: string): ACLDefinition | null;
     static getRegisteredTags(): string[];
     static getDependencies(tagName: string, options?: { transitive?: boolean }): string[];
-    static prefetch(tagName: string): Promise<string | DocumentFragment | undefined>;
+    static prefetch(
+        tagName: string,
+        options?: { signal?: AbortSignal },
+    ): Promise<string | DocumentFragment | undefined>;
     static prefetchAll(
         tagNames?: Iterable<string> | null,
-        options?: { concurrency?: number },
+        options?: { concurrency?: number; signal?: AbortSignal },
     ): Promise<Record<string, ACLPrefetchResult>>;
     static prefetchGraph(
         tagNames: Iterable<string>,
-        options?: { concurrency?: number; includeRoots?: boolean },
+        options?: { concurrency?: number; includeRoots?: boolean; signal?: AbortSignal },
     ): Promise<Record<string, ACLPrefetchResult>>;
     static registerManifest(
         manifest: ACLManifest,
@@ -546,6 +552,7 @@ export default class AlpineComponentLoader {
     static loadTemplate(
         source: string | HTMLTemplateElement,
         settings?: ACLComponentOptions,
+        options?: { signal?: AbortSignal },
     ): Promise<string | DocumentFragment>;
     static pruneCaches(prefix?: string, current?: string): Promise<boolean[] | undefined>;
     static clearTemplateCaches(prefix?: string): Promise<boolean[] | undefined>;

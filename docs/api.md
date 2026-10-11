@@ -1,6 +1,6 @@
 # API reference and troubleshooting
 
-This page maps the public runtime surface and provides common remedies. Feature guides contain the full workflows and security details.
+Public APIs, defaults, and troubleshooting. Feature guides provide complete workflows.
 
 ## Startup patterns
 
@@ -23,9 +23,14 @@ AlpineComponentLoader.define('profile-card', 'profile-card.html', {
 await AlpineComponentLoader.start();
 ```
 
-Load and expose a compatible Alpine 3.14-3.x build before components initialize. When Alpine is imported as a module, assign it to `window.Alpine` and start it once according to the application's bootstrap order.
+Expose Alpine 3.14-3.x on `window.Alpine` and start it once before components initialize.
 
-`config(options)` merges nested data, hook, event, security, observability, and adaptive-prefetch settings with current global configuration. Invalid cache strategies, loading modes, bounds, and persistence versions fail early.
+[Core](core.md) skips discovery; explicitly register templates and built-ins.
+
+Await `/polyfills` before dynamically importing the application. `waitForWebComponents()` integrates external loaders.
+See [polyfill options](polyfills.md). Startup completes registration; `loaded`/hydration events mark initialization.
+
+`config()` merges current defaults and synchronously validates modes, bounds, and persistence versions.
 
 Use `alpine-component-loader/auto` only when browser import-time startup is deliberate:
 
@@ -33,7 +38,8 @@ Use `alpine-component-loader/auto` only when browser import-time startup is deli
 import AlpineComponentLoader from 'alpine-component-loader/auto';
 ```
 
-The auto entry waits for DOM parsing, applies `window.AlpineComponentLoaderConfig` when present, and starts unless `autoStart` is false:
+The auto entry waits for DOM parsing, applies `window.AlpineComponentLoaderConfig` when present, and starts unless
+`autoStart` is false:
 
 ```html
 <script>
@@ -48,7 +54,7 @@ The auto entry waits for DOM parsing, applies `window.AlpineComponentLoaderConfi
 
 ## Isolated loader instances
 
-Use `createLoader()` when tests, micro-frontends, or multiple applications must not share configuration, registries, observers, metrics, or runtime caches:
+Use `createLoader()` for independent application/test state:
 
 ```js
 import { createLoader } from 'alpine-component-loader';
@@ -64,134 +70,131 @@ await loader.start();
 await loader.dispose();
 ```
 
-The static `root` limits declarative discovery to the supplied document,
-element, or open shadow root. The factory exposes a `ready` promise for
-integrations that need to observe completion of the isolated module graph.
-`dispose()` disconnects observers, destroys owned component instances, clears
-registries and in-memory caches, and rejects later mutating calls with
-`ACL_LOADER_DISPOSED`. Its `clearPersistentCaches` option defaults to `true`;
-pass `{ clearPersistentCaches: false }` when another loader or application must
-retain the same Cache API namespace. Browser custom-element names remain
-global; another isolated loader attempting to own the same tag receives
-`ACL_TAG_OWNERSHIP_CONFLICT`.
+`root` limits discovery to a document, element, or open Shadow Root; `ready` marks facade setup. Loaders share
+implementation modules but own configuration, registries, requests, queues, metrics, and memory caches. Persistent
+namespaces retain configured sharing. `dispose()` releases owned resources and rejects later mutation with
+`ACL_LOADER_DISPOSED`. `clearPersistentCaches` defaults to `true`; set it to `false` to retain shared persistent caches.
+Custom-element names remain global; duplicate loader ownership reports `ACL_TAG_OWNERSHIP_CONFLICT`.
 
-Before starting, the auto entry installs inline-template observation unless
-`observeTemplates` is `false`. This closes the gap between its startup scan and
-templates inserted while startup is pending. `autoStart: false` disables both
-startup and automatic observation. Its named `startAutoLoader()` export repeats
-the same guarded transaction without creating duplicate observers.
+`/auto` observes before scanning. `observeTemplates: false` retains only scanning; `autoStart: false` disables both.
+`startAutoLoader()` repeats startup without duplicate observers.
 
-All other public entries are safe to import without browser globals, although their browser-only operations still require DOM or Service Worker APIs.
+Other entries import without browser globals; browser operations still need DOM/Service Worker APIs.
 
-The root entry is a demand-loaded facade. Importing it does not request every runtime module. APIs, component configuration, and encountered markup activate only the component, rendering, remote-template, cache, data, persistence, asset, manifest, prefetch, observability, or built-in-element capabilities they need. Successful capability imports are shared for the page lifetime; concurrent callers await the same promise.
+Capabilities load on activation. Concurrent callers share an import promise; successful implementations are reused.
 
-`define()` and the registration methods are asynchronous. A `define()` call made before `start()` can remain unawaited because `start()` drains all queued definitions before resolving. Await the individual call when its constructor or readiness is needed immediately.
+Registration is asynchronous. `start()` drains pre-start definitions; await `define()` separately when you need its
+constructor.
 
-If a capability import fails, the activating operation rejects with an `ACLLoadError` whose code is `ACL_RUNTIME_MODULE_LOAD_FAILED`. The failed promise is discarded so a later explicit action can retry.
+Failed imports reject with `ACL_RUNTIME_MODULE_LOAD_FAILED` and are evicted for later retry.
 
 ## Configuration reference
 
-`config()` supplies global defaults; `define()` supplies one definition. Successive `config()` calls merge nested `attributes`, `data`, `hooks`, `events`, `errorCss`, `security`, `observability`, and `adaptivePrefetch` records; supplied arrays and scalar values replace their previous global values. While normalizing a definition, `attributes`, `data`, `hooks`, `events`, and `errorCss` merge with the global records, asset and shared-sheet arrays are concatenated, and the remaining explicit definition values override their global defaults.
+`config()` merges nested `attributes`, `data`, `hooks`, `events`, `errorCss`, `security`, `observability`, and
+`adaptivePrefetch`; arrays/scalars replace previous values. Definitions merge global prop/data/hook/event/error records,
+concatenate asset/shared-sheet arrays, and override other explicit defaults.
 
-| Option | Default | Contract |
-| --- | --- | --- |
-| `attributes` | `{}` | Typed prop constructor/descriptor map. |
-| `debug` | `false` | Loader debugger state after debugger injection. |
-| `autoStart` | `true` | Global-only gate used by the `/auto` entry. |
-| `observeTemplates` | `true` | Global-only `/auto` control for observing inline declarations inserted after startup. |
-| `basePath` | empty | Prefix for relative component sources. |
-| `sourceResolver` | `null` | Synchronously rewrite a source before `basePath`. |
-| `errorCss` | accessible built-in styles | Style record merged into the no-fallback error block. |
-| `loading` | `eager` | `eager`, `lazy`, or `idle`. |
-| `hydrate` | `eager` | SSR-only hydration trigger: `eager`, `visible`, `idle`, `interaction`, or `media`. |
-| `hydrateMedia` | `null` | Required media query for `hydrate: "media"`. |
-| `shadow` | `false` | Render into an open Shadow Root. |
-| `useConstructibleStyles` | `true` | Adopt cached constructible sheets when supported. |
-| `sharedStyleSheets` | `[]` | Application `CSSStyleSheet` objects adopted in Shadow DOM. |
-| `executeScripts` | `false` | Execute template scripts that survive the selected sanitizer. |
-| `stripStyles` | `false` | Remove template `<style>` elements. |
-| `sanitize` | `true` | Built-in sanitizer, `false`, or a custom sanitizer function. |
-| `security` | `{}` | Trusted Types policy and URL-policy settings. |
-| `observability` | `false` | Global structured-record retention/logger settings. |
-| `adaptivePrefetch` | `false` | Global adaptive-prefetch startup settings or `true` for defaults. |
-| `strictProps` | `false` | Throw instead of reporting and defaulting invalid props. |
-| `runtimeCacheMax` | `200` | Bound in-memory style, asset, and diagnostic maps. |
-| `cacheNamespace` | `default` | Global Cache API namespace segment. |
-| `keepAliveMax` | `Infinity` | Default dynamic inactive-child capacity. |
-| `dynamicTransition` | `auto` | Default dynamic transition preset. |
-| `transitionDuration` | `100` | Default dynamic transition duration in milliseconds. |
-| `events` | `{ forward: [] }` | Event-forwarding configuration. |
-| `externalCss` | `[]` | External stylesheet strings/descriptors. |
-| `externalScripts` | `[]` | External script strings/descriptors. |
-| `loadingTemplate` | `null` | Loading template URL, selector, or template element. |
-| `loadingHtml` | `null` | Loading markup string. |
-| `defaultComponentName` | `acl-component` | Default declarative-proxy tag used by on-demand discovery and explicit registration. |
-| `defaultDynamicName` | `acl-dynamic` | Default dynamic-loader tag used by on-demand discovery and explicit registration. |
-| `defaultBoundaryName` | `acl-boundary` | Default nearest-error-boundary tag used by discovery and explicit registration. |
-| `data` | grouped defaults | Request, retry, polling, response, and data-cache settings. |
-| `cacheTemplates` | `true` | Enable Cache API storage for external templates. |
-| `templateCacheStrategy` | `cache-first` | Template cache strategy. |
-| `templateCacheTtl` | `900000` | Template freshness in milliseconds. |
-| `templateCacheMax` | `100` | Active template namespace capacity. |
-| `templateRevision` | `null` | Explicit source content revision. |
-| `fallback` | `null` | Initial-failure template source. |
-| `hooks` | identity fetch hooks | Lifecycle, fetch, and preservation hooks. |
-| `persist` | `false` | `local`, `session`, `indexeddb`, or custom adapter mode. |
-| `persistKey` | `null` | Explicit storage key. |
-| `persistDebounce` | `250` | Automatic snapshot debounce in milliseconds. |
-| `persistAdapter` | `null` | Sync/async storage adapter. |
-| `persistVersion` | `1` | Positive stored-envelope version. |
-| `persistMigrate` | `null` | Sync/async migration for older valid envelopes. |
-| `bindStore` | `null` | Existing Alpine store name used as `$props`. |
-| `form` | `false` | Opt into form association and map value, restored state, and disabled props. |
+| Option                   | Default                    | Contract                                                                              |
+| ------------------------ | -------------------------- | ------------------------------------------------------------------------------------- |
+| `attributes`             | `{}`                       | Typed prop constructor/descriptor map.                                                |
+| `debug`                  | `false`                    | Loader debugger state after debugger injection.                                       |
+| `autoStart`              | `true`                     | Global-only gate used by the `/auto` entry.                                           |
+| `observeTemplates`       | `true`                     | Global-only `/auto` control for observing inline declarations inserted after startup. |
+| `basePath`               | empty                      | Prefix for relative component sources.                                                |
+| `sourceResolver`         | `null`                     | Synchronously rewrite a source before `basePath`.                                     |
+| `errorCss`               | accessible built-in styles | Style record merged into the no-fallback error block.                                 |
+| `loading`                | `eager`                    | `eager`, `lazy`, or `idle`.                                                           |
+| `hydrate`                | `eager`                    | SSR-only hydration trigger: `eager`, `visible`, `idle`, `interaction`, or `media`.    |
+| `hydrateMedia`           | `null`                     | Required media query for `hydrate: "media"`.                                          |
+| `shadow`                 | `false`                    | Render into an open Shadow Root.                                                      |
+| `useConstructibleStyles` | `true`                     | Adopt cached constructible sheets when supported.                                     |
+| `sharedStyleSheets`      | `[]`                       | Application `CSSStyleSheet` objects adopted in Shadow DOM.                            |
+| `executeScripts`         | `false`                    | Execute template scripts that survive the selected sanitizer.                         |
+| `stripStyles`            | `false`                    | Remove template `<style>` elements.                                                   |
+| `sanitize`               | `true`                     | Built-in sanitizer, `false`, or a custom sanitizer function.                          |
+| `security`               | `{}`                       | Trusted Types policy and URL-policy settings.                                         |
+| `observability`          | `false`                    | Global structured-record retention/logger settings.                                   |
+| `adaptivePrefetch`       | `false`                    | Global adaptive-prefetch startup settings or `true` for defaults.                     |
+| `strictProps`            | `false`                    | Throw instead of reporting and defaulting invalid props.                              |
+| `runtimeCacheMax`        | `200`                      | Bound in-memory style, asset, and diagnostic maps.                                    |
+| `cacheNamespace`         | `default`                  | Global Cache API namespace segment.                                                   |
+| `keepAliveMax`           | `Infinity`                 | Default dynamic inactive-child capacity.                                              |
+| `dynamicTransition`      | `auto`                     | Default dynamic transition preset.                                                    |
+| `transitionDuration`     | `100`                      | Default dynamic transition duration in milliseconds.                                  |
+| `events`                 | `{ forward: [] }`          | Event-forwarding configuration.                                                       |
+| `externalCss`            | `[]`                       | External stylesheet strings/descriptors.                                              |
+| `externalScripts`        | `[]`                       | External script strings/descriptors.                                                  |
+| `loadingTemplate`        | `null`                     | Loading template URL, selector, or template element.                                  |
+| `loadingHtml`            | `null`                     | Loading markup string.                                                                |
+| `defaultComponentName`   | `acl-component`            | Default declarative-proxy tag used by on-demand discovery and explicit registration.  |
+| `defaultDynamicName`     | `acl-dynamic`              | Default dynamic-loader tag used by on-demand discovery and explicit registration.     |
+| `defaultBoundaryName`    | `acl-boundary`             | Default nearest-error-boundary tag used by discovery and explicit registration.       |
+| `data`                   | grouped defaults           | Request, retry, polling, response, and data-cache settings.                           |
+| `cacheTemplates`         | `true`                     | Enable Cache API storage for external templates.                                      |
+| `templateCacheStrategy`  | `cache-first`              | Template cache strategy.                                                              |
+| `templateCacheTtl`       | `900000`                   | Template freshness in milliseconds.                                                   |
+| `templateCacheMax`       | `100`                      | Active template namespace capacity.                                                   |
+| `templateRevision`       | `null`                     | Explicit source content revision.                                                     |
+| `fallback`               | `null`                     | Initial-failure template source.                                                      |
+| `hooks`                  | identity fetch hooks       | Lifecycle, fetch, and preservation hooks.                                             |
+| `persist`                | `false`                    | `local`, `session`, `indexeddb`, or custom adapter mode.                              |
+| `persistKey`             | `null`                     | Explicit storage key.                                                                 |
+| `persistDebounce`        | `250`                      | Automatic snapshot debounce in milliseconds.                                          |
+| `persistAdapter`         | `null`                     | Sync/async storage adapter.                                                           |
+| `persistVersion`         | `1`                        | Positive stored-envelope version.                                                     |
+| `persistMigrate`         | `null`                     | Sync/async migration for older valid envelopes.                                       |
+| `bindStore`              | `null`                     | Existing Alpine store name used as `$props`.                                          |
+| `form`                   | `false`                    | Opt into form association and map value, restored state, and disabled props.          |
 
-Unknown option keys have no defined behavior. See [Components](components.md) for rendering/props, [Data](data.md) for the complete `data.*` table, [Lifecycle](lifecycle.md) for hooks/events, [Security](security.md), [Observability](observability.md), and [Adaptive prefetch](prefetch.md).
+Unknown option keys have no contract. See [components](components.md), [data](data.md), [lifecycle](lifecycle.md),
+[security](security.md), [observability](observability.md), and [prefetch](prefetch.md).
 
 ## Loader class reference
 
-`AlpineComponentLoader.version` is read-only and is injected from `package.json` in built artifacts; raw source modules use `development`. `AlpineComponentLoader.globalConfig` exposes normalized current defaults for inspection. Call `config(options)` instead of mutating the object directly.
+`version` is read-only, stamped from package.json (`development` in raw source). Inspect `globalConfig`; change it
+through `config()`.
 
-| Static member | Result |
-| --- | --- |
-| `version` | Runtime/build version used by diagnostics and default cache namespaces. |
-| `globalConfig` | Current normalized global settings. |
-| `config(options)` | Merge and validate global settings. |
-| `start()` | Drain queued definitions, discover inline definitions and built-in tags, and activate configured capabilities; returns `Promise<void>`. |
-| `define(tagName, source, options)` | Register/queue a definition; returns `Promise<CustomElementConstructor>`. |
-| `define(tagName, definition)` | Register an inline `{ template, ...options }` definition; returns `Promise<CustomElementConstructor>`. |
-| `registerComponent(name)` | Load and register the declarative proxy; returns `Promise<CustomElementConstructor>`. |
-| `registerDynamicLoader(name)` | Load and register the dynamic switcher; returns `Promise<CustomElementConstructor>`. |
-| `registerErrorBoundary(name)` | Load and register the nearest-descendant error boundary; returns `Promise<CustomElementConstructor>`. |
-| `registerTemplates(root)` | Discover inline template definitions in a subtree; returns `Promise<CustomElementConstructor[]>`. |
-| `observeTemplates(options)` | Observe inserted inline definitions and return a stop function. |
-| `stopObservingTemplates()` | Stop the active inline-template observer. |
-| `has(tagName)` | Test whether a loader definition exists. |
-| `getDefinition(tagName)` | Return an isolated definition snapshot or `null`. |
-| `getRegisteredTags()` | Return registered tag names. |
-| `getDependencies(tagName, options)` | Return direct or dependency-first transitive manifest dependencies. |
-| `registerManifest(manifest, options)` | Normalize/register a v1 manifest and optionally prefetch selected graphs. |
-| `registerManifestFrom(url, options)` | Fetch, bound, validate, and register a v1 manifest with URL-relative sources. |
-| `registerRouteManifest(routeKey, indexOrUrl, options)` | Resolve one exact route key and register its independent manifest shard. |
-| `registerSkeletonManifest(manifest)` | Register generated loading HTML by tag; returns `Promise<string[]>`. |
-| `loadTemplate(source, settings)` | Resolve a template element/selector/URL using current template-cache policy. |
-| `prefetch(tagName)` | Warm one registered component template. |
-| `prefetchAll(tagNames, options)` | Settle a bounded explicit component set. |
-| `prefetchGraph(tagNames, options)` | Settle roots and transitive manifest dependencies. |
-| `observePrefetch(options)` | Start adaptive observation; returns `Promise<ACLAdaptivePrefetchController>`. |
-| `stopObservingPrefetch()` | Disconnect the active adaptive controller. |
-| `subscribe(listener)` | Subscribe to redacted structured records and return an unsubscribe function. |
-| `getMetrics()` | Return current aggregate observability metrics. |
-| `clearMetrics()` | Reset retained records and aggregates. |
-| `pruneCaches(prefix, current)` | Remove old versioned template buckets while retaining the current bucket. |
-| `clearTemplateCaches(prefix)` | Remove all matching persistent template buckets. |
-| `clearTemplate(source, cacheKey)` | Remove matching cached revisions of one source. |
-| `getTemplateCacheInfo(source, settings)` | Inspect persistent template metadata. |
-| `getTemplateLoadInfo(source, settings)` | Inspect the latest in-memory load metadata. |
-| `pruneTemplateCache(options)` | Apply template expiry/capacity immediately and return evictions. |
-| `clearDataCache(finalUrlOrKey)` | Invalidate all data entries or matches for one final URL/key. |
-| `getDataCacheSize()` | Return the number of active/retained data entries. |
-| `getDataCacheInfo(finalUrlOrKey)` | Return redacted data-cache summary or entry metadata. |
-| `toggleDebug()` | Toggle an injected debugger or report that the debugger entry is absent. |
+| Static member                                          | Result                                                                                                                                                                                 |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`                                              | Runtime/build version used by diagnostics and default cache namespaces.                                                                                                                |
+| `globalConfig`                                         | Current normalized global settings.                                                                                                                                                    |
+| `config(options)`                                      | Merge and validate global settings.                                                                                                                                                    |
+| `start()`                                              | Drain queued definitions and activate configured capabilities; root entry also discovers inline definitions and built-in tags, while `/core` skips discovery. Returns `Promise<void>`. |
+| `define(tagName, source, options)`                     | Register/queue a definition; returns `Promise<CustomElementConstructor>`.                                                                                                              |
+| `define(tagName, definition)`                          | Register an inline `{ template, ...options }` definition; returns `Promise<CustomElementConstructor>`.                                                                                 |
+| `registerComponent(name)`                              | Load and register the declarative proxy; returns `Promise<CustomElementConstructor>`.                                                                                                  |
+| `registerDynamicLoader(name)`                          | Load and register the dynamic switcher; returns `Promise<CustomElementConstructor>`.                                                                                                   |
+| `registerErrorBoundary(name)`                          | Load and register the nearest-descendant error boundary; returns `Promise<CustomElementConstructor>`.                                                                                  |
+| `registerTemplates(root)`                              | Discover inline template definitions in a subtree; returns `Promise<CustomElementConstructor[]>`.                                                                                      |
+| `observeTemplates(options)`                            | Observe inserted inline definitions and return a stop function.                                                                                                                        |
+| `stopObservingTemplates()`                             | Stop the active inline-template observer.                                                                                                                                              |
+| `has(tagName)`                                         | Test whether a loader definition exists.                                                                                                                                               |
+| `getDefinition(tagName)`                               | Return an isolated definition snapshot or `null`.                                                                                                                                      |
+| `getRegisteredTags()`                                  | Return registered tag names.                                                                                                                                                           |
+| `getDependencies(tagName, options)`                    | Return direct or dependency-first transitive manifest dependencies.                                                                                                                    |
+| `registerManifest(manifest, options)`                  | Normalize/register a v1 manifest and optionally prefetch selected graphs.                                                                                                              |
+| `registerManifestFrom(url, options)`                   | Fetch, bound, validate, and register a v1 manifest with URL-relative sources.                                                                                                          |
+| `registerRouteManifest(routeKey, indexOrUrl, options)` | Resolve one exact route key and register its independent manifest shard.                                                                                                               |
+| `registerSkeletonManifest(manifest)`                   | Register generated loading HTML by tag; returns `Promise<string[]>`.                                                                                                                   |
+| `loadTemplate(source, settings)`                       | Resolve a template element/selector/URL using current template-cache policy.                                                                                                           |
+| `prefetch(tagName)`                                    | Warm one registered component template.                                                                                                                                                |
+| `prefetchAll(tagNames, options)`                       | Settle a bounded explicit component set.                                                                                                                                               |
+| `prefetchGraph(tagNames, options)`                     | Settle roots and transitive manifest dependencies.                                                                                                                                     |
+| `observePrefetch(options)`                             | Start adaptive observation; returns `Promise<ACLAdaptivePrefetchController>`.                                                                                                          |
+| `stopObservingPrefetch()`                              | Disconnect the active adaptive controller.                                                                                                                                             |
+| `subscribe(listener)`                                  | Subscribe to redacted structured records and return an unsubscribe function.                                                                                                           |
+| `getMetrics()`                                         | Return current aggregate observability metrics.                                                                                                                                        |
+| `clearMetrics()`                                       | Reset retained records and aggregates.                                                                                                                                                 |
+| `pruneCaches(prefix, current)`                         | Remove old versioned template buckets while retaining the current bucket.                                                                                                              |
+| `clearTemplateCaches(prefix)`                          | Remove all matching persistent template buckets.                                                                                                                                       |
+| `clearTemplate(source, cacheKey)`                      | Remove matching cached revisions of one source.                                                                                                                                        |
+| `getTemplateCacheInfo(source, settings)`               | Inspect persistent template metadata.                                                                                                                                                  |
+| `getTemplateLoadInfo(source, settings)`                | Inspect the latest in-memory load metadata.                                                                                                                                            |
+| `pruneTemplateCache(options)`                          | Apply template expiry/capacity immediately and return evictions.                                                                                                                       |
+| `clearDataCache(finalUrlOrKey)`                        | Invalidate all data entries or matches for one final URL/key.                                                                                                                          |
+| `getDataCacheSize()`                                   | Return the number of active/retained data entries.                                                                                                                                     |
+| `getDataCacheInfo(finalUrlOrKey)`                      | Return redacted data-cache summary or entry metadata.                                                                                                                                  |
+| `toggleDebug()`                                        | Toggle an injected debugger or report that the debugger entry is absent.                                                                                                               |
 
 ## Definitions and inline templates
 
@@ -206,8 +209,7 @@ const StatusBadge = await AlpineComponentLoader.define('status-badge', '#status-
 });
 ```
 
-The two-argument definition-object form keeps a non-empty inline HTML string
-beside its component options:
+The two-argument definition-object form keeps a non-empty inline HTML string beside its component options:
 
 ```js
 const GreetingCard = await AlpineComponentLoader.define('greeting-card', {
@@ -217,21 +219,13 @@ const GreetingCard = await AlpineComponentLoader.define('greeting-card', {
 });
 ```
 
-This form is typed as `ACLInlineComponentDefinition<TProps>`. It accepts no
-separate third options argument. The string becomes an inert detached template,
-uses the effective Trusted Types policy, and is sanitized during rendering. It
-does not run the URL source resolver, issue a template request, or create a
-persistent template-cache entry. Existing URL, selector, and
-`HTMLTemplateElement` definitions retain their current behavior.
+`ACLInlineComponentDefinition<TProps>` accepts no third argument. HTML becomes an inert template with Trusted Types and
+render-time sanitization, bypassing source resolution, fetching, and persistent template caching.
 
 Register authored inline templates in a DOM subtree:
 
 ```html
-<template
-    x-acl="status-badge"
-    acl-props='{ "label": "String", "tone": "String" }'
-    data-src="/api/status"
->
+<template x-acl="status-badge" acl-props='{ "label": "String", "tone": "String" }' data-src="/api/status">
     <span :data-tone="$props.tone" x-text="$props.$data?.label || $props.label"></span>
 </template>
 
@@ -242,12 +236,8 @@ Register authored inline templates in a DOM subtree:
 const constructors = await AlpineComponentLoader.registerTemplates(document);
 ```
 
-`template[x-acl]` and the established `template[acl-component]` spelling are
-aliases and use the same prop/data parser. If both attributes occur on one
-template, their case-normalized names must match. Configuration attributes stay
-on the inert definition template and are not copied into rendered component
-markup. Invalid names reject through ordinary custom-element validation; a
-duplicate tag retains the loader's already registered definition.
+Both declaration markers share parsing and must have matching normalized names when combined. Definition attributes
+remain inert. Invalid names reject; duplicate tags keep existing definitions.
 
 When templates can be inserted later, observe additions and retain the returned cleanup:
 
@@ -261,26 +251,23 @@ const stop = AlpineComponentLoader.observeTemplates({
 stop();
 ```
 
-The ordinary entry scans existing declarations in `start()` and leaves later
-observation opt-in. The auto entry differs only for late declarations:
+The ordinary entry scans existing declarations in `start()` and leaves later observation opt-in. The auto entry differs
+only for late declarations:
 
-| Entry/configuration | Existing declarations | Later declarations |
-| --- | --- | --- |
-| Ordinary `start()` | scanned | require `observeTemplates()` |
-| `/auto` default | scanned | observed automatically |
-| `/auto`, `observeTemplates: false` | scanned | ignored |
-| `/auto`, `autoStart: false` | not scanned | not observed |
+| Entry/configuration                | Existing declarations         | Later declarations           |
+| ---------------------------------- | ----------------------------- | ---------------------------- |
+| Ordinary `start()`                 | scanned                       | require `observeTemplates()` |
+| `/core.start()`                    | require `registerTemplates()` | require `observeTemplates()` |
+| `/auto` default                    | scanned                       | observed automatically       |
+| `/auto`, `observeTemplates: false` | scanned                       | ignored                      |
+| `/auto`, `autoStart: false`        | not scanned                   | not observed                 |
 
-`registerTemplates(root)` accepts a document, element, template, or open Shadow
-Root and includes a directly supplied matching template. `observeTemplates()`
-accepts `root` and `subtree`, ignores unrelated mutations without loading the
-component runtime, and returns an ownership-safe disposer. A later observer
-replaces the prior loader-owned observer; an older disposer cannot disconnect
-its replacement. `stopObservingTemplates()` stops the active manual or
-auto-installed observer. Calling `startAutoLoader()` again reinstalls automatic
-observation when it remains enabled.
+`registerTemplates(root)` scans documents, elements, templates, and open Shadow Roots, including a supplied matching
+template. `observeTemplates({ root, subtree })` ignores unrelated mutations and returns an ownership-safe disposer.
+Replacement cleanup cannot disconnect a newer observer. `stopObservingTemplates()` stops the active observer; enabled
+auto observation can be reinstalled.
 
-`start()` discovers existing and newly inserted `<acl-component>`, `<acl-dynamic>`, and `<acl-boundary>` tags. It loads and registers only the implementation whose tag appears. Because discovery upgrades inserted tags asynchronously, explicitly register a built-in when it must be defined before insertion:
+Root/auto discover built-ins on appearance; core or pre-insertion setup registers them explicitly:
 
 ```js
 await AlpineComponentLoader.registerComponent();
@@ -288,7 +275,7 @@ await AlpineComponentLoader.registerDynamicLoader();
 await AlpineComponentLoader.registerErrorBoundary();
 ```
 
-The optional `name` argument registers the corresponding built-in under a custom tag. `customElements.whenDefined(tagName)` remains available when code needs to coordinate with discovery-driven registration.
+Optional `name` sets a custom tag. `customElements.whenDefined()` can await discovery registration.
 
 ## Component manifests
 
@@ -325,36 +312,38 @@ await AlpineComponentLoader.registerManifestFrom('/acl-manifest.json', {
 await AlpineComponentLoader.registerRouteManifest('account/settings', '/acl-routes.json');
 ```
 
-`registerManifestFrom()` deduplicates concurrent URL/integrity requests per loader, supports caller `fetch`, `AbortSignal`, `RequestCache`, and integrity options, and evicts failed operations so they can be retried. Relative component paths resolve against the fetched manifest. `registerRouteManifest()` uses exact route-key lookup and resolves a shard relative to its route-index URL or an explicit base URL.
+`registerManifestFrom()` shares URL/integrity work, accepts fetch/signal/cache/integrity options, and retries after
+failure. Sources resolve from the fetched manifest. `registerRouteManifest()` selects exact keys and resolves shards
+from the index URL or explicit base.
 
 URL and route-manifest request options are:
 
-| Option | Default | Contract |
-| --- | --- | --- |
-| `basePath` | manifest URL directory | Explicit component-source base override. |
-| `prefetch` | `false` | `true` for all components or a list of tags/groups. |
-| `concurrency` | loader default | Positive prefetch worker bound. |
-| `fetch` | `globalThis.fetch` | Application-owned fetch implementation. |
-| `signal` | none | Caller cancellation signal. |
-| `timeout` | `10000` | Positive request deadline in milliseconds. |
-| `maxBytes` | 1 MiB | Positive decoded manifest response limit. |
-| `cache` | browser default | Fetch `RequestCache` mode. |
-| `integrity` | none | Expected Subresource Integrity metadata. |
+| Option        | Default                | Contract                                            |
+| ------------- | ---------------------- | --------------------------------------------------- |
+| `basePath`    | manifest URL directory | Explicit component-source base override.            |
+| `prefetch`    | `false`                | `true` for all components or a list of tags/groups. |
+| `concurrency` | loader default         | Positive prefetch worker bound.                     |
+| `fetch`       | `globalThis.fetch`     | Application-owned fetch implementation.             |
+| `signal`      | none                   | Caller cancellation signal.                         |
+| `timeout`     | `10000`                | Positive request deadline in milliseconds.          |
+| `maxBytes`    | 1 MiB                  | Positive decoded manifest response limit.           |
+| `cache`       | browser default        | Fetch `RequestCache` mode.                          |
+| `integrity`   | none                   | Expected Subresource Integrity metadata.            |
 
-`registerRouteManifest()` additionally accepts `baseUrl` when an in-memory route
-index needs an explicit shard base.
+`registerRouteManifest()` additionally accepts `baseUrl` when an in-memory route index needs an explicit shard base.
 
 Manifest/route failures remain typed `ACLLoadError` values:
 
-| Code | Failure |
-| --- | --- |
+| Code                                                    | Failure                                                 |
+| ------------------------------------------------------- | ------------------------------------------------------- |
 | `ACL_MANIFEST_FETCH_FAILED` / `ACL_MANIFEST_HTTP_ERROR` | Network/integrity failure or unsuccessful HTTP response |
-| `ACL_MANIFEST_TIMEOUT` / `ACL_LOAD_CANCELED` | Internal timeout or caller abort |
-| `ACL_MANIFEST_TOO_LARGE` | Declared or streamed body exceeds `maxBytes` |
-| `ACL_MANIFEST_INVALID_JSON` / `ACL_MANIFEST_INVALID` | JSON decoding or version-one manifest validation |
-| `ACL_ROUTE_INDEX_INVALID` / `ACL_ROUTE_NOT_FOUND` | Invalid v1 route index or missing exact route key |
+| `ACL_MANIFEST_TIMEOUT` / `ACL_LOAD_CANCELED`            | Internal timeout or caller abort                        |
+| `ACL_MANIFEST_TOO_LARGE`                                | Declared or streamed body exceeds `maxBytes`            |
+| `ACL_MANIFEST_INVALID_JSON` / `ACL_MANIFEST_INVALID`    | JSON decoding or version-one manifest validation        |
+| `ACL_ROUTE_INDEX_INVALID` / `ACL_ROUTE_NOT_FOUND`       | Invalid v1 route index or missing exact route key       |
 
-The same manifest can drive SSR, route shards, offline generation, dependency prefetch, TypeScript declarations, and Custom Elements metadata. See [Manifests, generated contracts, and CLI tooling](manifests-and-cli.md).
+Manifests also drive SSR, routes, offline assets, prefetch, types, and metadata. See
+[project tooling](manifests-and-cli.md).
 
 ## Registry inspection
 
@@ -368,7 +357,7 @@ AlpineComponentLoader.getDependencies('profile-card');
 AlpineComponentLoader.getDependencies('profile-card', { transitive: true });
 ```
 
-`getDefinition()` returns a safe definition snapshot with tag, source, cloned settings, and dependencies, or `null`. Do not modify underscored loader fields; they are internal implementation details.
+`getDefinition()` returns a cloned snapshot or `null`. Underscored registries are internal.
 
 ## Prefetch
 
@@ -387,7 +376,8 @@ const graph = await AlpineComponentLoader.prefetchGraph(['profile-card'], {
 });
 ```
 
-`prefetchAll()` and `prefetchGraph()` return a settled result for every selected tag. Adaptive observation is separately opt-in:
+`prefetchAll()` and `prefetchGraph()` return a settled result for every selected tag. Adaptive observation is separately
+opt-in:
 
 ```js
 const controller = await AlpineComponentLoader.observePrefetch();
@@ -415,7 +405,7 @@ Definitions with authored `loadingTemplate` or `loadingHtml` keep their authored
 npx alpine-component-loader skeleton ./index.html --mode manifest --out-dir skeletons
 ```
 
-See [Skeleton loading UI](skeletons.md) for generation, the CSS and manifest delivery choices, import order, and troubleshooting.
+See [skeleton generation and delivery](skeletons.md).
 
 ## Cache APIs
 
@@ -439,9 +429,12 @@ AlpineComponentLoader.getDataCacheInfo();
 AlpineComponentLoader.clearDataCache();
 ```
 
-Template cache entries expose `request`, `source`, `revision`, `fetchedAt`, `lastAccess`, and `ttl`. The latest load record adds `cacheKey`, `cacheHit`, and `loadedAt`. Data diagnostics expose a summary `size`/`keys` pair or entry fields including `key`, `finalUrl`, `target`, `strategy`, `expiresAt`, `lastAccess`, `pending`, and `subscribers`. None of these APIs returns template, response, header, body, prop, or persistence contents.
+Template diagnostics include `request`, `source`, `revision`, `fetchedAt`, `lastAccess`, and `ttl`; load records add
+`cacheKey`, `cacheHit`, and `loadedAt`. Data summaries expose `size`/`keys`, or `key`, `finalUrl`, `target`, `strategy`,
+`expiresAt`, `lastAccess`, `pending`, and `subscribers`. Contents, headers, props, and stored values are excluded.
 
-`pruneCaches()` removes older versioned template namespaces. Prefer targeted clear methods during normal development. Component hosts also expose `$props.$cache` helpers. See [Data, caching, polling, and persistence](data.md).
+`pruneCaches()` removes older version buckets. Use targeted clears or `$props.$cache` during recovery. See
+[caches](data.md).
 
 ## Observability
 
@@ -452,14 +445,15 @@ AlpineComponentLoader.config({
     observability: { bufferSize: 200, performanceMarks: false, logger: false },
 });
 
-const unsubscribe = AlpineComponentLoader.subscribe(record => console.debug(record));
+const unsubscribe = AlpineComponentLoader.subscribe((record) => console.debug(record));
 const snapshot = AlpineComponentLoader.getMetrics();
 
 AlpineComponentLoader.clearMetrics();
 unsubscribe();
 ```
 
-No transport is included. See [Observability](observability.md) for record shapes, logging, performance measures, and redaction.
+No transport is included. See [Observability](observability.md) for record shapes, logging, performance measures, and
+redaction.
 
 ## Component host API
 
@@ -478,143 +472,146 @@ await card.$props.$reload({ preserveState: true });
 await card.$props.$cache.clearData();
 ```
 
-| Built-in member | Contract |
-| --- | --- |
-| `$data` | Default parsed response target. |
-| `$loading` | Active data-request state. |
-| `$error` | Current data error message or `null`. |
-| `$lastUpdated` | Reactive-update timestamp. |
-| `$emit(name, detail)` | Dispatch a bubbling, composed host event. |
-| `$reload(options)` | Delegate to `reload(options)`. |
-| `$retry()` | Retry the configured data endpoint. |
-| `$cancel(reason)` | Cancel current component/data work. |
-| `$cache` | Scoped cache helper object. |
-| `clearTemplate()` on `$cache` | Clear this definition's template revisions. |
-| `clearData()` on `$cache` | Clear this host's exact data entry. |
-| `clear()` on `$cache` | Clear both scoped layers and report joint success. |
-| `$persistence` | Persistence helper object available after enabled initialization. |
-| `$form` | Form value, validity, associated form, and labels helper for opted-in definitions. |
-| `$key` on `$persistence` | Resolved storage key. |
-| `$save(value)` on `$persistence` | Queue a current snapshot or explicit value. |
-| `$get(field, fallback)` on `$persistence` | Read the full stored value or one field. |
-| `$clear()` on `$persistence` | Remove this storage key. |
-| `$flush()` on `$persistence` | Commit/await queued writes. |
+| Built-in member                           | Contract                                                                           |
+| ----------------------------------------- | ---------------------------------------------------------------------------------- |
+| `$data`                                   | Default parsed response target.                                                    |
+| `$loading`                                | Active data-request state.                                                         |
+| `$error`                                  | Current data error message or `null`.                                              |
+| `$lastUpdated`                            | Reactive-update timestamp.                                                         |
+| `$emit(name, detail)`                     | Dispatch a bubbling, composed host event.                                          |
+| `$reload(options)`                        | Delegate to `reload(options)`.                                                     |
+| `$retry()`                                | Retry the configured data endpoint.                                                |
+| `$cancel(reason)`                         | Cancel current component/data work.                                                |
+| `$cache`                                  | Scoped cache helper object.                                                        |
+| `clearTemplate()` on `$cache`             | Clear this definition's template revisions.                                        |
+| `clearData()` on `$cache`                 | Clear this host's exact data entry.                                                |
+| `clear()` on `$cache`                     | Clear both scoped layers and report joint success.                                 |
+| `$persistence`                            | Persistence helper object available after enabled initialization.                  |
+| `$form`                                   | Form value, validity, associated form, and labels helper for opted-in definitions. |
+| `$key` on `$persistence`                  | Resolved storage key.                                                              |
+| `$save(value)` on `$persistence`          | Queue a current snapshot or explicit value.                                        |
+| `$get(field, fallback)` on `$persistence` | Read the full stored value or one field.                                           |
+| `$clear()` on `$persistence`              | Remove this storage key.                                                           |
+| `$flush()` on `$persistence`              | Commit/await queued writes.                                                        |
 
-Wait for `loaded` or `acl:loadend` before assuming initialization-dependent helpers such as `$persistence` are available.
+Wait for `loaded` or `acl:loadend` before assuming initialization-dependent helpers such as `$persistence` are
+available.
 
-`ACLLoadError` instances may include `code`, `phase`, HTTP `status`, `retryable`, and `cause`. Treat `code` and `phase` as stable diagnostic categories instead of parsing message text.
+Inspect `ACLLoadError` fields `code` and `phase`, not message text. Optional fields include `status`, `retryable`, and
+`cause`.
 
 ## Element attribute reference
 
 The declarative proxy consumes definition settings and forwards runtime/public controls to the real component:
 
-| `<acl-component>` attribute | Contract |
-| --- | --- |
-| `src` | Required source. |
-| `tag` | Target component tag; otherwise derive it from the filename. |
-| `shadow` | Shadow toggle. |
-| `loading` | `eager`, `lazy`, or `idle`. |
-| `acl-props` | Strict-JSON prop descriptors. |
-| `data-fetch-options` | Strict-JSON base `RequestInit`. |
-| `external-css` / `external-scripts` | Strict-JSON asset arrays. |
-| `forward-events` | Strict-JSON forwarding rules. |
-| `hooks` | Safe dotted path to a hook object on `window`. |
-| `template-cache-strategy` | Per-definition template strategy. |
-| `loading-template` / `loading-html` | Loading source/markup. |
-| `sanitize` | Sanitization toggle. |
-| `bind-store` | Alpine store name. |
-| `fallback` | Initial-error template source. |
+| `<acl-component>` attribute         | Contract                                                     |
+| ----------------------------------- | ------------------------------------------------------------ |
+| `src`                               | Required source.                                             |
+| `tag`                               | Target component tag; otherwise derive it from the filename. |
+| `shadow`                            | Shadow toggle.                                               |
+| `loading`                           | `eager`, `lazy`, or `idle`.                                  |
+| `acl-props`                         | Strict-JSON prop descriptors.                                |
+| `data-fetch-options`                | Strict-JSON base `RequestInit`.                              |
+| `external-css` / `external-scripts` | Strict-JSON asset arrays.                                    |
+| `forward-events`                    | Strict-JSON forwarding rules.                                |
+| `hooks`                             | Safe dotted path to a hook object on `window`.               |
+| `template-cache-strategy`           | Per-definition template strategy.                            |
+| `loading-template` / `loading-html` | Loading source/markup.                                       |
+| `sanitize`                          | Sanitization toggle.                                         |
+| `bind-store`                        | Alpine store name.                                           |
+| `fallback`                          | Initial-error template source.                               |
 
 Registered component hosts accept declared prop attributes plus these runtime controls:
 
-| Registered-host attribute | Contract |
-| --- | --- |
-| `data-src` | Request URL. |
-| `data-fetch-keys` | Strict-JSON URL-key substitutions. |
-| `data-fetch-params` | Strict-JSON query parameters. |
-| `data-method` | HTTP method override. |
-| `data-body` | Raw or strict-JSON request body. |
-| `data-target` | Response destination in `$props`. |
-| `data-fetch-poll` | Polling interval in milliseconds. |
-| `data-fetch-timeout` | Per-attempt timeout in milliseconds. |
-| `data-retries` | Retry count after the initial attempt. |
-| `data-retry-delay` | Initial retry delay. |
-| `data-retry-max-delay` | Maximum retry delay. |
-| `data-retry-jitter` | Retry jitter from 0 through 1. |
-| `data-retry-unsafe-methods` | Boolean opt-in for retrying unsafe methods. |
-| `data-response-type` | `json`, `text`, `blob`, `arrayBuffer`, `stream`, or `auto`. |
-| `data-cache-strategy` | Data-cache strategy. |
-| `data-fetch-cache-ttl` | Settled-entry lifetime in milliseconds. |
-| `data-fetch-cache-max` | Settled shared-entry bound. |
-| `data-cache-key` | Explicit request/cache identity. |
-| `pause-polling-when-hidden` | Boolean document-visibility polling gate. |
-| `pause-polling-when-offline` | Boolean network-status polling gate. |
-| `pause-polling-when-offscreen` | Boolean viewport polling gate. |
-| `persist` | `local`, `session`, `indexeddb`, or a configured custom mode. |
-| `persist-key` | Explicit storage key. |
-| `persist-debounce` | Automatic snapshot delay in milliseconds. |
-| `persist-version` | Positive stored-envelope version. |
-| `keep-alive` | Preserve an ordinary component across temporary removal, subject to `keepAliveMax`. |
+| Registered-host attribute      | Contract                                                                            |
+| ------------------------------ | ----------------------------------------------------------------------------------- |
+| `data-src`                     | Request URL.                                                                        |
+| `data-fetch-keys`              | Strict-JSON URL-key substitutions.                                                  |
+| `data-fetch-params`            | Strict-JSON query parameters.                                                       |
+| `data-method`                  | HTTP method override.                                                               |
+| `data-body`                    | Raw or strict-JSON request body.                                                    |
+| `data-target`                  | Response destination in `$props`.                                                   |
+| `data-fetch-poll`              | Polling interval in milliseconds.                                                   |
+| `data-fetch-timeout`           | Per-attempt timeout in milliseconds.                                                |
+| `data-retries`                 | Retry count after the initial attempt.                                              |
+| `data-retry-delay`             | Initial retry delay.                                                                |
+| `data-retry-max-delay`         | Maximum retry delay.                                                                |
+| `data-retry-jitter`            | Retry jitter from 0 through 1.                                                      |
+| `data-retry-unsafe-methods`    | Boolean opt-in for retrying unsafe methods.                                         |
+| `data-response-type`           | `json`, `text`, `blob`, `arrayBuffer`, `stream`, or `auto`.                         |
+| `data-cache-strategy`          | Data-cache strategy.                                                                |
+| `data-fetch-cache-ttl`         | Settled-entry lifetime in milliseconds.                                             |
+| `data-fetch-cache-max`         | Settled shared-entry bound.                                                         |
+| `data-cache-key`               | Explicit request/cache identity.                                                    |
+| `pause-polling-when-hidden`    | Boolean document-visibility polling gate.                                           |
+| `pause-polling-when-offline`   | Boolean network-status polling gate.                                                |
+| `pause-polling-when-offscreen` | Boolean viewport polling gate.                                                      |
+| `persist`                      | `local`, `session`, `indexeddb`, or a configured custom mode.                       |
+| `persist-key`                  | Explicit storage key.                                                               |
+| `persist-debounce`             | Automatic snapshot delay in milliseconds.                                           |
+| `persist-version`              | Positive stored-envelope version.                                                   |
+| `keep-alive`                   | Preserve an ordinary component across temporary removal, subject to `keepAliveMax`. |
 
 The complete parsing, defaults, and validation rules are in [Data](data.md).
 
-| `<acl-dynamic>` attribute | Contract |
-| --- | --- |
-| `is` | Registered target tag. |
-| `keep-alive` | Cache inactive children. |
-| `keep-alive-max` | Inactive-child capacity. |
-| `transition` | Transition preset. |
-| `transition-duration` | Duration in milliseconds. |
+| `<acl-dynamic>` attribute | Contract                  |
+| ------------------------- | ------------------------- |
+| `is`                      | Registered target tag.    |
+| `keep-alive`              | Cache inactive children.  |
+| `keep-alive-max`          | Inactive-child capacity.  |
+| `transition`              | Transition preset.        |
+| `transition-duration`     | Duration in milliseconds. |
 
 Other dynamic-host attributes are copied to active and cached children.
 
 ## Public entry points
 
-| Entry | Default export | Named runtime exports | Environment note |
-| --- | --- | --- | --- |
-| `alpine-component-loader` | `AlpineComponentLoader` | `ACLLoadError`, `createLoader()`, `createIndexedDBPersistenceAdapter()` | SSR-safe import; operations may require DOM |
-| `alpine-component-loader/auto` | `AlpineComponentLoader` | `startAutoLoader()` plus core named exports | Browser startup side effect |
-| `alpine-component-loader/dev` | `connectACLDevServer()` | `connectACLDevServer()`, `reloadChangedTemplates()` | Browser/EventSource operations |
-| `alpine-component-loader/debugger` | `ACLDebugger` | `redactDiagnostics()`, `createDiagnosticSnapshot()`, `createComponentSnapshot()`, `diffDiagnosticSnapshots()` | Overlay operations require DOM |
-| `alpine-component-loader/a11y` | `ACLA11y` | `runBasicAccessibilityAudit()`, `auditAccessibility()`, `observeAccessibility()` | Audits require DOM |
-| `alpine-component-loader/a11y-scanner` | `ACLA11yScanner` | `mountAccessibilityScanner()` | Requires DOM |
-| `alpine-component-loader/offline` | `ACLOffline` | `registerOfflineWorker()`, `activateOfflineWorker()`, `getOfflineStatus()` | SSR-safe import; registration requires browser support |
-| `alpine-component-loader/testing` | `ACLTesting` | `waitForComponent()`, `mountComponent()`, `recordACLEvents()`, `installFetchMock()`, `createACLTestHarness()`, `assertLifecycleSequence()` | SSR-safe import; mounting requires DOM |
-| `alpine-component-loader/testing/playwright` | `ACLPlaywright` | `createACLPlaywrightTest()`, `expect` | Playwright test-runner process |
-| `alpine-component-loader/testing/vitest` | `ACLVitest` | `createACLVitestFixture()` | Vitest Browser Mode |
-| `alpine-component-loader/testing/server` | `ACLTestingServer` | `startACLTestServer()` | Node-only optional local server |
-| `alpine-component-loader/ssr` | `ACLSSR` | `createSSRRenderer()` | Node-only; optional bounded data resolution and Light DOM rendering |
-| `alpine-component-loader/project` | `defineConfig()` | `defineConfig()`, `loadProjectConfig()` | Node-only shared project configuration |
-| `alpine-component-loader/vite` | `alpineComponentLoader()` | `alpineComponentLoader()` | Node/Vite plugin; Vite remains an optional peer |
-| `alpine-component-loader/observability-exporters` | exporter collection | `createBatchExporter()`, `createBeaconExporter()`, `createOpenTelemetryExporter()`, `createSentryExporter()`, `connectExporter()` | Dependency-free optional browser transport/adapters |
+| Entry                                             | Default export                  | Named runtime exports                                                                                                                      | Environment note                                                          |
+| ------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| `alpine-component-loader`                         | `AlpineComponentLoader`         | `ACLLoadError`, `createLoader()`, `createIndexedDBPersistenceAdapter()`                                                                    | SSR-safe import; operations may require DOM                               |
+| `alpine-component-loader/auto`                    | `AlpineComponentLoader`         | `startAutoLoader()` plus root named exports                                                                                                | Browser startup side effect                                               |
+| `alpine-component-loader/core`                    | Explicit-startup default loader | `ACLLoadError`                                                                                                                             | Registers queued definitions without document discovery                   |
+| `alpine-component-loader/polyfills`               | `loadPolyfills()`               | `loadPolyfills()`, `waitForWebComponents()`                                                                                                | Optional Web Components bootstrap and asynchronous registration readiness |
+| `alpine-component-loader/dev`                     | `connectACLDevServer()`         | `connectACLDevServer()`, `reloadChangedTemplates()`                                                                                        | Browser/EventSource operations                                            |
+| `alpine-component-loader/debugger`                | `ACLDebugger`                   | `redactDiagnostics()`, `createDiagnosticSnapshot()`, `createComponentSnapshot()`, `diffDiagnosticSnapshots()`                              | Overlay operations require DOM                                            |
+| `alpine-component-loader/a11y`                    | `ACLA11y`                       | `runBasicAccessibilityAudit()`, `auditAccessibility()`, `observeAccessibility()`                                                           | Audits require DOM                                                        |
+| `alpine-component-loader/a11y-scanner`            | `ACLA11yScanner`                | `mountAccessibilityScanner()`                                                                                                              | Requires DOM                                                              |
+| `alpine-component-loader/offline`                 | `ACLOffline`                    | `registerOfflineWorker()`, `activateOfflineWorker()`, `getOfflineStatus()`                                                                 | SSR-safe import; registration requires browser support                    |
+| `alpine-component-loader/testing`                 | `ACLTesting`                    | `waitForComponent()`, `mountComponent()`, `recordACLEvents()`, `installFetchMock()`, `createACLTestHarness()`, `assertLifecycleSequence()` | SSR-safe import; mounting requires DOM                                    |
+| `alpine-component-loader/testing/playwright`      | `ACLPlaywright`                 | `createACLPlaywrightTest()`, `expect`                                                                                                      | Playwright test-runner process                                            |
+| `alpine-component-loader/testing/vitest`          | `ACLVitest`                     | `createACLVitestFixture()`                                                                                                                 | Vitest Browser Mode                                                       |
+| `alpine-component-loader/testing/server`          | `ACLTestingServer`              | `startACLTestServer()`                                                                                                                     | Node-only optional local server                                           |
+| `alpine-component-loader/ssr`                     | `ACLSSR`                        | `createSSRRenderer()`                                                                                                                      | Node-only; optional bounded data resolution and Light DOM rendering       |
+| `alpine-component-loader/project`                 | `defineConfig()`                | `defineConfig()`, `loadProjectConfig()`                                                                                                    | Node-only shared project configuration                                    |
+| `alpine-component-loader/vite`                    | `alpineComponentLoader()`       | `alpineComponentLoader()`                                                                                                                  | Node/Vite plugin; Vite remains an optional peer                           |
+| `alpine-component-loader/observability-exporters` | exporter collection             | `createBatchExporter()`, `createBeaconExporter()`, `createOpenTelemetryExporter()`, `createSentryExporter()`, `connectExporter()`          | Dependency-free optional browser transport/adapters                       |
 
-`parse5` and `@swc/core` are npm optional dependencies and are installed by
-default. Installations created with `--omit=optional` can still import the
-browser package and use lightweight CLI commands. Parser-, SSR-, and
-minifier-backed operations throw an `ACL_OPTIONAL_DEPENDENCY_MISSING` error
-with `dependency`, `feature`, and `install` fields plus the original resolution
-error as `cause`. Development and testing server options include
-`watchPollInterval`; it defaults to `5000`, and `0` disables safety scans.
+`parse5`/`@swc/core` install by default; `--omit=optional` keeps runtime/basic CLI use. Affected features report
+`ACL_OPTIONAL_DEPENDENCY_MISSING` with `dependency`, `feature`, `install`, and `cause`. Server `watchPollInterval`
+defaults to 5000 ms; `0` disables scans.
 
 The observability entry's default `exporters` object maps directly to its named functions.
 
-Default object aliases map directly to the named functions: `ACLA11y.audit()`/`ACLA11y.observe()`/`ACLA11y.runBasicAudit()`, `ACLA11yScanner.mount()`, the offline registration/activation/status helpers, the core and runner-specific testing helpers, and `ACLSSR.createSSRRenderer()`. The debugger default is a class exposing injection/snapshot behavior documented in [Accessibility and debugging](accessibility-and-debugging.md).
+Defaults alias named helpers: `ACLA11y.audit()`/`observe()`/`runBasicAudit()`, `ACLA11yScanner.mount()`, offline/testing
+helpers, and `ACLSSR.createSSRRenderer()`. The debugger default is a class; see
+[debugging](accessibility-and-debugging.md).
 
 Internal `dist/runtime/*` modules are intentionally absent from the package export map.
 
-Browser entries and their demand-loaded descendants are ES2022 modules. A CDN entry requested as `.min.js` propagates that suffix to package-owned dynamic imports; readable `.js` entries retain readable descendants. There is no automatic fallback from a missing `.min.js` descendant to `.js`.
+Native ES2022 entries retain their `.js`/`.min.js` family through dynamic imports. Missing minified dependencies reject
+without readable fallback.
 
-`createIndexedDBPersistenceAdapter()` remains synchronous: it returns a lightweight adapter facade, and the adapter's first storage operation loads and awaits the persistence capability.
+Builds emit both families; publish all of `dist/`, including nested modules.
+
+`createIndexedDBPersistenceAdapter()` is synchronous; storage methods load its implementation asynchronously.
 
 ## TypeScript
 
-Core declarations support typed props, options, hook contexts, errors, cache diagnostics, manifests, and every optional entry:
+Core declarations support typed props, options, hook contexts, errors, cache diagnostics, manifests, and every optional
+entry:
 
 ```ts
-import AlpineComponentLoader, {
-    type ACLComponentOptions,
-    type ACLProps,
-} from 'alpine-component-loader';
+import AlpineComponentLoader, { type ACLComponentOptions, type ACLProps } from 'alpine-component-loader';
 
 interface ProfileProps extends ACLProps {
     userId: string;
@@ -633,14 +630,11 @@ const options: ACLComponentOptions<ProfileProps> = {
     },
 };
 
-await AlpineComponentLoader.define<ProfileProps>(
-    'profile-card',
-    '/components/profile-card.html',
-    options,
-);
+await AlpineComponentLoader.define<ProfileProps>('profile-card', '/components/profile-card.html', options);
 ```
 
-These package declarations type the generic loader API. The CLI-generated `acl-components.d.ts` is application-specific: it augments `HTMLElementTagNameMap`, typed component properties/`$props`, and declared event listener overloads from an enriched manifest. See [Manifests, generated contracts, and CLI tooling](manifests-and-cli.md).
+Package types cover generic APIs. Generated `acl-components.d.ts` adds manifest-specific tag, prop, and event types. See
+[contract generation](manifests-and-cli.md).
 
 ## CLI discovery
 
@@ -651,15 +645,19 @@ npx alpine-component-loader --help
 npx alpine-component-loader validate .
 ```
 
-Commands include `create`, `serve`, `skeleton`, `audit`, `init`, `validate`, `manifest`, `routes`, `watch`, `offline`, `types`, and `schema`. Project commands read `acl.config.mjs` by default and accept `--config`; the offline command uses `--project-config` because `--config` remains its offline-policy flag. Tooling commands protect existing files unless their documented `--force` option is supplied.
+Commands include `create`, `serve`, `skeleton`, `audit`, `init`, `validate`, `manifest`, `routes`, `watch`, `preload`,
+`offline`, `types`, and `schema`. Project config defaults to `acl.config.mjs`; offline uses `--project-config` because
+`--config` selects worker policy. Existing files are protected unless documented `--force` is supplied.
 
-The [CLI guide](manifests-and-cli.md#cli-option-reference) lists safe manifest update/prune behavior, sidecar and offline schema kinds, starter templates, offline policy input, and audit report formats. Repository maintainers can inspect runtime caching and distribution-size guidance in [Runtime efficiency and distribution size](performance.md).
+See the [CLI option reference](manifests-and-cli.md#cli-option-reference).
 
 ## Additional entry points and exports
 
-The testing integrations are published as `alpine-component-loader/testing/playwright`, `alpine-component-loader/testing/vitest`, and `alpine-component-loader/testing/server`, alongside the core `alpine-component-loader/testing` entry.
+Testing entries are `/testing`, `/testing/playwright`, `/testing/vitest`, and `/testing/server`.
 
-Their runtime exports are `createACLPlaywrightTest()` and Playwright's `expect` through the `ACLPlaywright` default object, `createACLVitestFixture()` through `ACLVitest`, and `startACLTestServer()` through `ACLTestingServer`. Core testing also exports `createACLTestHarness()` and `assertLifecycleSequence()`. Offline prompt activation uses `activateOfflineWorker()`.
+Exports include `createACLPlaywrightTest()`/`expect` (`ACLPlaywright`), `createACLVitestFixture()` (`ACLVitest`),
+`startACLTestServer()` (`ACLTestingServer`), `createACLTestHarness()`, and `assertLifecycleSequence()`. Offline prompt
+activation uses `activateOfflineWorker()`.
 
 ## Troubleshooting
 
@@ -673,9 +671,9 @@ console.log(AlpineComponentLoader.getRegisteredTags());
 await AlpineComponentLoader.start();
 ```
 
-If Alpine is loaded as a module, expose and start it according to the application's integration order. Use the browser-only `auto` entry only when its startup side effect is desired.
+Expose/start module-based Alpine once. `/auto` starts ACL on import.
 
-If code needs `<acl-component>` or `<acl-dynamic>` defined before inserting it, await `registerComponent()` or `registerDynamicLoader()`. Otherwise, `start()` loads each built-in implementation after its tag is discovered.
+Await built-in registration before insertion when needed. Root/auto discover tags; core needs explicit calls.
 
 ### Manifest registration throws
 
@@ -685,7 +683,8 @@ Pass a parsed object rather than the manifest URL, check `version: 1`, and valid
 npx alpine-component-loader validate acl-manifest.json
 ```
 
-Missing dependencies, duplicate normalized names, cycles, invalid custom-element names, and missing local sources are reported explicitly.
+Missing dependencies, duplicate normalized names, cycles, invalid custom-element names, and missing local sources are
+reported explicitly.
 
 ### Props are empty or invalid
 
@@ -695,11 +694,13 @@ Declare each prop in `options.attributes`. Arrays and objects in HTML must be st
 <profile-card roles='["maintainer"]' account='{"id":"user-1"}'></profile-card>
 ```
 
-Listen for `acl:error`, enable `strictProps` while testing, and confirm the serialized manifest uses supported type names.
+Listen for `acl:error`, enable `strictProps` while testing, and confirm the serialized manifest uses supported type
+names.
 
 ### A script does not run
 
-Default sanitization removes scripts, and `executeScripts` also defaults to false. Put behavior in application modules or Alpine registrations. Only opt into trusted template scripts after reviewing both settings and CSP; see [Security and Trusted Types](security.md).
+Sanitization removes scripts and `executeScripts` defaults off. Prefer application modules; trusted template scripts
+require reviewing both settings and CSP. See [security](security.md).
 
 ### Requests repeat or remain stale
 
@@ -710,26 +711,62 @@ console.log(AlpineComponentLoader.getDataCacheInfo());
 console.log(await AlpineComponentLoader.getTemplateCacheInfo());
 ```
 
-Request identity includes method, headers, body, parser mode, and explicit cache key. Clear only the affected cache and reload the component when an in-flight request must also be replaced.
+Identity includes method, headers, body, parser, and explicit key. Clear the affected cache; reload to replace in-flight
+work.
 
 ### Hydration fetches the template
 
-Shadow definitions and opt-in Light DOM output hydrate when `data-acl-revision` matches the client manifest. Mismatch intentionally falls back to client rendering; see [Static SSR and hydration](ssr.md).
+Shadow and opt-in Light DOM SSR hydrate with matching revisions; mismatches use client rendering. See [SSR](ssr.md).
 
 ### Persistence does not restore
 
-Use a positive `persistVersion`, a stable `persistKey`, and a `persistMigrate` function for older envelopes. Await storage helpers and inspect `acl:error` for phase `persistence` without logging stored data.
+Use positive `persistVersion`, stable keys, and migrations for older envelopes. Await storage helpers and inspect
+persistence errors without logging stored data.
 
 ### Forwarded events are missing or duplicated
 
-Configure `events.forward`, dispatch a bubbling event inside the shadow root, and verify source/target names. Native composed events do not need forwarding. Reload replaces owned forwarders, so duplicates usually indicate an application listener registered more than once.
+Check `events.forward` names and bubbling. Composed events need no forwarding. Duplicate application listeners can cause
+repeated delivery.
 
 ### Offline assets are missing
 
-Inspect `acl-precache-manifest.json`. Component dependencies are automatic, but the HTML shell and every statically imported browser module require `--asset`. Compare `basePath`, `--base-url`, service-worker scope, and deployed URLs; see [Offline behavior](offline.md).
+Check `acl-precache-manifest.json`, shell/application `--asset` inputs, runtime graph expansion, and deployed base
+URLs/scope. See [offline support](offline.md).
 
 ### A dynamic component does not appear
 
-The `is` target must be a valid, already registered tag. Listen for `acl:error` on `<acl-dynamic>` and inspect `detail.targetTag` and `detail.error`.
+The `is` target must be a valid, already registered tag. Listen for `acl:error` on `<acl-dynamic>` and inspect
+`detail.targetTag` and `detail.error`.
 
 For upgrade-specific behavior see [MIGRATION.md](../MIGRATION.md).
+
+### Bounded templates and initialization
+
+`templateTimeout` defaults to `10000` ms and covers fetch/body consumption (`0` disables). `templateMaxBytes` defaults
+to `1048576` and checks declared, streamed, and cached bytes (`Infinity` disables). Errors are `ACL_TEMPLATE_TIMEOUT`,
+`ACL_TEMPLATE_TOO_LARGE`, `ACL_TEMPLATE_HTTP_ERROR`, `ACL_TEMPLATE_FETCH_FAILED`, or cancellation `ACL_LOAD_CANCELED`.
+
+`loadTemplate(source, settings, { signal })`, prefetch APIs, and adaptive `prefetch` accept signals. Cancellation
+releases one subscriber; final-owner release aborts shared work. Disposal releases revalidation. `prefetchConcurrency`
+defaults to four speculative downloads; calls can lower it, and foreground work promotes queued requests.
+
+`hydrationScheduler` defaults off, using direct rendering/Alpine paths. Enable `{ budgetMs: 8, maxTasksPerTurn: 4 }` for
+cooperative turns. Priority is eager/interaction/reload, then visible/media, then idle. Individual operations/hooks can
+exceed the budget; readiness follows completion.
+
+[Generated defaults](generated-option-defaults.md), validation, and declarations share descriptors. Builds embed
+defaults/checks in existing modules with no extra option request.
+
+`generateModulePreloads()` from `/project` resolves `{ urls, html }` from a manifest, `entryUrl`, explicit
+`tags`/`groups`, and optional `ACLRuntimeCapability` features. Graph expansion preserves version/base and
+readable/minified family for index/core entries. Legacy `acl-instance` stays on public entries only. Manifest lazy
+loading, visible hydration, and polling pauses infer `environment`; select it explicitly for imperative use.
+Environmental activation retries failed imports and invalidates late setup on teardown.
+
+Selectors include `hydration`, `triggers`, `styles`, `slots`, and `scripts`. Manifests infer triggers from
+loading/hydration, styles from shadow/shared sheets, and scripts from `executeScripts`. Select content-dependent
+transformations and imperative/SSR behavior explicitly.
+
+Core shares root's default context and synchronous validation. Its asynchronous startup skips discovery; explicit
+registration/observation loads on demand. Later root startup enables discovery. Core exports the default loader and
+`ACLLoadError`; root retains factory exports.

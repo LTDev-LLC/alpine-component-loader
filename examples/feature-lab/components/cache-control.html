@@ -47,8 +47,11 @@
     <p>Last fetched at <span x-text="$props.payload?.at || 'pending'"></span></p>
     <div class="actions">
         <button :disabled="cacheBusy || $props.$loading" @click="$props.$reload()">Reload</button>
-        <button :disabled="cacheBusy"
-            @click="cacheBusy = true; $props.payload = null; window.__resetDemoRequestCount('/demo-api/cache'); $props.$cache.clearData().finally(() => cacheBusy = false)">Clear
-            data cache</button>
+        <button
+            :disabled="cacheBusy"
+            @click="cacheBusy = true; $props.payload = null; window.__resetDemoRequestCount('/demo-api/cache'); $props.$cache.clearData().finally(() => cacheBusy = false)"
+        >
+            Clear data cache
+        </button>
     </div>
 </div>

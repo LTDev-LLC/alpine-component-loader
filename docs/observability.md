@@ -1,6 +1,7 @@
 # Observability
 
-ACL observability is local, bounded, and opt-in. It records structured lifecycle and diagnostic activity in memory, can expose correlated Performance API measures, and can forward diagnostics to an application logger. The core includes no transport, upload, analytics, or telemetry dependency. A separate dependency-free exporter entry is available when the application explicitly connects one.
+Observability is opt-in and local: bounded in-memory records, optional Performance API measures, and application
+logging. Transport is available through a separate dependency-free exporter.
 
 ## Quick start
 
@@ -29,7 +30,8 @@ const unsubscribe = AlpineComponentLoader.subscribe(record => {
 unsubscribe();
 ```
 
-Subscribers receive records even when retained metrics are disabled. Enabling `observability` controls counters, durations, recent-record retention, performance marks, and logger selection.
+Subscriptions receive records even without retention. `observability` controls counters, durations, recent records,
+performance marks, and logging.
 
 ## Record shape
 
@@ -57,11 +59,12 @@ Each record contains:
 - `duration` and `status` are normalized top-level values when supplied.
 - `detail` contains the remaining redacted context.
 
-Runtime event records include loads, hydration, prefetch, cache/revalidation, and errors. Internal warnings and errors are emitted as `diagnostic` records.
+Records cover loading, hydration, prefetch, cache/revalidation, and errors. Internal warnings/errors use `diagnostic`
+records.
 
 ## Inspect metrics
 
-`getMetrics()` returns a redacted clone, so callers cannot mutate retained state:
+`getMetrics()` returns a redacted clone of retained state:
 
 ```js
 const snapshot = AlpineComponentLoader.getMetrics();
@@ -84,10 +87,8 @@ The shape is:
 }
 ```
 
-The snapshot contains `startedAt`, event `totals`, aggregate `durations`, and
-the bounded `recent` records. Only records with finite durations contribute to
-duration aggregates. `bufferSize` bounds `recent`; counters and duration
-aggregates remain available even when the recent buffer is small or zero.
+Snapshots include `startedAt`, `totals`, `durations`, and `recent`. Only finite durations are aggregated. `bufferSize`
+bounds recent records without limiting counters or aggregates.
 
 Reset retained metrics without disconnecting subscribers:
 
@@ -95,11 +96,11 @@ Reset retained metrics without disconnecting subscribers:
 AlpineComponentLoader.clearMetrics();
 ```
 
-The new snapshot receives a fresh `startedAt`, empty totals/durations, and an empty recent list. Sequence numbers remain monotonic so external consumers can still identify ordering.
+Resetting clears totals, durations, and recent records and refreshes `startedAt`. Sequence numbers remain monotonic.
 
 ## Logging
 
-When no custom logger is configured, ACL diagnostics continue to use the matching console method. Set `logger: false` to suppress console diagnostics while retaining records:
+Diagnostics default to matching console methods. `logger: false` suppresses console output while retaining records:
 
 ```js
 AlpineComponentLoader.config({
@@ -142,15 +143,14 @@ AlpineComponentLoader.config({
 });
 ```
 
-Subscriber and logger exceptions are isolated. A monitoring integration cannot make a component load fail, and a failing listener does not prevent other listeners from receiving the record.
+Subscriber and logger exceptions cannot fail component loads or block other listeners.
 
-The observability `logger` may be `false`, one function, or an object with
-optional `debug`, `info`, `warn`, and `error` methods. Object methods receive
-only records matching their normalized severity.
+`logger` accepts `false`, a function, or an object with optional `debug`, `info`, `warn`, and `error` methods. Level
+methods receive matching severities only.
 
 ## Optional batching and vendor adapters
 
-Import exporters separately so no transport or vendor SDK enters the core browser graph:
+Import exporters separately to add transport:
 
 ```js
 import {
@@ -172,21 +172,19 @@ const connection = connectExporter(AlpineComponentLoader, exporter);
 await connection.dispose();
 ```
 
-`createBatchExporter()` accepts an application `send(records)` function and
-these queue controls:
+`createBatchExporter()` accepts an application `send(records)` function and these queue controls:
 
-| Option | Default | Contract |
-| --- | --- | --- |
-| `batchSize` | `20` | Positive records per delivery attempt. |
-| `flushInterval` | `5000` | Non-negative timer interval in milliseconds; `0` disables timed flushing. |
-| `maxQueue` | `200` | Positive retained-record bound; oldest queued records are dropped first. |
-| `retries` | `2` | Non-negative retries after a failed send. |
-| `retryDelay` | `250` | Initial exponential retry delay in milliseconds. |
-| `target` | `globalThis` | Optional `EventTarget` that owns the `pagehide` flush listener. |
+| Option          | Default      | Contract                                                                  |
+| --------------- | ------------ | ------------------------------------------------------------------------- |
+| `batchSize`     | `20`         | Positive records per delivery attempt.                                    |
+| `flushInterval` | `5000`       | Non-negative timer interval in milliseconds; `0` disables timed flushing. |
+| `maxQueue`      | `200`        | Positive retained-record bound; oldest queued records are dropped first.  |
+| `retries`       | `2`          | Non-negative retries after a failed send.                                 |
+| `retryDelay`    | `250`        | Initial exponential retry delay in milliseconds.                          |
+| `target`        | `globalThis` | Optional `EventTarget` that owns the `pagehide` flush listener.           |
 
-`createBeaconExporter()` uses `sendBeacon` on page hide when possible and falls
-back to fetch with `keepalive`. `flush()` drains queued batches; `dispose()`
-removes listeners and performs a final best-effort delivery.
+`createBeaconExporter()` uses `sendBeacon` on page hide, falling back to keepalive fetch. `flush()` drains batches;
+`dispose()` removes listeners and attempts final delivery.
 
 Use the generic queue when the application already owns a transport:
 
@@ -211,9 +209,10 @@ const connection = connectExporter(AlpineComponentLoader, exporter);
 await connection.flush();
 ```
 
-When the queue reaches `maxQueue`, it remains bounded rather than retaining unlimited runtime history. Failed sends follow only the configured retry policy; exporter errors never propagate into component lifecycle work.
+`maxQueue` bounds retained records. Failed sends follow the configured retry policy; exporter errors stay isolated from
+component work.
 
-Vendor adapters require caller-owned clients and add no SDK dependency:
+Vendor adapters use caller-owned clients without adding SDK dependencies:
 
 ```js
 import {
@@ -228,7 +227,8 @@ const otelConnection = connectExporter(AlpineComponentLoader, otel);
 const sentryConnection = connectExporter(AlpineComponentLoader, sentry);
 ```
 
-The OpenTelemetry adapter uses duck-typed tracer, meter, and logger objects. The Sentry adapter maps errors to captured messages and other records to breadcrumbs. Every adapter call is isolated from component execution. Exporters receive the same already-redacted records delivered by `subscribe()`.
+OpenTelemetry accepts tracer, meter, and logger objects. Sentry captures errors as messages and other records as
+breadcrumbs. Calls are isolated from component work and receive the same redacted records as `subscribe()`.
 
 ## Performance measures
 
@@ -251,7 +251,8 @@ const observer = new PerformanceObserver(list => {
 observer.observe({ type: 'measure', buffered: true });
 ```
 
-Measures use the runtime request ID so component work can be compared with application performance entries. Start/end marks are cleared after measurement. Performance instrumentation is best effort and does not interrupt loading if the platform rejects a mark or measure.
+Request IDs correlate measures with application entries. Marks are cleared after measurement. Unsupported or rejected
+instrumentation does not interrupt loading.
 
 Disconnect application observers when no longer needed:
 
@@ -269,7 +270,8 @@ Structured detail is recursively redacted before storage, subscription, or loggi
 - Errors are reduced to name, message, code, phase, status, and retryability.
 - Arrays are bounded and circular references are replaced.
 
-Fetched payloads, prop values, persistence data, raw headers, and request bodies are not retained. Application logger code should preserve that boundary and avoid joining records with sensitive state from elsewhere.
+Payloads, props, persistence, raw headers, and request bodies are excluded. Application loggers should avoid attaching
+sensitive state.
 
 ## DOM events versus observability records
 
@@ -285,11 +287,12 @@ const unsubscribe = AlpineComponentLoader.subscribe(record => {
 });
 ```
 
-Use DOM events for UI behavior and subscriptions/metrics for local diagnostics. Component lifecycle events may also originate on the component and bubble through the document.
+Use DOM events for UI behavior and subscriptions/metrics for diagnostics. Component events may bubble through the
+document.
 
 ## Debugger integration
 
-The optional debugger consumes loader state and structured activity to present a timeline and snapshots:
+The optional debugger displays loader state, activity, and snapshots:
 
 ```js
 import ACLDebugger from 'alpine-component-loader/debugger';
@@ -298,17 +301,18 @@ ACLDebugger.inject(AlpineComponentLoader);
 await AlpineComponentLoader.toggleDebug();
 ```
 
-Debugger exports apply an additional recursive redaction pass. They can include recent timeline and request activity, but never raw fetched or persisted application values.
+Debugger exports apply additional redaction to timeline and request activity; raw fetched or persisted values are
+excluded.
 
-Use the debugger for interactive diagnosis and `getMetrics()` for application-owned local summaries. Neither sends data anywhere automatically.
+Use the debugger for interactive inspection and `getMetrics()` for local summaries. Neither sends data automatically.
 
 ## Operational guidance
 
-- Use a finite `bufferSize` appropriate to the expected session length.
-- Prefer subscribers for temporary diagnostic tools and always unsubscribe.
-- Enable performance marks only when profiling to reduce Performance Timeline noise.
-- Treat custom loggers as application code: bound their own buffers and transports.
-- Clear metrics between repeatable performance scenarios.
-- Do not use local metrics as a source of billing, security audit, or guaranteed delivery data.
+- Bound `bufferSize` and application logger buffers.
+- Unsubscribe temporary tools after use.
+- Enable performance marks when profiling.
+- Clear metrics between repeatable scenarios.
+- Local metrics do not guarantee delivery or serve as billing/security audit data.
 
-For interactive inspection see [Accessibility and debugging](accessibility-and-debugging.md). For errors and cache remedies see [API reference and troubleshooting](api.md).
+For interactive inspection see [Accessibility and debugging](accessibility-and-debugging.md). For errors and cache
+remedies see [API reference and troubleshooting](api.md).

@@ -87,7 +87,11 @@ test('importing the core facade does not fetch runtime capabilities', async ({ p
 
     const paths = requestedPathnames(loaderServer);
     expect(loaderServer.moduleRequests[0]).toBe('/dist/index.js?fixture=facade-only');
-    expect(includesPathPrefix(paths, '/dist/runtime/')).toBe(false);
+    // Require only the shared context dependency on the facade path
+    expect(paths.filter((path) => path.startsWith('/dist/runtime/'))).toEqual([
+        // Locate the context URL in the selected module family
+        paths.find((path) => /\/runtime\/context(?:\.min)?\.js$/.test(path)),
+    ]);
     expect(includesPathPrefix(paths, '/dist/elements/')).toBe(false);
 });
 
@@ -212,7 +216,11 @@ test('the auto entry does not register unused built-in elements', async ({ page,
     const paths = requestedPathnames(loaderServer);
     expect(loaderServer.moduleRequests[0]).toBe('/dist/auto.min.js?fixture=min-auto');
     expect(allPathsAreMinified(paths)).toBe(true);
-    expect(includesPathPrefix(paths, '/dist/runtime/')).toBe(false);
+    // Require the same minimal facade dependencies with diagnostics enabled
+    expect(paths.filter((path) => path.startsWith('/dist/runtime/'))).toEqual([
+        // Locate the shared context implementation URL
+        paths.find((path) => /\/runtime\/context(?:\.min)?\.js$/.test(path)),
+    ]);
     expect(includesPathPrefix(paths, '/dist/elements/')).toBe(false);
 
     await page.evaluate(
@@ -265,6 +273,8 @@ test('a minified core entry propagates its suffix only to required definition mo
     expect(paths).not.toContain('/dist/runtime/adaptive-prefetch.min.js');
     expect(paths).not.toContain('/dist/runtime/assets.min.js');
     expect(paths).not.toContain('/dist/runtime/caches.min.js');
+    expect(paths).not.toContain('/dist/runtime/component/asset-controller.min.js');
+    expect(paths).not.toContain('/dist/runtime/component/persistence-controller.min.js');
     expect(paths).not.toContain('/dist/runtime/component/data-controller.min.js');
     expect(paths).not.toContain('/dist/runtime/fetch-cache.min.js');
     expect(paths).not.toContain('/dist/runtime/hmr.min.js');
@@ -289,6 +299,8 @@ test('connecting an inline component loads rendering without unrelated capabilit
 
     const paths = requestedPathnames(loaderServer);
     expect(paths).toContain('/dist/runtime/rendering.min.js');
+    expect(paths).not.toContain('/dist/runtime/component/asset-controller.min.js');
+    expect(paths).not.toContain('/dist/runtime/component/persistence-controller.min.js');
     expect(paths).not.toContain('/dist/runtime/adaptive-prefetch.min.js');
     expect(paths).not.toContain('/dist/runtime/assets.min.js');
     expect(paths).not.toContain('/dist/runtime/caches.min.js');
@@ -337,7 +349,9 @@ test('persistence configuration activates only the persistence capability module
     });
 
     const paths = requestedPathnames(loaderServer);
+    expect(paths).toContain('/dist/runtime/component/persistence-controller.min.js');
     expect(paths).toContain('/dist/runtime/persistence.min.js');
+    expect(paths).not.toContain('/dist/runtime/component/asset-controller.min.js');
     expect(paths).not.toContain('/dist/runtime/assets.min.js');
     expect(paths).not.toContain('/dist/runtime/component/data-controller.min.js');
     expect(paths).not.toContain('/dist/runtime/fetch-cache.min.js');
@@ -355,16 +369,132 @@ test('external styles activate only the asset and shared-cache capability module
             externalCss: ['/style/weird.css'],
         },
     });
+    await mountInlineComponent(page, loaderServer.baseUrl, {
+        tagName: 'acl-min-assets-second-probe',
+        fixture: 'min-assets',
+        config: {
+            externalCss: ['/style/weird.css'],
+        },
+    });
 
     const paths = requestedPathnames(loaderServer);
+    expect(countPath(paths, '/dist/runtime/component/asset-controller.min.js')).toBe(1);
     expect(paths).toContain('/dist/runtime/assets.min.js');
     expect(paths).toContain('/dist/runtime/caches.min.js');
     expect(paths).not.toContain('/dist/runtime/component/data-controller.min.js');
     expect(paths).not.toContain('/dist/runtime/fetch-cache.min.js');
     expect(paths).not.toContain('/dist/runtime/hmr.min.js');
     expect(paths).not.toContain('/dist/runtime/persistence.min.js');
+    expect(paths).not.toContain('/dist/runtime/component/persistence-controller.min.js');
     expect(allPathsAreMinified(paths)).toBe(true);
 });
+
+test('an existing component loads persistence on first use and reuses it on reload', async ({ page, loaderServer }) => {
+    // Confirm first-use activation does not require a different component definition
+    await preparePage(page);
+    await mountInlineComponent(page, loaderServer.baseUrl, {
+        tagName: 'acl-late-persistence-probe',
+        fixture: 'min-late-persistence',
+    });
+    expect(requestedPathnames(loaderServer)).not.toContain('/dist/runtime/component/persistence-controller.min.js');
+
+    const restored = await page.evaluate(async () => {
+        // Activate persistence through an existing attribute without re-registering the definition
+        const element = document.querySelector('acl-late-persistence-probe'),
+            options = {
+                clearTemplate: false,
+                clearData: false,
+            };
+        element.setAttribute('persist', 'session');
+        await element.reload(options);
+        element.$props.value = 'saved on demand';
+        const saved = element.$props.$persistence.$save();
+        await element.$props.$persistence.$flush();
+        await saved;
+        await element.reload(options);
+        const value = await element.$props.$persistence.$get('value');
+        element.remove();
+        return value;
+    });
+
+    expect(restored).toBe('saved on demand');
+    const paths = requestedPathnames(loaderServer);
+    expect(countPath(paths, '/dist/runtime/component/persistence-controller.min.js')).toBe(1);
+    expect(countPath(paths, '/dist/runtime/persistence.min.js')).toBe(1);
+    expect(paths).not.toContain('/dist/runtime/component/asset-controller.min.js');
+    expect(allPathsAreMinified(paths)).toBe(true);
+});
+
+// Exercise both new feature boundaries under a failed CDN module request
+for (const [feature, config] of [
+    ['asset', { externalCss: ['/style/weird.css'] }],
+    ['persistence', { persist: true }],
+]) {
+    test(`a failed ${feature} capability import stays inside the component error boundary`, async ({
+        page,
+        loaderServer,
+    }) => {
+        // Fail just the selected capability without disturbing the core module graph
+        await preparePage(page);
+        await page.route(
+            `**/dist/runtime/component/${feature}-controller.min.js*`,
+            // Simulate an unavailable optional module on the CDN
+            (route) => route.abort('failed'),
+        );
+        const result = await page.evaluate(
+            async ({ baseUrl, config, feature }) => {
+                // Observe the public error contract and any unexpected background rejection
+                const unhandled = [];
+                window.addEventListener(
+                    'unhandledrejection',
+                    // Record any rejection escaping the component lifecycle
+                    (event) => unhandled.push(String(event.reason)),
+                );
+                const { default: Loader } = await import(`${baseUrl}/dist/index.min.js?fixture=min-failed-${feature}`);
+                await Loader.define(`acl-failed-${feature}-probe`, {
+                    template: '<p>optional feature</p>',
+                    ...config,
+                });
+                await Loader.start();
+                const element = document.createElement(`acl-failed-${feature}-probe`),
+                    failed = new Promise((resolve) => {
+                        // Await the component's structured import failure
+                        element.addEventListener(
+                            'acl:error',
+                            // Project the error from the public lifecycle event
+                            (event) => resolve(event.detail.error),
+                            { once: true },
+                        );
+                    });
+                document.body.appendChild(element);
+                const error = await failed;
+                await element._activeLoadPromise;
+                // Allow any detached rejection to reach the observation listener
+                await new Promise((resolve) => setTimeout(resolve, 0));
+                return {
+                    code: error.code,
+                    phase: error.phase,
+                    retryable: error.retryable,
+                    state: element._state,
+                    unhandled,
+                };
+            },
+            {
+                baseUrl: loaderServer.baseUrl,
+                config,
+                feature,
+            },
+        );
+
+        expect(result).toEqual({
+            code: 'ACL_RUNTIME_MODULE_LOAD_FAILED',
+            phase: 'runtime-import',
+            retryable: true,
+            state: 'idle',
+            unhandled: [],
+        });
+    });
+}
 
 test('preserved reload activates HMR while an ordinary reload does not', async ({ page, loaderServer }) => {
     // Verify the reload option boundary through the public element method

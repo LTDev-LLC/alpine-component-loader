@@ -4,15 +4,17 @@ import type { ACLManifest } from './index.d.ts';
 
 export interface ACLSSRRendererOptions {
     manifest: ACLManifest;
+    concurrency?: number;
     root?: string;
     fetch?: typeof fetch;
-    resolver?: (source: string, definition: unknown) => string | Promise<string>;
+    resolver?: (source: string, definition: unknown, context: { signal?: AbortSignal }) => string | Promise<string>;
     timeout?: number;
     maxTemplateBytes?: number;
     maxDataBytes?: number;
     maxRedirects?: number;
     renderLightDom?: boolean;
     dataResolver?: (context: {
+        signal?: AbortSignal;
         tagName: string;
         props: Record<string, unknown>;
         attributes: Record<string, unknown>;
@@ -25,7 +27,8 @@ export interface ACLSSRRendererOptions {
         authorize?: (
             request: { url: string; method: string; headers?: Record<string, string>; redirect?: boolean },
             context: {
-                tagName: string;
+                signal?: AbortSignal;
+        tagName: string;
                 props: Record<string, unknown>;
                 attributes: Record<string, unknown>;
                 slots: string | Record<string, string | string[]>;
@@ -33,7 +36,8 @@ export interface ACLSSRRendererOptions {
             },
         ) => boolean | Promise<boolean>;
         resolve?: (context: {
-            tagName: string;
+            signal?: AbortSignal;
+        tagName: string;
             props: Record<string, unknown>;
             attributes: Record<string, unknown>;
             slots: string | Record<string, string | string[]>;
@@ -69,6 +73,7 @@ export interface ACLSSRRendererOptions {
 }
 
 export interface ACLSSRRenderOptions {
+    signal?: AbortSignal;
     props?: Record<string, unknown>;
     attributes?: Record<string, unknown>;
     slots?: string | Record<string, string | string[]>;
@@ -80,7 +85,8 @@ export interface ACLSSRRenderOptions {
 
 export interface ACLSSRRenderer {
     render(tagName: string, options?: ACLSSRRenderOptions): Promise<string>;
-    renderMany(requests: Array<ACLSSRRenderOptions & { tagName: string }>): Promise<string[]>;
+    renderMany(requests: Array<ACLSSRRenderOptions & { tagName: string }>, options?: { concurrency?: number; signal?: AbortSignal }): Promise<string[]>;
+    renderStream(requests: Iterable<ACLSSRRenderOptions & { tagName: string }>, options?: { concurrency?: number; signal?: AbortSignal }): AsyncIterable<string>;
     clearCache(): void;
 }
 

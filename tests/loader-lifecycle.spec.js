@@ -49,13 +49,23 @@ test('lazy light DOM placeholder is not captured as slot content', async ({ page
                 this.callback = callback;
             }
 
-            observe() {
+            observe(target) {
                 // Emit a deferred visible intersection for the fixture
                 setTimeout(
                     // Run the scheduled delayed task
-                    () => this.callback([{ isIntersecting: true }]),
+                    () =>
+                        this.callback([
+                            {
+                                target,
+                                isIntersecting: true,
+                            },
+                        ]),
                     0,
                 );
+            }
+
+            unobserve() {
+                // Release the fixture target
             }
 
             disconnect() {

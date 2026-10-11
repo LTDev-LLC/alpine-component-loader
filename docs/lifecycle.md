@@ -1,6 +1,7 @@
 # Lifecycle, events, and dynamic components
 
-Each component owns its template, data, assets, Alpine tree, timers, observers, persistence effects, event forwarding, and hook cleanups. New work supersedes stale work, and teardown releases resources once.
+Components own requests, assets, Alpine trees, timers, subscriptions, persistence, events, and hook cleanup. New
+generations supersede old work; teardown releases ownership once.
 
 ## Lifecycle states
 
@@ -10,31 +11,27 @@ A host moves through these internal states:
 idle → deferred/loading → ready → deactivated → destroyed
 ```
 
-`loading="lazy"` defers work until intersection, while `loading="idle"` schedules it for idle time. Loading and deferred hosts expose `aria-busy="true"`; ready, deactivated, and destroyed hosts do not.
+`loading="lazy"` defers work until intersection, while `loading="idle"` schedules it for idle time. Loading and deferred
+hosts expose `aria-busy="true"`; ready, deactivated, and destroyed hosts do not.
 
 ## Inline-template discovery lifecycle
 
-`start()` scans existing `template[x-acl]` and
-`template[acl-component]` declarations before completing registration. The
-ordinary entry does not retain a mutation observer; call `observeTemplates()`
-when definitions may arrive later.
+Root `start()` scans existing declarative templates. `observeTemplates()` handles later definitions.
 
-The `/auto` entry installs observation before its asynchronous startup scan so
-a template inserted during startup cannot fall into a discovery gap. Automatic
-observation is enabled by default and can be disabled with
-`window.AlpineComponentLoaderConfig.observeTemplates = false`. The opt-out
-keeps initial discovery; `autoStart: false` disables both startup and
-observation.
+[Core](core.md) needs explicit template/built-in registration. Startup completes registration; `loaded` and hydration
+events mark initialization. Optional [polyfills](polyfills.md) gate registration without changing events.
 
-Only one loader-owned template observer is active. Re-observing replaces it,
-and each returned cleanup can release only the observer it created.
-`stopObservingTemplates()` stops the active observer regardless of whether it
-was installed manually or by `/auto`. Registration failures are reported with
-the `template-observer` phase and do not create unhandled promise rejections.
+`/auto` observes before scanning to catch startup-time insertions. Set
+`window.AlpineComponentLoaderConfig.observeTemplates = false` to retain only scanning; `autoStart: false` disables both.
+
+One template observer is active per loader. Replacement cleanup releases only its own observer;
+`stopObservingTemplates()` releases the current one. Failures emit phase `template-observer` without unhandled
+rejections.
 
 ## Progressive SSR hydration
 
-Progressive hydration applies only when the host contains valid server-rendered markup and its `data-acl-revision` exactly matches the registered definition. Client-only components and stale SSR hosts continue through the ordinary `loading` pipeline.
+Progressive hydration needs valid SSR markup and an exact `data-acl-revision` match. Client-only or stale hosts use
+normal `loading`.
 
 ```js
 await AlpineComponentLoader.define('account-card', '/components/account-card.html', {
@@ -54,55 +51,58 @@ const html = await renderer.render('account-card', {
 });
 ```
 
-| `hydrate` mode | Trigger |
-| --- | --- |
-| `eager` | Hydrate immediately. |
-| `visible` | First intersection with a `100px` root margin. |
-| `idle` | `requestIdleCallback` with a bounded timeout fallback. |
-| `interaction` | First pointer hover, touch start, or focus entry; the event is not replayed. |
-| `media` | First match of `hydrateMedia` or the host `hydrate-media` attribute. |
+| `hydrate` mode | Trigger                                                                      |
+| -------------- | ---------------------------------------------------------------------------- |
+| `eager`        | Hydrate immediately.                                                         |
+| `visible`      | First intersection with a `100px` root margin.                               |
+| `idle`         | `requestIdleCallback` with a bounded timeout fallback.                       |
+| `interaction`  | First pointer hover, touch start, or focus entry; the event is not replayed. |
+| `media`        | First match of `hydrateMedia` or the host `hydrate-media` attribute.         |
 
-The host exposes `data-acl-hydration-state="deferred|hydrating|hydrated|error"`. Observers, media listeners, interaction listeners, and idle callbacks are released after hydration, disconnect, reload, or disposal.
+`data-acl-hydration-state` is `deferred`, `hydrating`, `hydrated`, or `error`. Hydration triggers release resources on
+completion, disconnect, reload, or disposal.
 
 Listen for public events rather than depending on private state:
 
 ```js
 const card = document.querySelector('profile-card');
 
-card.addEventListener('acl:loadstart', event => {
+card.addEventListener('acl:loadstart', (event) => {
     console.log('Started', event.detail.requestId);
 });
 
-card.addEventListener('acl:loadend', event => {
+card.addEventListener('acl:loadend', (event) => {
     console.log('Finished', event.detail.duration);
 });
 
-card.addEventListener('acl:error', event => {
+card.addEventListener('acl:error', (event) => {
     console.error(event.detail.phase, event.detail.error);
 });
 ```
 
-Component-emitted ACL events bubble and are composed, so an application can observe them at a stable ancestor. Their shared detail includes the component, tag name, current props, and timestamp, plus event-specific fields. Loader-wide events such as adaptive prefetch are dispatched directly on `document` with feature-specific detail.
+Component events bubble and are composed. Loader-wide events, such as prefetch, dispatch on `document` with
+feature-specific detail.
 
 ## Hooks and owned cleanup
 
-Component hooks are `beforeMount`, `mounted`, `loaded`, `updated`, `activated`, `deactivated`, and `unmounted`. Data hooks are `beforeFetch` and `afterFetch`. Development state preservation uses `captureState` and `restoreState`.
+Component hooks are `beforeMount`, `mounted`, `loaded`, `updated`, `activated`, `deactivated`, and `unmounted`. Data
+hooks are `beforeFetch` and `afterFetch`. Development state preservation uses `captureState` and `restoreState`.
 
-| Hook | Runs when |
-| --- | --- |
-| `beforeMount` | A load generation begins, before loading UI and resource work. |
-| `mounted` | Template rendering and Alpine initialization have completed. |
-| `loaded` | `mounted` has completed and the component is fully ready. |
-| `updated` | An observed prop or data-control attribute changes after readiness. |
-| `deactivated` | A retained component is detached and its pausable resources stop. |
-| `activated` | A retained initialized component is reattached. |
-| `unmounted` | Final destruction begins. |
-| `beforeFetch` | The final `RequestInit` is ready and may be replaced. |
-| `afterFetch` | A parsed shared response is ready for per-component transformation. |
-| `captureState` | A preserving reload is about to replace the rendered template. |
+| Hook           | Runs when                                                               |
+| -------------- | ----------------------------------------------------------------------- |
+| `beforeMount`  | A load generation begins, before loading UI and resource work.          |
+| `mounted`      | Template rendering and Alpine initialization have completed.            |
+| `loaded`       | `mounted` has completed and the component is fully ready.               |
+| `updated`      | An observed prop or data-control attribute changes after readiness.     |
+| `deactivated`  | A retained component is detached and its pausable resources stop.       |
+| `activated`    | A retained initialized component is reattached.                         |
+| `unmounted`    | Final destruction begins.                                               |
+| `beforeFetch`  | The final `RequestInit` is ready and may be replaced.                   |
+| `afterFetch`   | A parsed shared response is ready for per-component transformation.     |
+| `captureState` | A preserving reload is about to replace the rendered template.          |
 | `restoreState` | The replacement has mounted and built-in state restoration is complete. |
 
-Hooks may be asynchronous. A lifecycle hook may return a cleanup function; the component owns it and runs it once on reload or destruction:
+Async lifecycle hooks may return cleanup, owned until reload/destruction:
 
 ```js
 AlpineComponentLoader.define('profile-card', '/components/profile-card.html', {
@@ -129,43 +129,47 @@ AlpineComponentLoader.define('profile-card', '/components/profile-card.html', {
 });
 ```
 
-`updated` runs for observed attribute changes after the component is ready. `activated` and `deactivated` describe keep-alive reconnection. `unmounted` runs before final destruction, persistence release, Alpine destruction, and cleanup execution.
+`updated` follows ready-state attribute changes. Keep-alive reconnects emit `activated`/`deactivated`. `unmounted`
+precedes persistence/Alpine release and final cleanup.
 
-Hook failures are normalized as `ACLLoadError` values with code `ACL_HOOK_FAILED` and reported through `acl:error` with `phase: "hook"`. Detached notification hooks such as `updated` do not interrupt attribute processing.
+Hook failures emit `acl:error` with `ACL_HOOK_FAILED`, phase `hook`. Notification hooks such as `updated` do not
+interrupt attribute handling.
 
-Lifecycle contexts contain `el`, `root`, and `props`; `updated` also receives `name`, `oldVal`, and `newVal`. Fetch contexts contain the aliases `el`/`$el`, `root`/`$root`, and `props`/`$props`. Preservation hooks receive `reason`; `restoreState` takes the captured snapshot as its first argument.
+Lifecycle contexts include `el`, `root`, and `props`; `updated` adds `name`, `oldVal`, and `newVal`. Fetch contexts add
+`$el`, `$root`, and `$props` aliases. Preservation hooks receive `reason`; `restoreState` takes the snapshot first.
 
 ## Compatibility and ACL events
 
 Successful loads emit compatibility `mount` and `loaded` events in addition to namespaced lifecycle events:
 
 ```js
-card.addEventListener('loaded', event => {
+card.addEventListener('loaded', (event) => {
     console.log('Props are ready', event.detail.props);
 });
 ```
 
 Common namespaced events include:
 
-| Event | Dispatch target | Meaning |
-| --- | --- | --- |
-| `mount` | Component host | Compatibility event after Alpine initialization. |
-| `loaded` | Component host | Compatibility event after the loaded hook. |
-| `acl:loadstart` | Component host | A component generation started. |
-| `acl:loadend` | Component host | A load completed, fell back, failed, or was canceled. |
-| `acl:error` | Component or dynamic host | Typed template, fetch, hook, persistence, sanitizer, asset, hydration, or switch failure. |
-| `acl:cachehit` | Component host | A shared data response was used. |
-| `acl:cacheevict` | `document` | A template entry expired, exceeded capacity, was superseded, or was reclaimed for quota. |
-| `acl:revalidated` | Component host | A stale-while-revalidate data refresh arrived. |
-| `acl:hydrationstart` / `acl:hydrationend` / `acl:hydrationerror` | Component host | Declarative Shadow DOM adoption lifecycle. |
-| `acl:boundary-error` / `acl:boundary-retry` / `acl:boundary-reset` | `<acl-boundary>` | Nearest-boundary failure ownership and recovery. |
-| `acl:dev-reload-start` / `acl:dev-reload-end` | Component host | A targeted preserving reload began or ended. |
-| `acl:dev-reload` | `window` | Aggregate development-client reload result. |
-| `acl:prefetchstart` / `acl:prefetchend` / `acl:prefetchskip` | `document` | Adaptive prefetch activity or a connection-policy skip. |
-| `acl:a11y` | Audited component | Optional accessibility result. |
-| `acl:offline-registered` / `acl:offline-updatefound` | `window` | Offline worker registration or update discovery. |
+| Event                                                              | Dispatch target           | Meaning                                                                                   |
+| ------------------------------------------------------------------ | ------------------------- | ----------------------------------------------------------------------------------------- |
+| `mount`                                                            | Component host            | Compatibility event after Alpine initialization.                                          |
+| `loaded`                                                           | Component host            | Compatibility event after the loaded hook.                                                |
+| `acl:loadstart`                                                    | Component host            | A component generation started.                                                           |
+| `acl:loadend`                                                      | Component host            | A load completed, fell back, failed, or was canceled.                                     |
+| `acl:error`                                                        | Component or dynamic host | Typed template, fetch, hook, persistence, sanitizer, asset, hydration, or switch failure. |
+| `acl:cachehit`                                                     | Component host            | A shared data response was used.                                                          |
+| `acl:cacheevict`                                                   | `document`                | A template entry expired, exceeded capacity, was superseded, or was reclaimed for quota.  |
+| `acl:revalidated`                                                  | Component host            | A stale-while-revalidate data refresh arrived.                                            |
+| `acl:hydrationstart` / `acl:hydrationend` / `acl:hydrationerror`   | Component host            | Declarative Shadow DOM adoption lifecycle.                                                |
+| `acl:boundary-error` / `acl:boundary-retry` / `acl:boundary-reset` | `<acl-boundary>`          | Nearest-boundary failure ownership and recovery.                                          |
+| `acl:dev-reload-start` / `acl:dev-reload-end`                      | Component host            | A targeted preserving reload began or ended.                                              |
+| `acl:dev-reload`                                                   | `window`                  | Aggregate development-client reload result.                                               |
+| `acl:prefetchstart` / `acl:prefetchend` / `acl:prefetchskip`       | `document`                | Adaptive prefetch activity or a connection-policy skip.                                   |
+| `acl:a11y`                                                         | Audited component         | Optional accessibility result.                                                            |
+| `acl:offline-registered` / `acl:offline-updatefound`               | `window`                  | Offline worker registration or update discovery.                                          |
 
-Component ACL event detail includes `component`, `tagName`, `props`, and `timestamp` plus phase-specific fields. Component events bubble and are composed. Loader-wide events are emitted directly on their documented global target. Structured observability records use the corresponding unprefixed type names but are delivered through `subscribe()`, not DOM propagation.
+Component detail contains `component`, `tagName`, `props`, `timestamp`, and phase fields. Observability delivers
+corresponding unprefixed record types through `subscribe()`.
 
 Use `{ once: true }` for one-time readiness work and remove long-lived application listeners during route teardown.
 
@@ -174,27 +178,21 @@ Use `{ once: true }` for one-time readiness work and remove long-lived applicati
 Use `$emit` for the public component event:
 
 ```html
-<button
-    type="button"
-    @click="$props.$emit('profile-follow', { id: $props.userId })"
->
-    Follow
-</button>
+<button type="button" @click="$props.$emit('profile-follow', { id: $props.userId })">Follow</button>
 ```
 
-`$emit(name, detail)` dispatches from the component host with `bubbles: true` and `composed: true`, so no forwarding rule is needed.
+`$emit(name, detail)` dispatches from the component host with `bubbles: true` and `composed: true`, so no forwarding
+rule is needed.
 
-Native composed events already cross a shadow boundary. For an application event that does not, configure `events.forward` with a name or source/target mapping:
+Native composed events already cross a shadow boundary. For an application event that does not, configure `events` with
+a `forward` name or source/target mapping:
 
 ```js
 AlpineComponentLoader.define('profile-card', '/components/profile-card.html', {
     shadow: true,
     attributes: { userId: String },
     events: {
-        forward: [
-            'profile-follow',
-            { from: 'internal-select', as: 'profile-select', bubbles: true, composed: true },
-        ],
+        forward: ['profile-follow', { from: 'internal-select', as: 'profile-select', bubbles: true, composed: true }],
     },
 });
 ```
@@ -202,16 +200,12 @@ AlpineComponentLoader.define('profile-card', '/components/profile-card.html', {
 Inside the shadow template:
 
 ```html
-<button
-    x-data="{ props: $el.$props }"
-    type="button"
-    @click="$dispatch('profile-follow', { id: props.userId })"
->
+<button x-data="{ props: $el.$props }" type="button" @click="$dispatch('profile-follow', { id: props.userId })">
     Follow
 </button>
 ```
 
-The host redispatches a `CustomEvent` with the original detail. Forwarding listeners are replaced cleanly during reload and removed during teardown, so an event is not duplicated after repeated reloads.
+The host redispatches original detail as a `CustomEvent`. Reload replaces forwarding listeners; teardown removes them.
 
 The declarative proxy accepts the same rules as strict JSON:
 
@@ -227,11 +221,10 @@ The declarative proxy accepts the same rules as strict JSON:
 ></acl-component>
 ```
 
-A string preserves the name and defaults both `bubbles` and `composed` to true. A mapping requires `from` and may override `as`, `bubbles`, or `composed`. Do not forward a native or application event that is already composed under the same name, or consumers may receive both the original and the redispatched event.
+Strings preserve names and default `bubbles`/`composed` to true. Mappings require `from` and may change `as`, `bubbles`,
+or `composed`. Avoid forwarding already-composed events under the same name, which duplicates delivery.
 
-The `events` option contains one `forward` array. Each entry is either a source
-event name or a rule with `from`, optional `as`, and optional `bubbles` and
-`composed` overrides.
+`events.forward` accepts event names or mapping rules.
 
 ## Cancel, retry, and reload
 
@@ -250,18 +243,20 @@ await card.reload({
 });
 ```
 
-| Reload option | Default | Purpose |
-| --- | --- | --- |
-| `preserveState` | `false` | Restore public props, controls, focus, selection, and scroll after remounting. |
-| `clearTemplate` | `true` | Remove matching template revisions before loading. |
-| `clearData` | `true` | Invalidate the exact data entry and reset its target. |
-| `reason` | `manual` | Label reload events and preservation-hook context. |
+| Reload option   | Default  | Purpose                                                                        |
+| --------------- | -------- | ------------------------------------------------------------------------------ |
+| `preserveState` | `false`  | Restore public props, controls, focus, selection, and scroll after remounting. |
+| `clearTemplate` | `true`   | Remove matching template revisions before loading.                             |
+| `clearData`     | `true`   | Invalidate the exact data entry and reset its target.                          |
+| `reason`        | `manual` | Label reload events and preservation-hook context.                             |
 
 - `cancel(reason)` aborts deferred, template, asset, Alpine-wait, and data work owned by the current generation.
 - `retry()` retries the current component data request when one is configured.
-- `reload()` cancels stale work, optionally clears caches, tears down the current Alpine tree and cleanups, and loads a new generation.
+- `reload()` cancels stale work, optionally clears caches, tears down the current Alpine tree and cleanups, and loads a
+  new generation.
 
-For a state-preserving development reload, the loader captures public props, form values, selection, focus, and scroll. Add custom state when the application has non-DOM state:
+Preserving reloads capture props, form values, selection, focus, and scroll. Capture application-specific state with
+hooks:
 
 ```js
 hooks: {
@@ -274,13 +269,15 @@ hooks: {
 }
 ```
 
-DOM controls are matched across replacement markup by `data-acl-preserve-key`, then a unique `id`, a unique `name`, and finally their DOM path:
+DOM controls are matched across replacement markup by `data-acl-preserve-key`, then a unique `id`, a unique `name`, and
+finally their DOM path:
 
 ```html
 <textarea data-acl-preserve-key="draft"></textarea>
 ```
 
-Use a stable preservation key when surrounding structure, IDs, or names may change. Preservation hooks run only when `preserveState` is true. If custom restoration fails, the loader reports `ACL_HMR_RESTORE_FAILED` and performs a clean non-preserving reload.
+Use stable preservation keys. Hooks run only for `preserveState: true`; failed restoration reports
+`ACL_HMR_RESTORE_FAILED` and retries without preservation.
 
 ## Error boundaries
 
@@ -289,23 +286,23 @@ Use a stable preservation key when surrounding structure, IDs, or names may chan
 ```html
 <acl-boundary>
     <account-card></account-card>
-    <section slot="fallback" role="alert">
-        Account details are temporarily unavailable.
-    </section>
+    <section slot="fallback" role="alert">Account details are temporarily unavailable.</section>
 </acl-boundary>
 ```
 
-The default slot renders normal descendants; `slot="fallback"` is shown after the nearest boundary catches a descendant `acl:error`. Nested boundaries own only their nearest descendants. The boundary exposes `error`, `errors`, `reset()`, and async `retry()`. Retry calls `reload()` on failed connected hosts and restores normal content only when every host becomes ready. Without an authored fallback, the boundary supplies a small accessible retry UI.
+The nearest boundary catches descendant `acl:error` and swaps its default slot for `slot="fallback"`. It exposes
+`error`, `errors`, `reset()`, and async `retry()`. Retry reloads failed connected hosts and restores content when all
+are ready. Missing authored fallbacks use an accessible retry UI.
 
 Application controls can use the same recovery surface:
 
 ```js
 const boundary = document.querySelector('acl-boundary');
 
-boundary.addEventListener('acl:boundary-error', event => {
+boundary.addEventListener('acl:boundary-error', (event) => {
     console.error('Boundary caught', event.detail.error);
 });
-boundary.addEventListener('acl:boundary-retry', event => {
+boundary.addEventListener('acl:boundary-retry', (event) => {
     console.info('Retry result', event.detail);
 });
 
@@ -313,7 +310,7 @@ await boundary.retry();
 boundary.reset();
 ```
 
-`reset()` clears boundary state and restores normal content without reloading failed hosts. Use `retry()` when those hosts should run their normal `reload()` path first.
+`reset()` clears boundary state only; `retry()` reloads failed hosts first.
 
 ## Form-associated components
 
@@ -335,12 +332,12 @@ await AlpineComponentLoader.define('quantity-field', '/components/quantity-field
 });
 ```
 
-The mapped props drive native form value, restoration state, and disabled state. Hosts support reset, disabled, and state-restoration callbacks plus `form`, `labels`, `validity`, `validationMessage`, `willValidate`, `checkValidity()`, `reportValidity()`, `setFormValue()`, and `setValidity()`. Templates receive the same controls at `$props.$form`.
+Mapped props control form value, restoration, and disabled state. Hosts expose reset/disabled/restoration callbacks,
+`form`, `labels`, `validity`, `validationMessage`, `willValidate`, `checkValidity()`, `reportValidity()`,
+`setFormValue()`, and `setValidity()`.
 
-Within a template, `setValue()` at
-`$props.$form.setValue(value, state)` is the helper equivalent of the host's
-`setFormValue(value, state)`. `$props.$form` also exposes `form`, `labels`,
-`setValidity()`, `checkValidity()`, and `reportValidity()`.
+`$props.$form` provides `form`, `labels`, `setValue(value, state)`, `setValidity()`, `checkValidity()`, and
+`reportValidity()`. `setValue()` corresponds to host `setFormValue()`.
 
 Use it like an ordinary successful form control:
 
@@ -359,24 +356,21 @@ Use it like an ordinary successful form control:
 <button type="button" @click="$props.quantity += 1">+</button>
 ```
 
-For custom validation, call `setValidity(flags, message, anchor)` through the host or `$props.$form`, then let the form invoke `checkValidity()`/`reportValidity()` normally.
+For custom validation, call `setValidity(flags, message, anchor)` through the host or `$props.$form`, then let the form
+invoke `checkValidity()`/`reportValidity()` normally.
 
-When `ElementInternals` is unavailable, ACL maintains a hidden input for form submission. It reports a diagnostic because native validation, labels, and lifecycle callbacks cannot be fully emulated by that fallback.
+Without `ElementInternals`, a hidden input provides submission. A diagnostic notes that native validation, labels, and
+callbacks cannot be fully emulated.
 
 ## Dynamic components
 
 `<acl-dynamic>` renders a registered component named by `is`:
 
 ```html
-<acl-dynamic
-    is="profile-card"
-    user-id="user-1"
-    transition="fade"
-    transition-duration="180"
-></acl-dynamic>
+<acl-dynamic is="profile-card" user-id="user-1" transition="fade" transition-duration="180"></acl-dynamic>
 ```
 
-Changing `is` switches to another registered custom element. Public attributes on the dynamic host are copied to the active child and mirrored to cached children. Loader controls such as `is`, `transition`, and `keep-alive` are not forwarded.
+Changing `is` switches the active registered component.
 
 Supported transition values are `auto`, `none`, `fade`, `view`, `scale`, `slide-left`, `slide-right`, and `blur`:
 
@@ -385,35 +379,36 @@ const outlet = document.querySelector('acl-dynamic');
 outlet.setAttribute('is', 'account-settings');
 ```
 
-| Attribute | Default | Purpose |
-| --- | --- | --- |
-| `is` | none | Registered target tag; removing it destroys active and cached children. |
-| `keep-alive` | absent | Retain inactive children. |
-| `keep-alive-max` | global `keepAliveMax` | Maximum inactive entries with least-recently-used eviction. |
-| `transition` | global `dynamicTransition` | `auto`, `view`, `fade`, `scale`, `slide-left`, `slide-right`, `blur`, or `none`. |
-| `transition-duration` | global `transitionDuration` | Bounded transition duration in milliseconds. |
+| Attribute             | Default                     | Purpose                                                                          |
+| --------------------- | --------------------------- | -------------------------------------------------------------------------------- |
+| `is`                  | none                        | Registered target tag; removing it destroys active and cached children.          |
+| `keep-alive`          | absent                      | Retain inactive children.                                                        |
+| `keep-alive-max`      | global `keepAliveMax`       | Maximum inactive entries with least-recently-used eviction.                      |
+| `transition`          | global `dynamicTransition`  | `auto`, `view`, `fade`, `scale`, `slide-left`, `slide-right`, `blur`, or `none`. |
+| `transition-duration` | global `transitionDuration` | Bounded transition duration in milliseconds.                                     |
 
-All other host attributes are copied to the active child and mirrored to cached children. The loader controls `is`, `keep-alive`, `keep-alive-max`, `transition`, `transition-duration`, and its internal component marker, so those are not forwarded.
+Public attributes mirror to active/cached children. Controls `is`, `keep-alive`, `keep-alive-max`, `transition`,
+`transition-duration`, and internal markers are not forwarded.
 
-`auto` uses the View Transitions API when available and falls back to a bounded CSS transition. Reduced-motion preference disables animation. Superseded switches cancel their frames and timers, and temporary effects restore authored inline styles. When focus was inside the outgoing component, the switcher prefers `[autofocus]` or `[data-acl-autofocus]` in the incoming component, then its first ordinary focusable element.
+`auto` uses View Transitions or bounded CSS fallback; reduced motion disables animation. Superseded switches cancel
+frames/timers and restore authored styles. Focus moves from the outgoing host to incoming autofocus or the first
+focusable control.
 
-The target must already be registered. Invalid or missing targets emit `acl:error` from the dynamic host with `phase: "dynamic"`.
+The target must already be registered. Invalid or missing targets emit `acl:error` from the dynamic host with
+`phase: "dynamic"`.
 
 ## Keep-alive behavior
 
 Add `keep-alive` to cache inactive dynamic children:
 
 ```html
-<acl-dynamic
-    is="profile-card"
-    keep-alive
-    keep-alive-max="3"
-></acl-dynamic>
+<acl-dynamic is="profile-card" keep-alive keep-alive-max="3"></acl-dynamic>
 ```
 
-Inactive children stop polling and slot observation and receive `deactivated`; reconnected children resume owned resources and receive `activated`. The cache uses bounded least-recently-used order. Evicted children and all cached children on dynamic-host disconnect are destroyed.
+Inactive children pause polling/slot observation and emit `deactivated`; reconnection resumes resources and emits
+`activated`. The bounded LRU cache destroys evictions and all children on host disconnect.
 
-Use a finite `keep-alive-max` for long-running applications. `keepAliveMax` can also be configured globally; `Infinity` is supported but should be deliberate.
+Set finite `keep-alive-max` or global `keepAliveMax` for bounded retention. `Infinity` is supported.
 
 An ordinary registered component can also retain its initialized Alpine state across removal:
 
@@ -426,11 +421,13 @@ panel.remove();
 document.body.appendChild(panel);
 ```
 
-Detachment pauses polling and Light DOM slot observation and calls `deactivated`; reattachment resumes owned resources and calls `activated`.
+Detachment pauses polling and Light DOM slot observation and calls `deactivated`; reattachment resumes owned resources
+and calls `activated`.
 
 ## Development server and targeted HMR
 
-The packaged development server injects an EventSource client, reports changed component sources, clears each matching template once, and reloads live instances—including instances in open Shadow Roots—with preserving defaults:
+The dev server injects EventSource, invalidates changed templates once, and preserves matching live hosts, including
+open Shadow Roots:
 
 ```bash
 npx alpine-component-loader serve ./public --host 127.0.0.1 --port 4173
@@ -439,15 +436,9 @@ npx alpine-component-loader serve ./public --host 127.0.0.1 --port 4173
 Integrate those operations with another server through the public development entry:
 
 ```js
-import {
-    connectACLDevServer,
-    reloadChangedTemplates,
-} from 'alpine-component-loader/dev';
+import { connectACLDevServer, reloadChangedTemplates } from 'alpine-component-loader/dev';
 
-const result = await reloadChangedTemplates([
-    '/components/profile-card.html',
-    '/components/account-settings.html',
-]);
+const result = await reloadChangedTemplates(['/components/profile-card.html', '/components/account-settings.html']);
 
 console.log(result.sources, result.tags, result.reloaded, result.failed);
 
@@ -461,11 +452,13 @@ console.log(connection.eventSource);
 connection.close();
 ```
 
-`reloadChangedTemplates()` uses `{ preserveState: true, clearTemplate: false, clearData: false, reason: "hmr" }` after clearing affected template revisions once. It emits per-component reload events followed by aggregate `acl:dev-reload` detail. `connectACLDevServer()` accepts template-change and page-reload messages; a template message may request a full-page fallback when no live component matches. The returned read-only `eventSource` becomes `null` after `close()`.
+`reloadChangedTemplates()` uses `{ preserveState: true, clearTemplate: false, clearData: false, reason: "hmr" }`.
+Per-host events precede aggregate `acl:dev-reload`. `connectACLDevServer()` handles template/page messages and optional
+page fallback when no hosts match. `eventSource` becomes `null` after `close()`.
 
 ## Teardown guarantees
 
-An ordinary component disconnect waits briefly before destruction so DOM moves can reconnect without losing state. Final teardown:
+Disconnect delays destruction briefly to permit DOM moves. Final teardown:
 
 - Cancels deferred, template, asset, Alpine-wait, and data work.
 - Stops polling and detaches visibility/network/intersection signals.
@@ -474,4 +467,4 @@ An ordinary component disconnect waits briefly before destruction so DOM moves c
 - Destroys the Alpine tree and runs owned cleanups once.
 - Clears rendered content and marks the host destroyed.
 
-For request behavior see [Data, caching, polling, and persistence](data.md). For test helpers that wait on lifecycle states see [Testing utilities](testing.md).
+See [requests and persistence](data.md) or [lifecycle test helpers](testing.md).

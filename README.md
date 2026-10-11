@@ -1,65 +1,59 @@
 # AlpineComponentLoader
 
-A dependency-free browser runtime for loading reusable HTML components with
-Alpine.js from URLs, existing DOM templates, JavaScript inline strings, or
-declarative `template[x-acl]` definitions. The package also includes isolated
-loader instances, progressive SSR hydration, form-associated components,
-nearest error boundaries, opt-in development and accessibility tools, route
-shards, Vite integration, ready-made test fixtures, bounded offline policies,
-and static Node SSR.
+AlpineComponentLoader (ACL) loads reusable HTML components with Alpine.js from URLs, DOM templates, inline strings, or
+`template[x-acl]` declarations. Optional capabilities add data fetching, persistence, hydration, forms, offline support,
+and development tools.
 
-This documentation targets package version `1.x`. ACL-owned public document
-formats and diagnostic snapshots use schema version `1`; externally governed
-Custom Elements Manifest, SARIF, and JSON Schema dialect identifiers retain
-their standards-defined versions. See
-[Format and schema versions](docs/manifests-and-cli.md#format-and-schema-versions)
-for the complete compatibility table.
+These docs cover package `1.x`. ACL document schemas use version `1`; external standards retain their own versions. See
+[format and schema versions](docs/manifests-and-cli.md#format-and-schema-versions).
 
 ## Recommended setup: jsDelivr CDN
 
-For browser projects, the recommended way to use AlpineComponentLoader is
-directly from jsDelivr with an
-[import map](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script/type/importmap).
-This requires no package installation or application build step and preserves
-the loader's on-demand module graph.
+Use jsDelivr with an
+[import map](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script/type/importmap) for browser
+projects that need no installation or application build.
 
 Add this to the document `<head>`:
 
 ```html
-<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.17.4/dist/cdn.min.js"></script>
 <script type="importmap">
     {
         "imports": {
-            "alpine-component-loader": "https://cdn.jsdelivr.net/gh/LTDev-LLC/alpine-component-loader@latest/dist/index.min.js",
-            "alpine-component-loader/auto": "https://cdn.jsdelivr.net/gh/LTDev-LLC/alpine-component-loader@latest/dist/auto.min.js",
-            "alpine-component-loader/dev": "https://cdn.jsdelivr.net/gh/LTDev-LLC/alpine-component-loader@latest/dist/dev.min.js",
-            "alpine-component-loader/debugger": "https://cdn.jsdelivr.net/gh/LTDev-LLC/alpine-component-loader@latest/dist/debugger.min.js",
-            "alpine-component-loader/a11y": "https://cdn.jsdelivr.net/gh/LTDev-LLC/alpine-component-loader@latest/dist/a11y.min.js",
-            "alpine-component-loader/a11y-scanner": "https://cdn.jsdelivr.net/gh/LTDev-LLC/alpine-component-loader@latest/dist/a11y-scanner.min.js",
-            "alpine-component-loader/offline": "https://cdn.jsdelivr.net/gh/LTDev-LLC/alpine-component-loader@latest/dist/offline.min.js",
-            "alpine-component-loader/observability-exporters": "https://cdn.jsdelivr.net/gh/LTDev-LLC/alpine-component-loader@latest/dist/observability-exporters.min.js",
-            "alpine-component-loader/testing": "https://cdn.jsdelivr.net/gh/LTDev-LLC/alpine-component-loader@latest/dist/testing.min.js"
+            "alpine-component-loader": "https://cdn.jsdelivr.net/gh/LouisT/alpine-component-loader@latest/dist/index.min.js",
+            "alpine-component-loader/core": "https://cdn.jsdelivr.net/gh/LouisT/alpine-component-loader@latest/dist/core.min.js",
+            "alpine-component-loader/auto": "https://cdn.jsdelivr.net/gh/LouisT/alpine-component-loader@latest/dist/auto.min.js",
+            "alpine-component-loader/dev": "https://cdn.jsdelivr.net/gh/LouisT/alpine-component-loader@latest/dist/dev.min.js",
+            "alpine-component-loader/debugger": "https://cdn.jsdelivr.net/gh/LouisT/alpine-component-loader@latest/dist/debugger.min.js",
+            "alpine-component-loader/a11y": "https://cdn.jsdelivr.net/gh/LouisT/alpine-component-loader@latest/dist/a11y.min.js",
+            "alpine-component-loader/a11y-scanner": "https://cdn.jsdelivr.net/gh/LouisT/alpine-component-loader@latest/dist/a11y-scanner.min.js",
+            "alpine-component-loader/offline": "https://cdn.jsdelivr.net/gh/LouisT/alpine-component-loader@latest/dist/offline.min.js",
+            "alpine-component-loader/observability-exporters": "https://cdn.jsdelivr.net/gh/LouisT/alpine-component-loader@latest/dist/observability-exporters.min.js",
+            "alpine-component-loader/polyfills": "https://cdn.jsdelivr.net/gh/LouisT/alpine-component-loader@latest/dist/polyfills.min.js",
+            "alpine-component-loader/testing": "https://cdn.jsdelivr.net/gh/LouisT/alpine-component-loader@latest/dist/testing.min.js"
         }
     }
 </script>
 ```
-Optionally, you may pin a tagged version such as `v1.0.2`:
+
+For production, replace `RELEASE_TAG` with a release tag or commit containing the entries you use. Older releases may
+lack `/core` or `/polyfills`:
+
 ```html
 <script type="importmap">
     {
         "imports": {
-            "alpine-component-loader": "https://cdn.jsdelivr.net/gh/LTDev-LLC/alpine-component-loader@1.0.2/dist/index.min.js",
-            <!-- Other import paths... -->
+            "alpine-component-loader": "https://cdn.jsdelivr.net/gh/LouisT/alpine-component-loader@RELEASE_TAG/dist/index.min.js",
+            "alpine-component-loader/core": "https://cdn.jsdelivr.net/gh/LouisT/alpine-component-loader@RELEASE_TAG/dist/core.min.js",
+            "alpine-component-loader/polyfills": "https://cdn.jsdelivr.net/gh/LouisT/alpine-component-loader@RELEASE_TAG/dist/polyfills.min.js"
         }
     }
 </script>
 ```
 
+Import-map entries download only when imported.
 
-Declaring these browser entries in the import map does not download them. The
-browser fetches an entry only when application code imports its specifier.
-
-Application modules can then use the documented bare package specifiers:
+Import ACL from your application module:
 
 ```html
 <script type="module" src="/js/components.js"></script>
@@ -73,55 +67,73 @@ AlpineComponentLoader.define('profile-card', '/components/profile-card.html');
 await AlpineComponentLoader.start();
 ```
 
-The repository ships readable ES2022 modules. Adding `.min` before `.js` asks
-jsDelivr to generate and cache a minified response, so generated `.min.js` files
-are not committed to the repository. A public entry loaded as `.min.js`
-propagates that suffix to every package-owned module it later requests; a
-readable `.js` entry requests readable descendants. Use one family consistently
-instead of mixing readable and minified entries.
+`npm run build` emits readable `.js` and prebuilt `.min.js` files for every `dist/` module. Publish the complete
+directory to GitHub or a static host. Entries request dependencies in their own readable/minified family; keep that
+family consistent.
 
-The root entry is a small facade. Component construction, rendering, remote
-templates, caches, data, persistence, external assets, manifests, adaptive
-prefetch, observability, built-in elements, and tooling are loaded dynamically
-only when configuration, markup, or an API call activates them. Importing the
-facade does not fetch every runtime module.
+The entry loads optional implementations only when markup, configuration, or an API call activates them.
 
-For production, replace `@latest` with a release tag or commit so deployments
-remain reproducible. Because jsDelivr generates minified responses dynamically,
-do not attach an SRI hash to a generated `.min.js` URL.
+`alpine-component-loader/core` exports the default loader and `ACLLoadError`. Its `start()` registers queued definitions
+without document discovery:
 
-The included development server mirrors that URL contract locally. When a requested `.min.js` file does not exist but its contained `.js` sibling does, the server minifies the readable source in memory and serves it without writing a generated file. Physical `.min.js` files take precedence, source changes invalidate the in-memory result, and the same behavior applies to project assets and the server's package-module URLs. If an existing import map points `alpine-component-loader` at `index.min.js`, the injected HMR mappings are derived from the same base and suffix so the application and development client share one module family.
+```js
+import Loader from 'alpine-component-loader/core';
+await Loader.define('profile-card', { template: '<p>Profile</p>' });
+await Loader.start();
+```
+
+For CDN delivery, map `/core` to `dist/core.js` or `dist/core.min.js`. Root and core share the default loader; a later
+root `start()` enables discovery. Both offer explicit observation. Isolated-loader and persistence-adapter factories are
+root-entry exports.
+
+The optional [`/polyfills` entry](docs/polyfills.md) loads needed Web Components fallbacks and waits for registration
+readiness. Native browsers skip upstream downloads; HTML Imports are excluded.
+
+Choose root for discovery, `/core` for explicit registration, or `/auto` for import-time startup. Core applications must
+register built-ins such as `<acl-boundary>` explicitly. See [core startup](docs/core.md).
+
+Load polyfills in a separate bootstrap before dynamically importing the application. Use Alpine's ESM setup from the
+[polyfill guide](docs/polyfills.md) for this ordering:
+
+```js
+// bootstrap.js; the import map includes /polyfills and /core.
+import loadPolyfills from 'alpine-component-loader/polyfills';
+
+await loadPolyfills();
+await import('./app.js');
+```
+
+`app.js` starts Alpine once, registers ACL definitions, and awaits `start()`. The [polyfill guide](docs/polyfills.md)
+covers CDN/Vite setup, `WebComponents.waitFor()`, CSP, and offline assets. ACL still requires native ESM/ES2022.
+
+Inline eager components skip unused networking, caches, data, hydration, transformations, environment, and scheduling
+modules. Loaders share implementation URLs while keeping runtime state isolated.
+
+The development server serves physical `.min.js` files first and generates missing siblings from `.js` in memory. Source
+changes invalidate generated responses. HMR mappings follow the application's base URL and suffix. See
+[server setup](docs/manifests-and-cli.md#development-server-and-command-discovery).
 
 ## Package and CLI installation
 
-Install the GitHub package when the project needs the command-line tools, Node
-SSR entry, or package-manager integration:
+Install the GitHub package for CLI tools, Node SSR, or package-manager integration:
 
 ```bash
-npm install github:LTDev-LLC/alpine-component-loader alpinejs
+npm install github:LouisT/alpine-component-loader alpinejs
 ```
 
-Default npm installs include the optional `parse5` parser and `@swc/core`
-minifier used by manifest inspection, SSR, and generated `.min.js` responses.
-Browser-only consumers can opt into a lean install:
+Default installs include optional `parse5` and `@swc/core` tooling. To omit them:
 
 ```bash
-npm install --omit=optional github:LTDev-LLC/alpine-component-loader alpinejs
+npm install --omit=optional github:LouisT/alpine-component-loader alpinejs
 ```
 
-The package root, CLI help, project creation, configuration, and other
-dependency-free commands remain available. Parser-, SSR-, or minifier-backed
-features report `ACL_OPTIONAL_DEPENDENCY_MISSING` with the required package and
-installation command.
+Lean installs retain the runtime, basic CLI commands, and prebuilt JavaScript serving. Features needing an omitted tool
+report `ACL_OPTIONAL_DEPENDENCY_MISSING` with an installation command.
 
-In a lean install, readable JavaScript serving remains available. Install
-`parse5` before using component inspection, manifest generation, inline-template
-HMR, or SSR. Install `@swc/core` before requesting generated `.min.js` responses
-or explicitly minified generated assets. Installing without `--omit=optional`
-continues to provide both tools automatically.
+Install `parse5` for inspection, manifest generation, inline-template HMR, or SSR; install `@swc/core` for on-demand
+minification and distribution builds.
 
-Installing the package creates the `alpine-component-loader` binary in the
-project's `node_modules/.bin`, so it can be run by name with `npx`:
+The installed CLI runs through `npx`:
 
 ```bash
 npx alpine-component-loader --help
@@ -132,53 +144,44 @@ npx alpine-component-loader routes --config acl.config.mjs
 npx alpine-component-loader watch --config acl.config.mjs
 ```
 
-For local package development, install the checkout from a relative or absolute
-path first:
+For local development:
 
 ```bash
 npm install --save-dev file:../alpine-component-loader
 npx alpine-component-loader --help
 ```
 
-To run the local checkout once without adding it to another project's
-dependencies:
+To run a local checkout without installing it:
 
 ```bash
 npx --package=. -- alpine-component-loader --help
 ```
 
-A one-off GitHub invocation is also supported:
+For a one-off GitHub invocation:
 
 ```bash
-npx --package=github:LTDev-LLC/alpine-component-loader -- alpine-component-loader --help
+npx --package=github:LouisT/alpine-component-loader -- alpine-component-loader --help
 ```
 
-Pin the GitHub dependency to a tag or commit for reproducible installs. A bare
-`npx alpine-component-loader` only searches installed binaries before falling
-back to the npm registry, so install from GitHub or a local path first.
+Pin GitHub installs to a tag or commit. Install the package before using bare `npx alpine-component-loader`, which
+otherwise falls back to the npm registry.
 
-The suffix-aware graph is a native ESM delivery contract. When an application
-uses a bundler, keep `alpine-component-loader` external and serve its `dist`
-tree unchanged so runtime module URLs remain relative to the package entry;
-computed capability imports are intentionally not a bundler chunk-discovery
-API.
+Keep ACL external to application bundles and serve `dist/` unchanged. Runtime capability imports resolve relative to the
+entry URL.
 
-The browser runtime supports Alpine.js 3.14-3.x and modern Chrome, Edge,
-Firefox, and Safari. The CLI, build tooling, testing integrations, and Node-only
-SSR entry require Node.js 22 or later. Use the repository `.nvmrc` with
-`nvm use` to select the minimum supported release locally.
+ACL supports Alpine.js 3.14-3.x and modern Chrome, Edge, Firefox, and Safari. Node tooling requires Node.js 22+;
+`nvm use` selects the repository minimum.
 
 ## Quick start
 
-To begin from a maintained build-free or Vite starter:
+Create a starter:
 
 ```bash
 npx alpine-component-loader create my-app
 npx alpine-component-loader create my-vite-app --template vite
 ```
 
-After adding the recommended CDN import map, define components from an
-application module:
+After adding the import map, register components:
 
 ```js
 import AlpineComponentLoader from 'alpine-component-loader';
@@ -195,7 +198,8 @@ AlpineComponentLoader.define('profile-card', 'profile-card.html', {
 await AlpineComponentLoader.start();
 ```
 
-`define()` returns a promise. Calls made before `start()` may be left pending as above because `start()` waits for the queued definitions; use `await AlpineComponentLoader.define(...)` when the constructor or immediate definition readiness is needed.
+`define()` returns a promise. `start()` waits for pre-start definitions; await `define()` when you need its constructor
+immediately.
 
 ```html
 <profile-card name="Ada" count="3">
@@ -203,10 +207,8 @@ await AlpineComponentLoader.start();
 </profile-card>
 ```
 
-JavaScript can carry an inline template and its options in one definition. The
-string is parsed through the same Trusted Types and sanitizer pipeline as a
-fetched template, but it performs no template request or persistent template
-cache work:
+Inline definitions use the same Trusted Types and sanitizer pipeline as URL templates, without fetching or persistent
+template caching:
 
 ```js
 await AlpineComponentLoader.define('inline-greeting', {
@@ -230,16 +232,11 @@ An existing DOM template also works without a request:
 await AlpineComponentLoader.define('profile-card', '#profile-template', { shadow: true });
 ```
 
-For a definition authored entirely in HTML, `x-acl` names the custom element.
-`acl-props` and the documented declarative data attributes belong to the
-definition; individual component instances may override data attributes:
+`x-acl` names a declarative component. Put `acl-props` and data options on its definition; instances may override data
+attributes:
 
 ```html
-<template
-    x-acl="profile-template"
-    acl-props='{ "name": "String" }'
-    data-src="/api/profile"
->
+<template x-acl="profile-template" acl-props='{ "name": "String" }' data-src="/api/profile">
     <article x-data="{ open: false }">
         <h2 x-text="$props.$data?.name"></h2>
         <slot name="action"></slot>
@@ -251,12 +248,8 @@ definition; individual component instances may override data attributes:
 </profile-template>
 ```
 
-`start()` scans existing `template[x-acl]` and
-`template[acl-component]` declarations. With the ordinary package entry,
-call `observeTemplates()` to register declarations inserted later. The
-`alpine-component-loader/auto` entry installs that observer by default; opt out
-without disabling the initial scan by setting the global configuration before
-importing `/auto`:
+`start()` scans existing `template[x-acl]` and `template[acl-component]` declarations. `observeTemplates()` handles
+later additions. `/auto` enables observation by default; configure it before import to opt out:
 
 ```html
 <script>
@@ -266,9 +259,7 @@ importing `/auto`:
 </script>
 ```
 
-Custom elements must use explicit closing tags in HTML, such as
-`<profile-template></profile-template>`; do not rely on XML-style self-closing
-syntax.
+Custom elements need closing tags: `<profile-template></profile-template>`, not XML self-closing syntax.
 
 The declarative proxy provides the same registration path from HTML:
 
@@ -285,16 +276,15 @@ The declarative proxy provides the same registration path from HTML:
 </acl-component>
 ```
 
-`start()` discovers existing and newly inserted `<acl-component>`, `<acl-dynamic>`, and `<acl-boundary>` tags, then loads only the implementation that appeared. To guarantee registration before inserting a tag, explicitly await `registerComponent()`, `registerDynamicLoader()`, or `registerErrorBoundary()`.
+`start()` discovers `<acl-component>`, `<acl-dynamic>`, and `<acl-boundary>` as they appear. For registration before
+insertion, await `registerComponent()`, `registerDynamicLoader()`, or `registerErrorBoundary()`.
 
-Use `alpine-component-loader/auto` only when import-side-effect startup and
-default late-template observation are desired. All other public entries are
-safe to import without browser globals; browser-only operations still require
-a DOM.
+`/auto` starts on import. Other entries are safe to import without browser globals; browser operations require a DOM.
 
 ## Integrated project workflow
 
-Put shared paths and policies in `acl.config.mjs`. Paths resolve from this file, unknown keys fail validation, and CLI flags override Vite plugin options, which override project configuration, which overrides defaults:
+`acl.config.mjs` shares paths and policies between CLI and Vite. Paths resolve from that file; unknown keys fail
+validation. Precedence is CLI flags → plugin options → project config → defaults:
 
 ```js
 import { defineConfig } from 'alpine-component-loader/project';
@@ -321,7 +311,7 @@ export default defineConfig({
 });
 ```
 
-Generate deterministic artifacts or keep filesystem-backed tasks current:
+Generate artifacts or watch for changes:
 
 ```bash
 npx alpine-component-loader manifest --update
@@ -331,15 +321,11 @@ npx alpine-component-loader watch
 npx alpine-component-loader watch --poll-interval 0
 ```
 
-The watcher prefers one recursive native subscription and falls back to
-per-directory subscriptions where Node or the platform does not support it.
-`watch.pollInterval` and `--poll-interval` control the periodic safety scan;
-zero disables it. Programmatic development and testing servers expose the same
-control as `watchPollInterval`. Safe inference writes only certain
-dependencies, slots, and static external assets; sidecars remain authoritative.
-Browser-backed route discovery, skeletons, and audits are opt-in in watch mode.
+Watch mode uses native subscriptions with directory fallbacks and a periodic safety scan (`watch.pollInterval` or
+`--poll-interval`; `0` disables it). Servers expose `watchPollInterval`. Safe inference updates certain dependencies,
+slots, and static assets; sidecars remain authoritative. Browser-backed discovery, skeletons, and audits are opt-in.
 
-For Vite, enable the package plugin and register an exact route key from its virtual module:
+In Vite, enable the plugin and register route keys through its virtual module:
 
 ```js
 // vite.config.js
@@ -364,19 +350,21 @@ const start = async () => {
 start();
 ```
 
-Development uses native ACL modules, targeted template HMR, and a generated route index. Production externalizes ACL from Rollup, copies readable modules and route shards, and injects a base-aware import map. See the runnable [Vite starter](starters/vite/README.md).
+Vite serves native modules and targeted HMR in development. Production copies ACL modules and route shards, then injects
+a base-aware import map. See the [Vite starter](starters/vite/README.md).
 
 ## Features
 
-- [URL, DOM, and JavaScript inline template sources; `x-acl` discovery; declarative registration; props; helpers; Alpine stores; slots; Shadow/Light DOM; styles; assets; loading; and fallback UI](docs/components.md), including [generated responsive skeletons](docs/skeletons.md).
-- [Data fetching, URL/body handling, response parsing, cancellation, retries, polling, template/data caches, persistence adapters, migrations, and storage helpers](docs/data.md).
-- [Lifecycle hooks, progressive hydration, error boundaries, form association, cleanup, events, state-preserving reloads, targeted HMR, dynamic components, transitions, and keep-alive](docs/lifecycle.md).
-- [Recursive sanitization, custom URL policy, Trusted Types, CSP operation, and browser/server rendering parity](docs/security.md).
-- [Version-one manifests, conservative inference, route shards, shared configuration, watch mode, Vite delivery, component sidecars, generated TypeScript declarations, JSON Schema, and Custom Elements metadata](docs/manifests-and-cli.md).
-- [Adaptive prefetch](docs/prefetch.md), [bounded offline navigation/runtime policies](docs/offline.md), and [static Node SSR with initial data plus Shadow or opt-in Light DOM hydration](docs/ssr.md).
-- [Structured local observability](docs/observability.md), [isolated loaders and Playwright/Vitest fixtures](docs/testing.md), optional [debugger and accessibility tools](docs/accessibility-and-debugging.md), and [runtime efficiency and distribution-size gates](docs/performance.md).
-- [Runtime security boundaries](docs/security.md), [the vulnerability disclosure policy](SECURITY.md), and automated static, dependency, CodeQL, and sanitizer-parity checks.
-- [Complete public API, option, helper, attribute, entry-point, and TypeScript references](docs/api.md).
+- [Components](docs/components.md): templates, props, slots, styles, Shadow DOM, assets, and
+  [skeletons](docs/skeletons.md).
+- [Data](docs/data.md): fetching, polling, caches, and persistence.
+- [Lifecycle](docs/lifecycle.md): hydration, events, forms, boundaries, reloads, and cleanup.
+- [Project tooling](docs/manifests-and-cli.md): manifests, inference, routes, Vite, and generated contracts.
+- [SSR](docs/ssr.md), [prefetch](docs/prefetch.md), and [offline support](docs/offline.md).
+- [Testing](docs/testing.md), [observability](docs/observability.md), and
+  [accessibility/debugging](docs/accessibility-and-debugging.md).
+- [Security](docs/security.md), [core startup](docs/core.md), [polyfills](docs/polyfills.md), and the
+  [API reference](docs/api.md).
 
 ## Common examples
 
@@ -425,7 +413,8 @@ await AlpineComponentLoader.registerManifestFrom('/acl-manifest.json', {
 await AlpineComponentLoader.registerRouteManifest('account', '/routes/acl-routes.json');
 ```
 
-Concurrent URL/integrity requests are deduplicated per loader, failed operations can be retried, and relative component/shard URLs resolve from the fetched manifest or route index.
+URL/integrity requests share work per loader and retry after failure. Relative URLs resolve from the fetched manifest or
+route index.
 
 Defer valid SSR hydration until interaction, and contain descendant failures at the nearest boundary:
 
@@ -444,7 +433,7 @@ await AlpineComponentLoader.define('account-card', '/components/account-card.htm
 </acl-boundary>
 ```
 
-Other SSR-only progressive modes are `visible`, `idle`, and `media` with `hydrateMedia`; client-only rendering continues to use `loading`.
+SSR hydration also supports `visible`, `idle`, and `media` with `hydrateMedia`. Client rendering uses `loading`.
 
 Opt a definition into the native form lifecycle with JSON-safe prop mappings:
 
@@ -463,7 +452,7 @@ await AlpineComponentLoader.define('quantity-field', '/components/quantity-field
 });
 ```
 
-The host exposes form/internals validity methods and `$props.$form`; environments without `ElementInternals` receive a maintained hidden-input submission fallback.
+Hosts expose validity methods and `$props.$form`, with hidden-input submission when `ElementInternals` is unavailable.
 
 Observe opt-in prefetch targets:
 
@@ -476,7 +465,7 @@ Read local metrics:
 
 ```js
 AlpineComponentLoader.config({ observability: { bufferSize: 200 } });
-const unsubscribe = AlpineComponentLoader.subscribe(record => console.debug(record));
+const unsubscribe = AlpineComponentLoader.subscribe((record) => console.debug(record));
 const snapshot = AlpineComponentLoader.getMetrics();
 unsubscribe();
 ```
@@ -484,10 +473,7 @@ unsubscribe();
 Batch and deliver the same redacted records through a demand-loaded entry:
 
 ```js
-import {
-    connectExporter,
-    createBeaconExporter,
-} from 'alpine-component-loader/observability-exporters';
+import { connectExporter, createBeaconExporter } from 'alpine-component-loader/observability-exporters';
 
 const exporterConnection = connectExporter(
     AlpineComponentLoader,
@@ -520,8 +506,7 @@ import { createSSRRenderer } from 'alpine-component-loader/ssr';
 const renderer = createSSRRenderer({
     manifest,
     root: process.cwd(),
-    dataResolver: async ({ tagName, props }) =>
-        tagName === 'profile-card' ? loadProfile(props.name) : undefined,
+    dataResolver: async ({ tagName, props }) => (tagName === 'profile-card' ? loadProfile(props.name) : undefined),
 });
 const html = await renderer.render('profile-card', {
     props: { name: 'Ada', count: 3 },
@@ -530,7 +515,8 @@ const html = await renderer.render('profile-card', {
 });
 ```
 
-Use `dataPolicy` instead of `dataResolver` when SSR should follow JSON-safe component data requests. It requires `baseUrl` and exact allowed origins or an authorization callback, validates every redirect, permits only GET/HEAD by default, strips sensitive headers, and enforces timeout/byte limits:
+`dataPolicy` follows JSON-safe component requests instead of using `dataResolver`. It requires `baseUrl` and origin
+authorization, validates redirects, defaults to GET/HEAD, strips sensitive headers, and limits time and bytes:
 
 ```js
 const policyRenderer = createSSRRenderer({
@@ -555,7 +541,7 @@ npx alpine-component-loader audit / --root public \
   --format sarif --out reports/a11y.sarif
 ```
 
-See the [complete example catalog](examples/README.md), including the runnable feature lab, SSR examples, HMR, bounded offline worker, accessibility audit, and static isolated-loader playground.
+See the [example catalog](examples/README.md) for runnable demonstrations.
 
 ## Documentation
 
@@ -566,7 +552,6 @@ See the [complete example catalog](examples/README.md), including the runnable f
 - [SSR and hydration](docs/ssr.md)
 - [Testing utilities](docs/testing.md)
 - [Skeleton loading UI](docs/skeletons.md)
-- [Runtime efficiency and distribution size](docs/performance.md)
 - [Observability](docs/observability.md)
 - [Adaptive prefetch](docs/prefetch.md)
 - [Manifests, generated contracts, and CLI tooling](docs/manifests-and-cli.md)
@@ -578,6 +563,26 @@ See the [complete example catalog](examples/README.md), including the runnable f
 
 ## Verification
 
+Repository builds use the exact `devDependencies.alpinejs-pinned` pin in `package.json`. Update it, run `npm install`,
+then `npm run build` to refresh CDN URLs, examples, starters, and offline workers. Staging, capture, and benchmarks use
+the same alias.
+
+Prettier formats JavaScript, HTML/SSR templates, CSS, and Markdown. Markdown prose wraps at 120 columns. Format
+everything or one language:
+
+```bash
+npm run format
+npm run format:js
+npm run format:html
+npm run format:css
+```
+
+`npm run check:format` checks all four formats; `check:format:js`, `:html`, `:css`, and `:md` check them separately. CI
+and `validate` enforce these rules. `.prettierignore` excludes generated files, dependencies, and staging output.
+
+When formatting changes a template with a pinned `templateRevision`, refresh its manifest with the CLI's
+[`manifest --update`](docs/manifests-and-cli.md#generated-fields-and-authored-fields) command.
+
 ```bash
 npm ci
 npm run playwright:install -- chromium firefox webkit
@@ -587,14 +592,15 @@ npm run security:static
 npm run check:reproducible
 ```
 
-For an exceptional direct push to `main` that has already been validated locally, include GitHub's native `[skip actions]` marker in the commit message:
+For a locally validated direct push to `main`, GitHub's `[skip actions]` commit marker skips push workflows:
 
 ```bash
 git commit -m "chore: update repository metadata [skip actions]"
 git push origin main
 ```
 
-The marker prevents workflows triggered by that push from starting. Do not use it on the HEAD commit of a pull request: skipped required checks can remain pending and block the pull request. See [GitHub's workflow-skipping reference](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/skip-workflow-runs).
+Avoid this marker on pull-request HEAD commits: skipped required checks may block merging. See
+[GitHub's workflow-skipping reference](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/skip-workflow-runs).
 
 ## License
 

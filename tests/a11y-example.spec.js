@@ -151,3 +151,24 @@ test('accessibility example introduces, reports, debugs, and fixes component vio
     ).toEqual([]);
     expect(errors).toEqual([]);
 });
+
+test('manual accessibility startup downloads tools only when their controls are used', async ({ page }) => {
+    // Verify implementation exclusion as well as the visible manual workflow
+    const modules = [];
+    // Inspect the requested module family
+    page.on('request', (request) => modules.push(new URL(request.url()).pathname));
+    await page.goto(application.url + '?tools=manual');
+    await expect(page.locator('#audit-status')).toHaveText('Component ready; audit tools activate when requested');
+    // Inspect the requested module family
+    expect(modules.some((path) => /\/(?:a11y|a11y-scanner|debugger)\.min\.js$/.test(path))).toBe(false);
+    await page.getByRole('button', { name: 'Introduce issues' }).click();
+    await expect(page.locator('#audit-status')).toHaveText('19 violations');
+    // Inspect the requested module family
+    expect(modules.some((path) => /\/a11y\.min\.js$/.test(path))).toBe(true);
+    // Inspect the requested module family
+    expect(modules.some((path) => /\/a11y-scanner\.min\.js$/.test(path))).toBe(false);
+    await page.getByRole('button', { name: 'Activate scanner' }).click();
+    await expect(page.getByRole('button', { name: 'A11y Audit' })).toBeVisible();
+    await page.getByRole('button', { name: 'Open debugger' }).click();
+    await expect(page.locator('#acl-debug-panel')).toBeVisible();
+});

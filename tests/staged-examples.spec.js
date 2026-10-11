@@ -5,10 +5,11 @@ import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { extname, isAbsolute, relative, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { stageExamples } from '../scripts/stage-example.mjs';
+import { alpineRuntime, resolveAlpineFile } from '../scripts/alpine-runtime.mjs';
 import { getSeriousAccessibilityViolations } from './fixtures/accessibility.js';
 
 const repositoryRoot = resolve('.'),
-    alpineUrl = 'https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js',
+    alpineUrl = alpineRuntime.cdnUrl,
     contentTypes = {
         '.css': 'text/css; charset=utf-8',
         '.html': 'text/html; charset=utf-8',
@@ -73,14 +74,14 @@ const startStaticServer = async (root) => {
     };
 };
 
-test('the static catalog navigates to every bundled backend-free example', async ({ browser, page }, testInfo) => {
+test('the default static catalog navigates to all four backend-free examples', async ({ browser, page }, testInfo) => {
     // Stage and boot every supported example through one plain file server
     test.slow();
     const temporaryRoot = await mkdtemp(resolve(tmpdir(), 'acl-staged-browser-')),
-        alpineSource = await readFile(resolve('node_modules/alpinejs-315/dist/cdn.min.js'), 'utf8'),
+        alpineSource = await readFile(resolveAlpineFile(repositoryRoot), 'utf8'),
         requests = [],
         developmentRequests = [],
-        names = ['playground', 'feature-lab', 'a11y', 'offline'],
+        names = ['a11y', 'feature-lab', 'offline', 'playground'],
         outputRoot = resolve(temporaryRoot, testInfo.project.name);
     await page.route(alpineUrl, (route) => {
         // Fulfill the exact CDN request from the pinned local test dependency
@@ -118,7 +119,6 @@ test('the static catalog navigates to every bundled backend-free example', async
     try {
         await stageExamples(
             {
-                names,
                 root: repositoryRoot,
                 outputRoot,
             },

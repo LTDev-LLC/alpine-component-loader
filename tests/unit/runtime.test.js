@@ -1,3 +1,4 @@
+import { DATA_OPTION_DESCRIPTORS } from '../../scripts/data-descriptors.mjs';
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import fc from 'fast-check';
@@ -21,7 +22,6 @@ import { delayWithSignal, raceWithSignal } from '../../src/runtime/errors.js';
 import {
     DATA_CACHE_BOUND_ATTRIBUTES,
     DATA_FETCH_ATTRIBUTES,
-    DATA_OPTION_DESCRIPTORS,
     DATA_POLL_ATTRIBUTES,
     DEFAULT_DATA_OPTIONS,
     INTERNAL_COMPONENT_ATTRIBUTES,
@@ -900,7 +900,10 @@ describe('shared value normalization', () => {
             }).toString(),
             'filter%5Bstate%5D=open&tag=a&tag=b',
         );
-        assert.equal(getTemplateLoadKey('/card.html', { _templateCacheKey: 'v1' }), 'v1::/card.html');
+        assert.equal(
+            getTemplateLoadKey('/card.html', { _templateCacheKey: 'v1' }),
+            'v1::::cache-first::true::undefined::10000::1048576::/card.html',
+        );
     });
 
     test('merges fetch headers and normalizes forwarding rules', () => {

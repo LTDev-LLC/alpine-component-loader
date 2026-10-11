@@ -1,46 +1,50 @@
 # Playground
 
-The playground is itself an AlpineComponentLoader application. Its header, workbench controls, editor, preview pane, accessibility summary, diagnostics, and footer are inline declarative ACL components backed by an Alpine store. The default Northstar operations dashboard inside the preview is a second, isolated ACL application.
+An ACL workbench with inline declarative controls and an isolated Northstar dashboard preview.
 
-The dashboard demonstrates a root component, nested declarative components, typed props, Alpine-generated collections, named and default slots, a selector-based Shadow DOM profile, store binding, local state, composed events, theme tokens, and loader observability.
+The dashboard demonstrates nested components, typed props, collections, slots, Shadow DOM, stores, events, theming, and
+observability.
 
 ## Editable sources
 
-- **Page HTML** is a minimal `<demo-dashboard>` consumer with typed attributes and supplied slots.
-- **Components** contains the root dashboard and every nested ACL template.
-- **CSS** defines the responsive dashboard and its light/dark semantic tokens.
-- **JavaScript** creates stable Alpine stores, patches their actions during HMR, configures ACL, registers the Shadow DOM component, and starts the loader.
+- **Page HTML**: dashboard host, attributes, and supplied slots.
+- **Components**: root and nested templates.
+- **CSS**: responsive layout and theme tokens.
+- **JavaScript**: stores, HMR actions, configuration, and registration.
 
-Edits run automatically after a short delay. Select **Run preview** or press `Ctrl+Enter`/`Command+Enter` to execute the active editor immediately.
+Edits auto-run after a short delay. **Run preview** or `Ctrl+Enter`/`Command+Enter` runs immediately.
 
 - Page HTML creates a fresh iframe document, custom-element registry, Alpine stores, and scanner.
 - Component content patches its existing template and state-preservingly reloads only affected ACL instances.
 - CSS replaces the preview's stable stylesheet.
 - JavaScript disposes the previous authored module and updates the existing Alpine application.
 
-Page HTML takes precedence when several sources are pending. Component
-identities and contracts remain fixed during HMR. Adding or removing templates,
-changing `x-acl`, `acl-component`, `id`, `acl-props`, or another template
-attribute, or adding non-template markup keeps the last good preview and
-requests a Page HTML run.
+Page HTML takes priority. HMR requires stable component identities/contracts; adding/removing templates or changing
+their attributes keeps the last good preview and requests a full Page HTML run.
 
-Authored JavaScript receives `Alpine`, `AlpineComponentLoader`, `createLoader`, and the playground-only `playgroundHot` context. Use `playgroundHot.signal` for signal-bound listeners or `playgroundHot.dispose(callback)` for synchronous or asynchronous cleanup. Cleanup runs in reverse registration order before the next JavaScript execution.
+JavaScript receives `Alpine`, `AlpineComponentLoader`, `createLoader`, and `playgroundHot`. Use its `signal` for
+listeners and `dispose(callback)` for sync/async cleanup, which runs in reverse order before the next execution.
 
-The theme control is an editable `demo-theme-toggle` component bound to the Alpine `theme` store through `bind-store="theme"`. Light mode is restored on every full preview boot; theme choice, dashboard store values, local component state, focus, selection, and scroll survive incremental updates.
+`demo-theme-toggle` binds to the `theme` store. Full boots reset to light mode; incremental updates preserve stores,
+local state, focus, selection, and scroll.
 
 ## Accessibility auditing
 
-**Audit accessibility** runs the packaged dependency-free ACL scanner against both documents. The summary reports component, finding, error, and stale state separately for the workbench and preview. Each document retains the scanner's keyboard-accessible launcher and modal for detailed results.
+**Audit accessibility** scans both documents with ACL rules. Separate summaries track findings, errors, and stale
+results; each document has a keyboard-accessible scanner modal.
 
-Audits run manually. A successful preview or workbench HMR update marks the corresponding result stale until it is scanned again. One scanner failure does not discard a valid result from the other document.
+Audits are manual. Successful updates mark results stale; one scanner failure leaves the other document's result intact.
 
-The scanner assists development but does not replace keyboard and screen-reader testing, contrast review, zoom and reflow testing, reduced-motion review, localization, or testing with disabled people.
+Also test keyboard/screen-reader use, contrast, zoom/reflow, reduced motion, localization, and usability with disabled
+people.
 
 ## Drafts and execution
 
-Use **Show diagnostics** to inspect the bounded 50-entry console stream, update mode, and redacted ACL metrics. Drafts and auto-run preference are stored under `acl-playground:v5`; incompatible v4 drafts are left untouched and are not loaded. **Reset sample** confirms before restoring all sources and creating a light-mode preview.
+**Show diagnostics** displays 50 console entries, update mode, and redacted metrics. Drafts use `acl-playground:v5`; v4
+drafts remain untouched. **Reset sample** confirms before restoring a fresh light-mode preview.
 
-Editable JavaScript is trusted, same-origin developer code. The iframe provides DOM and CSS isolation, not a hostile-code security boundary.
+Editable JavaScript is trusted, same-origin developer code. The iframe provides DOM and CSS isolation, not a
+hostile-code security boundary.
 
 From the repository root:
 
@@ -49,24 +53,31 @@ npm run build
 npm run example:playground
 ```
 
-Open <http://127.0.0.1:4173/>. The redirect retains
-`/examples/playground/`, matching the GitHub Pages artifact.
+Open <http://127.0.0.1:4173/>. The redirect retains `/examples/playground/`, matching the GitHub Pages artifact.
 
 ## Static staging
 
-Run `npm run stage` to build ACL and replace `_site` with the default
-single-Playground GitHub Pages artifact; `npm run staging` is an equivalent
-alias. Include additional static examples, such as
-`npm run stage -- playground feature-lab`, to generate an ordered root catalog
-instead. The command captures the Playground’s responsive component geometry,
-writes `skeletons/acl-skeletons.css`, and links it from the staged page head.
-The staged import map points every ACL browser export at `/dist/*.min.js`; no
-development-server module route is retained. Both the workbench and each fresh
-preview iframe load Alpine from the exact pinned CDN script:
+`npm run staging` includes all four static examples and a catalog. Use `npm run staging -- playground` for Playground
+alone. Staging links responsive skeletons and direct minified ACL imports. Workbench and previews use pinned CDN Alpine:
 
 ```html
-<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.17.4/dist/cdn.min.js"></script>
 ```
 
-The artifact does not contain a local Alpine package, so a fresh visit requires
-network access to jsDelivr.
+The artifact does not contain a local Alpine package, so a fresh visit requires network access to jsDelivr.
+
+## Startup entry and fallback APIs
+
+Root discovers workbench templates; `createLoader()` isolates previews. Core shares the default context and is not a
+substitute for isolation. See [entry selection](../../docs/core.md).
+
+Each iframe needs its own polyfill bootstrap before Alpine/application imports. The workbench bootstrap does not
+initialize previews. See [polyfill usage](../../docs/polyfills.md).
+
+## Capability samples and preview bootstrap
+
+**Load selected sample** replaces all four sources after confirmation. Samples cover core, transformations, scheduling,
+and isolated loaders. **Reset sample** restores Northstar.
+
+**Await polyfills inside preview** gates each iframe and is saved with its entry choice. Diagnostics show shared
+implementation URLs and isolated loader state. Runtime experiments use disposable documents.

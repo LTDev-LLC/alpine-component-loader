@@ -1,8 +1,8 @@
 // @license AlpineComponentLoader
-// Copyright (c) LTDev LLC
+// Copyright (c) LouisT
 // Licensed under the MIT license in the repository root
 
-// Propagate jsDelivr's generated minified entry suffix to package-owned dependencies
+// Propagate the prebuilt minified entry suffix to package-owned dependencies
 const isMinifiedModule = new URL(import.meta.url).pathname.endsWith('.min.js'), resolveLocalModule = (specifier)=>isMinifiedModule ? specifier.replace(/\.js$/, '.min.js') : specifier, importLocalModule = (specifier)=>import(/* @vite-ignore */ resolveLocalModule(specifier)), importDeferredLocalModule = (specifier, retry = 0)=>import(/* @vite-ignore */ `${resolveLocalModule(specifier)}${retry ? `?acl-retry=${retry}` : ''}`), [{ auditAccessibility }, { restoreOverlayFocus, trapOverlayFocus }, { ACLLoadError }] = await Promise.all([
     importLocalModule('./a11y.js'),
     importLocalModule('./runtime/overlay-utils.js'),

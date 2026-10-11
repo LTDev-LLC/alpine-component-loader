@@ -1,40 +1,42 @@
 # Manifests, generated contracts, and CLI tooling
 
-A version-one component manifest is a reusable, JSON-safe description of the components in an application. The browser loader, static SSR renderer, offline generator, dependency prefetcher, and contract generator all consume the same component manifest. Skeleton loading UI uses a separate generated skeleton manifest.
+A version-one component manifest is a JSON-safe component catalog shared by browser loading, SSR, offline generation,
+dependency prefetching, and contract tools. Skeleton loading UI uses a separate manifest.
 
 ## Format and schema versions
 
-Package releases and document schemas are versioned independently. This
-documentation describes package `1.0.0`; the built runtime exposes that value
-through `AlpineComponentLoader.version`.
+Package and document versions are independent. This guide covers package `1.0.0`, exposed as
+`AlpineComponentLoader.version`.
 
-| Artifact or standard | Version | Ownership and compatibility |
-| --- | --- | --- |
-| Component manifest and route shard | `1` | ACL-owned; accepted by browser registration, SSR, contracts, routes, and offline tooling. |
-| Component `.acl.json` sidecar | `1` | ACL-owned authoring metadata. |
-| Route index and skeleton manifest | `1` | ACL-owned runtime inputs. |
-| Offline policy and generated precache manifest | `1` | ACL-owned generator/worker inputs. |
-| Accessibility baseline/report and observability beacon envelope | `1` | ACL-owned tooling payloads. |
-| Diagnostic snapshot `schemaVersion` | `1` | ACL-owned debugger/support payload. |
-| Generated JSON Schemas | ACL document version `1` | The schemas themselves declare the external JSON Schema Draft 2020-12 dialect. |
-| Custom Elements Manifest `schemaVersion` | `2.1.0` | External Custom Elements Manifest standard; do not reset it to the ACL schema version. |
-| SARIF report and `$schema` | `2.1.0` | External SARIF standard; required by SARIF consumers. |
+| Artifact or standard                                            | Version                  | Ownership and compatibility                                                               |
+| --------------------------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------- |
+| Component manifest and route shard                              | `1`                      | ACL-owned; accepted by browser registration, SSR, contracts, routes, and offline tooling. |
+| Component `.acl.json` sidecar                                   | `1`                      | ACL-owned authoring metadata.                                                             |
+| Route index and skeleton manifest                               | `1`                      | ACL-owned runtime inputs.                                                                 |
+| Offline policy and generated precache manifest                  | `1`                      | ACL-owned generator/worker inputs.                                                        |
+| Accessibility baseline/report and observability beacon envelope | `1`                      | ACL-owned tooling payloads.                                                               |
+| Diagnostic snapshot `schemaVersion`                             | `1`                      | ACL-owned debugger/support payload.                                                       |
+| Generated JSON Schemas                                          | ACL document version `1` | The schemas themselves declare the external JSON Schema Draft 2020-12 dialect.            |
+| Custom Elements Manifest `schemaVersion`                        | `2.1.0`                  | External Custom Elements Manifest standard; do not reset it to the ACL schema version.    |
+| SARIF report and `$schema`                                      | `2.1.0`                  | External SARIF standard; required by SARIF consumers.                                     |
 
-Application persistence envelopes use their configured `persistVersion`; that
-number is application migration state, not an ACL schema version. Likewise,
-package `1.0.0`, JSON Schema Draft 2020-12, and the external `2.1.0` formats do
-not imply that an ACL version-one manifest should be rewritten.
+`persistVersion` tracks application migrations. Package versions, JSON Schema Draft 2020-12, and external `2.1.0`
+formats do not change ACL’s version-one manifest format.
 
 ## Starter projects
 
-Create a build-free project or a Vite project without running an installer on the user's behalf:
+Create a build-free or Vite project; the command does not install dependencies:
 
 ```bash
 npx alpine-component-loader create my-components
 npx alpine-component-loader create my-vite-app --template vite
 ```
 
-The maintained `vanilla` starter is a minimal URL-manifest workflow. The more complete [Vite starter](../starters/vite/README.md) includes two dependency-expanded route shards, base-aware client routing, targeted HMR, generated contracts, a form-associated component, an error boundary, bounded observability, and accessibility policy files. Existing files remain protected unless `--force` is explicit. The static [playground](../examples/playground/README.md) demonstrates isolated loader instances and is deployed through GitHub Pages. Repository contributors can run `npm run stage -- <example...>` or the equivalent `npm run staging -- <example...>` for any ordered selection of Playground, Feature Lab, Accessibility, and Offline. The command builds ACL, checks/installs Playwright Chromium, bundles the selected pages into one atomic `_site` artifact, and gives them one shared family of direct `/dist/*.min.js` import-map entries. It also captures responsive CSS skeletons for each selected page, writes them below that example’s `skeletons/` directory, and links them early in the staged document head. A single selection uses a root redirect; multiple distinct selections use the generated static catalog. Capture failures preserve the previous `_site`, and Offline staging precaches the final linked skeleton stylesheet.
+The `vanilla` starter demonstrates URL manifests. The [Vite starter](../starters/vite/README.md) adds route shards,
+routing, HMR, contracts, forms, boundaries, metrics, and accessibility policies. Existing files require `--force` to
+replace. The [playground](../examples/playground/README.md) demonstrates isolated loaders. Contributors can stage
+selected examples with `npm run stage -- <example...>`; see [example staging](../examples/README.md) for shared modules,
+captured skeletons, and atomic output.
 
 ## Quick start
 
@@ -55,9 +57,11 @@ npx alpine-component-loader manifest components --out acl-manifest.json
 npx alpine-component-loader validate acl-manifest.json
 ```
 
-The `manifest` command recursively finds `.html` and `.htm` files. A filename becomes the custom-element tag, so `profile-card.html` becomes `<profile-card>`. Adjacent `<tag>.acl.json` sidecars own JSON-safe dependencies, groups, options, and metadata. Filenames must produce valid, unique custom-element names containing a hyphen.
+`manifest` recursively discovers `.html`/`.htm` files. Basenames become tags (`profile-card.html` → `<profile-card>`),
+which must be valid, unique custom-element names. Adjacent `<tag>.acl.json` sidecars declare dependencies, groups,
+options, and metadata.
 
-The generated manifest contains relative template sources, dependencies inferred from known custom-element tags in the templates, and SHA-256 template revisions:
+Output includes relative sources, dependencies inferred from known component tags, and SHA-256 revisions:
 
 ```json
 {
@@ -82,7 +86,7 @@ The generated manifest contains relative template sources, dependencies inferred
 }
 ```
 
-Use `--dry-run` to print the proposed JSON without writing it, and `--json` when another tool needs the structured command result:
+`--dry-run` previews JSON without writing; `--json` returns a structured command result:
 
 ```bash
 npx alpine-component-loader manifest components --out acl-manifest.json --dry-run
@@ -91,30 +95,38 @@ npx alpine-component-loader manifest components --out acl-manifest.json --dry-ru
 
 ## Generated fields and authored fields
 
-Generation can reliably infer only information present in the component directory:
+Generation infers these fields from component files:
 
 - `.html` and `.htm` files are discovered recursively in stable path order.
 - The basename becomes the lower-case component tag.
 - `source` is relative to the output manifest directory.
-- A dependency is inferred structurally with parse5 when a template contains another known component tag, including nested templates and multiline or unusually quoted markup.
+- A dependency is inferred structurally with parse5 when a template contains another known component tag, including
+  nested templates and multiline or unusually quoted markup.
 - `options.templateRevision` is a `sha256-` digest of the template contents.
-- Known nested component hosts, named/default `<slot>` elements, static stylesheet links, and static external script sources are structurally discoverable.
+- Known nested component hosts, named/default `<slot>` elements, static stylesheet links, and static external script
+  sources are structurally discoverable.
 - Sidecar `groups` populate manifest group membership.
 
-Safe inference writes only structurally certain dependencies, slots, and external asset descriptors; it never enables script execution. Likely `$props` references, literal `$dispatch`/`$emit` event names, and declarative data attributes are reported as non-authoritative diagnostics. Use `--infer safe` (default), `--infer report` to report without writing inferred metadata, or `--infer off`. Shadow behavior, prop/event schemas, data authorization, loading/fallback templates, and descriptions remain sidecar-owned. Sidecar values always win and generated updates never overwrite authored fields.
+Safe inference writes structurally certain dependencies, slots, and external assets; it never enables scripts. `$props`,
+literal `$dispatch`/`$emit` names, and data attributes are diagnostics only. Choose `--infer safe` (default), `report`
+(diagnostics without inferred metadata), or `off`. Shadow behavior, prop/event schemas, data authorization,
+loading/fallback templates, and descriptions require sidecars. Authored fields take precedence.
 
-The command refuses to replace an existing output unless `--force` is supplied. `--update` safely refreshes generated source and revision fields while preserving fields that are not owned by a sidecar. Sidecar top-level dependencies, options, metadata, and group declarations are authoritative when present. Components missing from disk are retained with a warning; add `--prune` to remove them:
+Existing output requires `--force` or `--update`. Updates refresh generated sources/revisions and preserve other
+authored fields. Sidecar dependencies, options, metadata, and groups are authoritative. Missing components remain with a
+warning unless `--prune` is supplied:
 
 ```bash
 npx alpine-component-loader manifest components --out acl-manifest.json --update
 npx alpine-component-loader manifest components --out acl-manifest.json --update --prune
 ```
 
-The `init` command creates both the template and its version-one sidecar. Use `schema --kind component` for editor validation of sidecars, `schema --kind manifest` for the aggregate manifest, and `schema --kind offline` for offline policy files.
+`init` creates a template and version-one sidecar. Generate editor schemas with `schema --kind component`, `manifest`,
+or `offline`.
 
 ## Complete component manifest
 
-Component entries may be a source string or a full definition. Use the full form when the component needs options, dependencies, or metadata:
+Entries accept a source string or a definition. Use definitions for options, dependencies, or metadata:
 
 ```json
 {
@@ -178,9 +190,13 @@ Component entries may be a source string or a full definition. Use the full form
 }
 ```
 
-`basePath` is combined with relative component sources by the browser, SSR, and offline tooling. An absolute source or remote URL is not prefixed. Dependencies must name components in the same manifest, cannot contain duplicates or self-references, and must form an acyclic graph. Normalization registers dependencies before the components that use them.
+`basePath` prefixes relative sources across browser, SSR, and offline tools. Absolute sources and remote URLs are
+unchanged. Dependencies must name components in the same manifest, with no duplicates, self-references, or cycles.
+Registration orders dependencies first.
 
-Prop names and runtime prop types come only from `options.attributes`. Metadata describes components to generated tools; it does not change runtime rendering. Metadata event-detail schemas support JSON-safe primitive, object, and array shapes, `properties`, `items`, required keys, enums, and nullability.
+`options.attributes` defines runtime props and types. Metadata describes tooling contracts without changing rendering.
+Event-detail schemas support JSON-safe primitives, objects, arrays, `properties`, `items`, required keys, enums, and
+nullability.
 
 ## Scaffold a component
 
@@ -193,11 +209,12 @@ npx alpine-component-loader init profile-card \
   --shadow
 ```
 
-`--shadow` adds `options.shadow: true`. The incremental entry does not include a content revision or prop/metadata contracts, so add those manually or copy the revision from a generated manifest. `--dry-run` previews the component source. Existing component files and duplicate manifest entries are protected unless `--force` is used.
+`--shadow` adds `options.shadow: true`. Add revisions and prop/metadata contracts manually or from generated output.
+`--dry-run` previews source; `--force` permits replacing files and duplicate manifest entries.
 
 ## Register a manifest in the browser
 
-`registerManifest()` accepts a parsed manifest object, not a URL. Fetch and parse the file first, then register it before startup:
+`registerManifest()` takes a parsed object. Fetch and parse the manifest before startup:
 
 ```js
 import AlpineComponentLoader from 'alpine-component-loader';
@@ -216,7 +233,8 @@ console.log(result.prefetched);
 await AlpineComponentLoader.start();
 ```
 
-`prefetch` may be `true` for every registered component or an array of group/tag names. Every prefetch result is settled independently so one failed template does not hide the status of the others.
+`prefetch: true` selects all registered components; an array selects groups/tags. Results settle independently,
+including failures.
 
 For URL loading and route shards:
 
@@ -233,7 +251,9 @@ await AlpineComponentLoader.registerManifestFrom('/acl-manifest.json', {
 await AlpineComponentLoader.registerRouteManifest('account/settings', '/routes/acl-routes.json');
 ```
 
-The URL loader enforces a default 10-second timeout and 1 MiB response limit, supports integrity/cache/abort/custom-fetch options, deduplicates concurrent URL/integrity requests per loader, evicts failures for retry, and resolves component paths relative to the final manifest URL. Route lookup is exact; it does not use prefixes or route-pattern matching.
+URL loading defaults to a 10-second timeout and 1 MiB limit. It supports integrity, caching, abort, and custom fetch;
+deduplicates concurrent URL/integrity requests per loader; and evicts failures for retry. Sources resolve against the
+final manifest URL. Routes use exact matching.
 
 ## Shared project configuration
 
@@ -284,26 +304,26 @@ export default defineConfig({
 });
 ```
 
-Paths resolve from the configuration file. Unknown keys fail validation. CLI flags override Vite-plugin options, which override project configuration, which overrides defaults. Project commands discover `acl.config.mjs` from the invocation directory or accept `--config`; `offline` uses `--project-config` because its existing `--config` flag remains the offline policy.
+Paths resolve from the config file; unknown keys fail validation. Precedence is CLI flags → Vite options → project
+config → defaults. Commands discover `acl.config.mjs` from the invocation directory or accept `--config`. Offline uses
+`--project-config`, reserving `--config` for its policy.
 
 Top-level project configuration groups are:
 
-| Field | Purpose |
-| --- | --- |
-| `root` | Shared project root; relative paths below resolve from the config file. |
-| `components` | Component directory, manifest output, inference, update, and prune policy. |
-| `routes` | Source manifest, route output, discovery target/browser, timeout, and entries. |
-| `contracts` | Type declarations, Custom Elements Manifest, and manifest/component/offline schema outputs. |
-| `offline` | Manifest, selected groups/assets, browser base, namespace, policy, and JavaScript minification. |
-| `watch` | Task selection, debounce, and safety-scan interval. |
-| `audit` | Routes, report format/output, browser, baseline, and suppressions. |
-| `vite` | Module delivery and route-copy behavior shared with the plugin. |
-| `skeleton` | Capture target/routes, filters, viewports, output mode, and overwrite policy. |
+| Field        | Purpose                                                                                         |
+| ------------ | ----------------------------------------------------------------------------------------------- |
+| `root`       | Shared project root; relative paths below resolve from the config file.                         |
+| `components` | Component directory, manifest output, inference, update, and prune policy.                      |
+| `routes`     | Source manifest, route output, discovery target/browser, timeout, and entries.                  |
+| `contracts`  | Type declarations, Custom Elements Manifest, and manifest/component/offline schema outputs.     |
+| `offline`    | Manifest, selected groups/assets, browser base, namespace, policy, and JavaScript minification. |
+| `watch`      | Task selection, debounce, and safety-scan interval.                                             |
+| `audit`      | Routes, report format/output, browser, baseline, and suppressions.                              |
+| `vite`       | Module delivery and route-copy behavior shared with the plugin.                                 |
+| `skeleton`   | Capture target/routes, filters, viewports, output mode, and overwrite policy.                   |
 
-`loadProjectConfig()` accepts `configFile`, `invocationDirectory`, `optional`,
-and normalized `overrides`; it returns the resolved `config`, discovered
-`configFile`, and `configDirectory`. Most applications only need
-`defineConfig()` and CLI discovery.
+`loadProjectConfig({ configFile, invocationDirectory, optional, overrides })` returns resolved `config`, `configFile`,
+and `configDirectory`. Most apps use `defineConfig()` and CLI discovery.
 
 ## Route shards and watch mode
 
@@ -314,18 +334,20 @@ npx alpine-component-loader routes --config acl.config.mjs --force
 npx alpine-component-loader routes --route /account --target ./index.html --force
 ```
 
-Authored component/group roots are expanded through the dependency graph. Routes marked `discover: true` additionally crawl the rendered document and every open Shadow Root with Playwright. Unknown observed components become warnings. Shard filenames combine a stable route key with a short content hash; the index records each shard URL, SHA-256 revision, and ordered component list.
+Route roots expand through dependencies. `discover: true` also crawls the rendered document and open Shadow Roots with
+Playwright, warning about unknown components. Shard names include a stable route key and content hash; the index records
+URLs, SHA-256 revisions, and ordered components.
 
 Each configured route entry supports:
 
-| Field | Contract |
-| --- | --- |
-| `key` | Stable exact lookup key. |
-| `id` | Alias used when `key` is omitted. |
-| `path` | Navigation path and final fallback key; required for discovery. |
-| `components` | Authored component roots. |
-| `groups` | Authored manifest groups. |
-| `discover` | Whether Playwright should add components observed on the rendered route. |
+| Field        | Contract                                                                 |
+| ------------ | ------------------------------------------------------------------------ |
+| `key`        | Stable exact lookup key.                                                 |
+| `id`         | Alias used when `key` is omitted.                                        |
+| `path`       | Navigation path and final fallback key; required for discovery.          |
+| `components` | Authored component roots.                                                |
+| `groups`     | Authored manifest groups.                                                |
+| `discover`   | Whether Playwright should add components observed on the rendered route. |
 
 At least one of `key`, `id`, or `path` must be non-empty.
 
@@ -363,7 +385,7 @@ The index maps the stable authored key to the content-addressed shard:
 }
 ```
 
-Relative shard URLs resolve against the route-index URL. A caller can override that base for an in-memory index with the `baseUrl` option.
+Shard URLs resolve against the route-index URL. Use `baseUrl` to override an in-memory index’s base.
 
 Watch configured filesystem tasks with serialized, debounced regeneration:
 
@@ -374,14 +396,10 @@ npx alpine-component-loader watch --include-expensive
 npx alpine-component-loader watch --poll-interval 0
 ```
 
-The coordinator prefers one recursive native watcher and safely falls back to
-per-directory watchers. It preserves the last valid artifact after failures,
-reruns dirty work after the active pass, writes replacements atomically, and
-closes watchers on termination signals. `watch.pollInterval` defaults to
-`5000`; the CLI `--poll-interval` overrides configuration, and `0` disables
-periodic safety scans. Browser-backed route crawling, skeleton capture, and
-audits run only when explicitly selected or enabled with
-`--include-expensive`.
+Watch uses a recursive native watcher when available, otherwise per-directory watchers. Regeneration is debounced and
+serialized; failures preserve valid artifacts, replacements are atomic, and termination closes watchers. Safety scans
+default to 5,000 ms; `--poll-interval` overrides `watch.pollInterval`, and `0` disables scans. Route crawling, skeleton
+capture, and audits require explicit selection or `--include-expensive`.
 
 | Task                | Typical dependency                                     | Default watch eligibility                       |
 | ------------------- | ------------------------------------------------------ | ----------------------------------------------- |
@@ -418,16 +436,19 @@ const start = async () => {
 start();
 ```
 
-The Vite plugin runs the shared manifest/contract/route generators, externalizes ACL from optimization and Rollup, serves the readable native module tree in development, injects matching import maps, emits targeted template HMR, and copies modules to `assets/alpine-component-loader/<version>/` in production. For application-managed delivery use `{ moduleDelivery: 'external', moduleBase: 'https://cdn.example/acl/' }`.
+The Vite plugin runs manifest, contract, and route generators; externalizes ACL; serves readable native ESM in
+development; injects import maps; and sends targeted HMR. Production modules are copied to
+`assets/alpine-component-loader/<version>/`. For managed delivery, set
+`{ moduleDelivery: 'external', moduleBase: 'https://cdn.example/acl/' }`.
 
-| Plugin option | Default | Contract |
-| --- | --- | --- |
-| `configFile` | discovered `acl.config.mjs` | Explicit project configuration path. |
-| `moduleDelivery` | `copy` | `copy` package modules into the build or use an application-owned `external` base. |
-| `moduleDirectory` | `assets/alpine-component-loader/1.0.0` | Build-relative destination for copied modules. |
-| `moduleBase` | none | Required URL base when `moduleDelivery: "external"`. |
-| `routeDirectory` | `acl-routes` | Build-relative route index/shard destination. |
-| `generate` | `true` | Run configured manifest, contract, and route generation before serving/building. |
+| Plugin option     | Default                                | Contract                                                                           |
+| ----------------- | -------------------------------------- | ---------------------------------------------------------------------------------- |
+| `configFile`      | discovered `acl.config.mjs`            | Explicit project configuration path.                                               |
+| `moduleDelivery`  | `copy`                                 | `copy` package modules into the build or use an application-owned `external` base. |
+| `moduleDirectory` | `assets/alpine-component-loader/1.0.0` | Build-relative destination for copied modules.                                     |
+| `moduleBase`      | none                                   | Required URL base when `moduleDelivery: "external"`.                               |
+| `routeDirectory`  | `acl-routes`                           | Build-relative route index/shard destination.                                      |
+| `generate`        | `true`                                 | Run configured manifest, contract, and route generation before serving/building.   |
 
 ## Which feature uses which manifest?
 
@@ -442,7 +463,8 @@ The Vite plugin runs the shared manifest/contract/route generators, externalizes
 | Manifest validation              | Generated JSON Schema                       | `acl-manifest.schema.json` for editors and validators                      |
 | Skeleton loading UI              | Rendered pages, not the component manifest  | `acl-skeletons.generated.js` and reservation CSS                           |
 
-The Custom Elements Manifest (`custom-elements.json`) is editor/tooling output and is not registered with the runtime. The offline precache manifest is consumed by the generated service worker, not by `registerManifest()`. The skeleton manifest has a different `skeletons` shape and is registered with `registerSkeletonManifest()`.
+`custom-elements.json` is editor output. The precache manifest belongs to the service worker. Neither goes to
+`registerManifest()`; skeleton manifests use `registerSkeletonManifest()`.
 
 ## Validate manifests and directories
 
@@ -453,13 +475,14 @@ npx alpine-component-loader schema --out acl-manifest.schema.json
 npx alpine-component-loader validate acl-manifest.json
 ```
 
-Validation uses the same normalization rules as the runtime and also checks local component sources. A directory target validates its `acl-manifest.json` when present; otherwise it validates discoverable component templates:
+Validation shares runtime normalization and checks local sources. A directory validates its `acl-manifest.json`, or
+discoverable templates when no manifest exists:
 
 ```bash
 npx alpine-component-loader validate components
 ```
 
-Validation reports all discoverable diagnostics and exits unsuccessfully when errors are present. It does not rewrite project files.
+Validation reports diagnostics, exits unsuccessfully on errors, and does not rewrite files.
 
 ## Generate TypeScript and editor contracts
 
@@ -471,11 +494,14 @@ npx alpine-component-loader types acl-manifest.json \
   --custom-elements-out generated/custom-elements.json
 ```
 
-Declarations augment `HTMLElementTagNameMap`, expose typed `$props` and properties, and add typed custom-event listener overloads. The Custom Elements Manifest contains descriptions, properties, attributes, events, and slots for compatible editors and documentation tools.
+Declarations augment `HTMLElementTagNameMap` with typed props, properties, and event listeners. Custom Elements Manifest
+output describes components, properties, attributes, events, and slots for editors.
 
-Only JSON-serializable prop type names are supported in a manifest: `String`, `Number`, `Boolean`, `Array`, and `Object`. Runtime-only functions such as validators and coercers belong in JavaScript definitions rather than a JSON manifest.
+Manifest prop types are `String`, `Number`, `Boolean`, `Array`, or `Object`. Functions such as validators and coercers
+require JavaScript definitions.
 
-Use `--dry-run` to validate without writing, combine it with `--json` to inspect structured generated content, and use `--force` to replace existing artifacts. Without explicit output flags, the CLI writes `acl-components.d.ts`, `custom-elements.json`, or `acl-manifest.schema.json` in the current working directory.
+`--dry-run` validates without writing; add `--json` for structured content. `--force` replaces outputs. Default
+filenames are `acl-components.d.ts`, `custom-elements.json`, and `acl-manifest.schema.json` in the current directory.
 
 ## Generate offline artifacts
 
@@ -494,19 +520,18 @@ npx alpine-component-loader offline acl-manifest.json \
   --force
 ```
 
-It creates `acl-precache-manifest.json` and `acl-sw.js`. Component templates, their external assets, loading templates, and fallbacks are discovered from the selected component definitions; application shell files and imported browser modules must be supplied with repeatable `--asset` flags. See [Offline behavior](offline.md) for scope, URL, and activation guidance.
+Output is `acl-precache-manifest.json` and `acl-sw.js`. Selected definitions provide templates, external assets, loading
+templates, and fallbacks. Add shell files and browser modules with repeatable `--asset`. See
+[offline setup](offline.md).
 
-Add `--minify-js` when those explicit local JavaScript assets should be
-published and precached as virtual `.min.js` URLs. The generator hashes the
-actual minified bytes, leaves existing `.min.js` and remote URLs unchanged, and
-does not rewrite component assets discovered from the manifest. It does not
-write physical minified files; use these virtual URLs with the packaged
-development server, a jsDelivr-style CDN, or another host that provides the
-matching `.min.js` responses.
+`--minify-js` gives explicit local JavaScript assets virtual `.min.js` URLs and hashes the minified bytes. Existing
+minified files, remote URLs, and discovered component assets are unchanged. The command does not write minified files;
+your build or server must serve them. The packaged development server supports these virtual responses.
 
 ## Generate a skeleton manifest
 
-Skeleton generation renders a local page or remote URL at mobile and desktop sizes. It does not derive loading geometry from the component manifest:
+Skeleton generation captures a local page or remote URL at mobile and desktop sizes; geometry comes from the rendered
+page:
 
 ```bash
 npx alpine-component-loader skeleton ./index.html \
@@ -514,7 +539,8 @@ npx alpine-component-loader skeleton ./index.html \
   --out-dir skeletons
 ```
 
-`--mode manifest` writes `acl-skeletons.generated.js` and `acl-skeletons.generated.css`; `--mode both` also writes the standalone `acl-skeletons.css`. Import and register the generated module before component startup:
+`--mode manifest` writes `acl-skeletons.generated.js` and `.css`; `--mode both` also writes `acl-skeletons.css`.
+Register the generated module before startup:
 
 ```js
 import AlpineComponentLoader from 'alpine-component-loader';
@@ -525,13 +551,13 @@ await AlpineComponentLoader.registerSkeletonManifest(skeletons);
 await AlpineComponentLoader.start();
 ```
 
-Use `--route` repeatedly to capture more pages and `--include` or `--exclude` to select component tags. The generator protects non-generated files unless `--force` is supplied.
+Repeat `--route` for pages; use `--include`/`--exclude` for tags. Replacing non-generated files requires `--force`.
 
 See [Skeleton loading UI](skeletons.md) for the complete capture and integration workflow.
 
 ## CLI option reference
 
-Run `npx alpine-component-loader --help` for the installed version's command summary. Options accept `--name value` or `--name=value` where a value is required.
+`npx alpine-component-loader --help` lists commands. Value options accept `--name value` or `--name=value`.
 
 | Command             | Option                                  | Default and behavior                                                           |
 | ------------------- | --------------------------------------- | ------------------------------------------------------------------------------ |
@@ -601,24 +627,23 @@ Run `npx alpine-component-loader --help` for the installed version's command sum
 | Project commands    | `--config <file>`                       | Explicit shared project configuration; flags retain highest precedence.        |
 | Every command       | `-h` / `--help`                         | Print command help without starting servers, browsers, or generators.          |
 
-`--dry-run` and `--force` apply to `create`, `init`, `manifest`, `offline`, `types`, and `schema`; `validate` and `audit` are inherently read-only except for an explicit audit report file. `--json` applies to project/contract commands; audit chooses JSON with `--format json`. Skeleton output has its own `--force` and `--allow-partial` controls.
+`create`, `init`, `manifest`, `offline`, `types`, and `schema` support `--dry-run`/`--force`. Validation and audits are
+read-only except explicit report output. Project/contract commands use `--json`; audits use `--format json`. Skeleton
+capture has separate `--force` and `--allow-partial` controls.
 
 ### Optional tooling in lean installations
 
-Default npm installs include `parse5` and `@swc/core`. Browser-only consumers
-may install the package with `--omit=optional`; CLI help, package imports,
-starter creation, schema generation, and readable JavaScript serving do not
-load either tool merely to start.
+Default installs include optional `parse5` and `@swc/core`. With `--omit=optional`, help, imports, starter creation,
+schemas, and readable serving still work without loading either tool.
 
-| Requested feature | Tool required in a lean install |
-| --- | --- |
-| Component inspection, `manifest`, project validation, and inline-template HMR | `parse5` |
-| `alpine-component-loader/ssr` | `parse5` |
-| Generated `.min.js` server responses or explicitly minified generated JavaScript | `@swc/core` |
+| Requested feature                                                                | Tool required in a lean install |
+| -------------------------------------------------------------------------------- | ------------------------------- |
+| Component inspection, `manifest`, project validation, and inline-template HMR    | `parse5`                        |
+| `alpine-component-loader/ssr`                                                    | `parse5`                        |
+| Generated `.min.js` server responses or explicitly minified generated JavaScript | `@swc/core`                     |
 
-An omitted-tool failure uses code `ACL_OPTIONAL_DEPENDENCY_MISSING` and includes
-the dependency name, requested feature, and an `npm install <dependency>`
-command. Readable serving remains usable without SWC.
+Missing tools report `ACL_OPTIONAL_DEPENDENCY_MISSING`, the feature/dependency, and its install command. Readable
+serving works without SWC.
 
 ## Development server and command discovery
 
@@ -629,10 +654,52 @@ npx alpine-component-loader serve ./public --host 127.0.0.1 --port 4173
 npx alpine-component-loader --help
 ```
 
-The development server is intended for local component work. Production hosting, bundling, routing, and service-worker delivery remain application responsibilities.
+The server supports local development. Production hosting, routing, bundling, and worker delivery belong to the
+application.
 
-The server injects an EventSource bootstrap into the primary page, sends template-specific messages for component HTML changes, and requests a page reload for other files. For manual integration and state-preserving behavior, see [Development server and targeted HMR](lifecycle.md#development-server-and-targeted-hmr).
+An injected EventSource client receives template-specific HMR and reloads for other file changes. See
+[manual HMR and state preservation](lifecycle.md#development-server-and-targeted-hmr).
 
-For local CDN-parity testing, request any contained JavaScript asset with `.min.js`. If that file is absent and the matching `.js` source exists, the server generates the minified response in memory, retains it until the source changes, and never writes it to disk. An existing `.min.js` file is served unchanged. This also works below `/__acl_hmr/modules/`. Map `alpine-component-loader` to `/__acl_hmr/modules/index.min.js` in the page's import map; the server derives the remaining injected package entries from that base and suffix so both the application and HMR client use the fully minified runtime family.
+The server serves existing `.min.js` files unchanged. For missing ones with a matching `.js` source, it generates and
+caches a response in memory until the source changes. This includes `/__acl_hmr/modules/`. Map ACL to
+`/__acl_hmr/modules/index.min.js` to use the minified family for both app and HMR imports.
 
-For feature-specific workflows, continue to [Static SSR and hydration](ssr.md), [Offline behavior](offline.md), [Adaptive prefetch](prefetch.md), and [Components, props, slots, and rendering](components.md).
+For feature-specific workflows, continue to [Static SSR and hydration](ssr.md), [Offline behavior](offline.md),
+[Adaptive prefetch](prefetch.md), and [Components, props, slots, and rendering](components.md).
+
+## Explicit module preloads and offline runtime expansion
+
+Generate hints for the components required on the initial page:
+
+```sh
+alpine-component-loader preload acl-manifest.json --entry-url https://cdn.jsdelivr.net/gh/LouisT/alpine-component-loader@latest/dist/index.min.js --group initial --feature scheduler --out acl-preloads.html
+```
+
+Repeat `--tag`, `--group`, and `--feature`. `--json` returns `{ urls, html }`; `--out`, `--dry-run`, and `--force`
+control output. Without tags/groups, only the runtime and explicit features are hinted. Invalid selections reject
+generation. Each eager dependency gets one explicit hint; see
+[modulepreload behavior](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/rel/modulepreload).
+
+Vite `>=5 <9` supports opt-in `preload`, for example
+`{ tags: ['initial-card'], groups: ['initial'], features: ['scheduler'] }`. HTML hints use the configured manifest and
+import-map delivery base. Integration checks cover pinned Vite 5-8 and development, including Rolldown production
+builds. See [Vite migration](https://vite.dev/guide/migration).
+
+Offline accepts `runtime: { entryUrl, features }`, or `--runtime-entry` and repeatable `--runtime-feature`. The shared
+graph expands selected components and capabilities. Declare imperative features such as `dynamic`, `debugger`, or
+`offline`. Manifest lazy loading, visible hydration, and environmentally paused polling infer `environment`;
+attribute/API activation needs `--feature environment` or `--runtime-feature environment`. Authored assets, remote
+policies, and revisions still apply.
+
+Use `core.min.js` with `--entry-url`/`--runtime-entry` for explicit startup. Vite’s
+`preload: { entry: 'core', groups: ['initial'] }` selects its `/core` mapping; the default is the root entry. Both
+remain mapped.
+
+`preload.entry` selects hints; app code must import `/core` to use [explicit startup](core.md). The `polyfills` selector
+includes the wrapper, not upstream scripts or initialization. For offline fallback, self-host vendor files, list them as
+assets, and pass their URLs to `loadPolyfills()`. See [polyfill delivery](polyfills.md#self-hosted-delivery).
+
+Selectors include `hydration`, `triggers`, `styles`, `slots`, and `scripts`. Preloads infer manifest options; explicitly
+select content-dependent styles/slots. Offline also inspects local component, loading, and fallback templates and
+conservatively includes styles/slots for opaque remote templates. SSR and imperative features require explicit
+selection. Shared implementation URLs are deduplicated.

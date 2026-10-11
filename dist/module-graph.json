@@ -1,0 +1,626 @@
+{
+    "version": 1,
+    "packageVersion": "1.2.0",
+    "capabilities": {
+        "component": [
+            "runtime/component/lifecycle-controller.js",
+            "runtime/rendering.js"
+        ],
+        "templates": [
+            "runtime/template-loader.js",
+            "runtime/template-requests.js"
+        ],
+        "cache": [
+            "runtime/template-cache.js"
+        ],
+        "manifest": [
+            "runtime/registry.js",
+            "runtime/manifest-loader.js"
+        ],
+        "data": [
+            "runtime/component/data-controller.js",
+            "runtime/fetch-cache.js"
+        ],
+        "persistence": [
+            "runtime/component/persistence-controller.js"
+        ],
+        "assets": [
+            "runtime/component/asset-controller.js"
+        ],
+        "form": [
+            "runtime/component/form-controller.js"
+        ],
+        "hydration": [
+            "runtime/component/hydration.js"
+        ],
+        "triggers": [
+            "runtime/component/triggers.js"
+        ],
+        "styles": [
+            "runtime/component/styles.js"
+        ],
+        "slots": [
+            "runtime/component/slots.js"
+        ],
+        "scripts": [
+            "runtime/component/scripts.js"
+        ],
+        "scheduler": [
+            "runtime/initialization-scheduler.js"
+        ],
+        "environment": [
+            "runtime/environment.js"
+        ],
+        "polyfills": [
+            "polyfills.js"
+        ],
+        "hmr": [
+            "runtime/hmr.js"
+        ],
+        "observability": [
+            "runtime/observability.js"
+        ],
+        "adaptivePrefetch": [
+            "runtime/adaptive-prefetch.js"
+        ],
+        "dynamic": [
+            "elements/dynamic.js"
+        ],
+        "boundary": [
+            "elements/boundary.js"
+        ],
+        "declarative": [
+            "elements/declarative.js"
+        ],
+        "offline": [
+            "offline.js"
+        ],
+        "debugger": [
+            "debugger.js",
+            "runtime/debugger-panel.js"
+        ],
+        "scanner": [
+            "a11y-scanner.js",
+            "runtime/a11y-scanner-dialog.js"
+        ]
+    },
+    "nodes": {
+        "a11y-scanner.js": {
+            "eager": [
+                "a11y.js",
+                "acl-load-error.js",
+                "runtime/overlay-utils.js"
+            ],
+            "deferred": [
+                "runtime/a11y-scanner-dialog.js"
+            ],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "a11y.js": {
+            "eager": [],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "acl-load-error.js": {
+            "eager": [],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "auto.js": {
+            "eager": [
+                "index.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "core.js": {
+            "eager": [
+                "acl-load-error.js",
+                "runtime/context.js"
+            ],
+            "deferred": [
+                "runtime/loader.js"
+            ],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "debugger.js": {
+            "eager": [
+                "acl-load-error.js",
+                "runtime/overlay-utils.js"
+            ],
+            "deferred": [
+                "runtime/debugger-panel.js"
+            ],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "dev.js": {
+            "eager": [
+                "index.js"
+            ],
+            "deferred": [
+                "inline-templates.js"
+            ],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "elements/boundary.js": {
+            "eager": [],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "elements/declarative.js": {
+            "eager": [
+                "runtime/config.js",
+                "runtime/data-options.js",
+                "runtime/props.js",
+                "runtime/values.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "elements/dynamic.js": {
+            "eager": [
+                "runtime/config.js",
+                "runtime/errors.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "index.js": {
+            "eager": [
+                "acl-load-error.js",
+                "runtime/context.js"
+            ],
+            "deferred": [
+                "runtime/loader.js",
+                "runtime/persistence.js"
+            ],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "inline-templates.js": {
+            "eager": [],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "observability-exporters.js": {
+            "eager": [],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "offline.js": {
+            "eager": [],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "polyfills.js": {
+            "eager": [
+                "acl-load-error.js",
+                "runtime/context.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/a11y-scanner-dialog.js": {
+            "eager": [
+                "runtime/overlay-utils.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/adaptive-prefetch.js": {
+            "eager": [],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/assets.js": {
+            "eager": [
+                "runtime/values.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/caches.js": {
+            "eager": [
+                "runtime/context.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/component/asset-controller.js": {
+            "eager": [
+                "runtime/assets.js",
+                "runtime/config.js",
+                "runtime/errors.js",
+                "runtime/values.js"
+            ],
+            "deferred": [
+                "runtime/caches.js"
+            ],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/component/data-controller.js": {
+            "eager": [
+                "runtime/config.js",
+                "runtime/errors.js",
+                "runtime/values.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/component/form-controller.js": {
+            "eager": [],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/component/hydration.js": {
+            "eager": [],
+            "deferred": [
+                "runtime/component/styles.js",
+                "runtime/rendering.js"
+            ],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/component/lifecycle-controller.js": {
+            "eager": [
+                "runtime/config.js",
+                "runtime/errors.js",
+                "runtime/lifecycle.js",
+                "runtime/props.js",
+                "runtime/values.js"
+            ],
+            "deferred": [
+                "runtime/component/asset-controller.js",
+                "runtime/component/data-controller.js",
+                "runtime/component/hydration.js",
+                "runtime/component/persistence-controller.js",
+                "runtime/component/scripts.js",
+                "runtime/component/slots.js",
+                "runtime/component/styles.js",
+                "runtime/component/triggers.js",
+                "runtime/fetch-cache.js",
+                "runtime/hmr.js",
+                "runtime/initialization-scheduler.js",
+                "runtime/rendering.js"
+            ],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/component/persistence-controller.js": {
+            "eager": [
+                "runtime/config.js",
+                "runtime/data-options.js",
+                "runtime/errors.js",
+                "runtime/persistence.js",
+                "runtime/values.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/component/scripts.js": {
+            "eager": [],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/component/slots.js": {
+            "eager": [],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/component/styles.js": {
+            "eager": [
+                "runtime/caches.js",
+                "runtime/config.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/component/triggers.js": {
+            "eager": [],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/config.js": {
+            "eager": [],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/context.js": {
+            "eager": [],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/contracts.js": {
+            "eager": [],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/data-options.js": {
+            "eager": [
+                "runtime/config.js",
+                "runtime/values.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/debugger-panel.js": {
+            "eager": [
+                "runtime/overlay-utils.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/environment.js": {
+            "eager": [],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/errors.js": {
+            "eager": [
+                "acl-load-error.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/fetch-cache.js": {
+            "eager": [
+                "runtime/config.js",
+                "runtime/context.js",
+                "runtime/values.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/hmr.js": {
+            "eager": [
+                "runtime/values.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/initialization-scheduler.js": {
+            "eager": [],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/lifecycle.js": {
+            "eager": [],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/loader.js": {
+            "eager": [
+                "inline-templates.js",
+                "runtime/config.js",
+                "runtime/context.js",
+                "runtime/errors.js",
+                "runtime/props.js",
+                "runtime/values.js"
+            ],
+            "deferred": [
+                "elements/boundary.js",
+                "elements/declarative.js",
+                "elements/dynamic.js",
+                "runtime/adaptive-prefetch.js",
+                "runtime/assets.js",
+                "runtime/component/form-controller.js",
+                "runtime/component/lifecycle-controller.js",
+                "runtime/data-options.js",
+                "runtime/environment.js",
+                "runtime/manifest-loader.js",
+                "runtime/observability.js",
+                "runtime/registry.js",
+                "runtime/rendering.js",
+                "runtime/template-cache.js",
+                "runtime/template-loader.js"
+            ],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/manifest-loader.js": {
+            "eager": [
+                "runtime/errors.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/observability.js": {
+            "eager": [],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/overlay-utils.js": {
+            "eager": [],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/persistence.js": {
+            "eager": [
+                "runtime/config.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/props.js": {
+            "eager": [
+                "runtime/context.js",
+                "runtime/values.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/registry.js": {
+            "eager": [
+                "runtime/config.js",
+                "runtime/contracts.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/rendering.js": {
+            "eager": [
+                "runtime/errors.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/template-cache.js": {
+            "eager": [],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/template-loader.js": {
+            "eager": [
+                "runtime/caches.js",
+                "runtime/config.js",
+                "runtime/errors.js",
+                "runtime/values.js"
+            ],
+            "deferred": [
+                "runtime/template-requests.js"
+            ],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/template-requests.js": {
+            "eager": [
+                "runtime/errors.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "runtime/values.js": {
+            "eager": [],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "testing-playwright.js": {
+            "eager": [],
+            "deferred": [],
+            "external": [
+                "../server/testing-server.mjs",
+                "@playwright/test"
+            ],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "testing-vitest.js": {
+            "eager": [
+                "testing.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        },
+        "testing.js": {
+            "eager": [
+                "index.js",
+                "runtime/rendering.js"
+            ],
+            "deferred": [],
+            "external": [],
+            "staticRelative": [],
+            "instanceEdges": []
+        }
+    }
+}

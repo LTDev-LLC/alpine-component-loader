@@ -2,6 +2,7 @@ import { expect, test, preparePage, projectRoot, featureLabPath } from './fixtur
 import AxeBuilder from '@axe-core/playwright';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { alpineRuntime, resolveAlpineFile } from '../scripts/alpine-runtime.mjs';
 
 let baseUrl, counts;
 test.beforeAll(async ({ loaderServer }) => {
@@ -12,7 +13,7 @@ test.beforeAll(async ({ loaderServer }) => {
 const openRealFeatureLab = async (page, { hash = '' } = {}) => {
     // Open real feature lab
     const errors = [],
-        alpineSource = await readFile(join(projectRoot, 'node_modules/alpinejs-315/dist/cdn.min.js'), 'utf8'),
+        alpineSource = await readFile(resolveAlpineFile(projectRoot), 'utf8'),
         fontAwesomeUrl = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
         confettiUrl = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js';
     page.on(
@@ -24,7 +25,7 @@ const openRealFeatureLab = async (page, { hash = '' } = {}) => {
         // Handle the console event
         if (message.type() === 'error') errors.push(message.text());
     });
-    await page.route('https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js', (route) => {
+    await page.route(alpineRuntime.cdnUrl, (route) => {
         // Fulfill the routed Alpine request from the local fixture
         return route.fulfill({
             contentType: 'text/javascript',
@@ -94,7 +95,7 @@ test.describe('feature lab pages', () => {
     test('feature lab loads main showcases without console errors', async ({ page }) => {
         // Exercise the test scenario
         const errors = [],
-            alpineSource = await readFile(join(projectRoot, 'node_modules/alpinejs-315/dist/cdn.min.js'), 'utf8'),
+            alpineSource = await readFile(resolveAlpineFile(projectRoot), 'utf8'),
             fontAwesomeUrl = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
             confettiUrl = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js',
             externalRequests = [],
@@ -113,7 +114,7 @@ test.describe('feature lab pages', () => {
             const pathname = new URL(request.url()).pathname;
             if (pathname.startsWith('/__acl_hmr/modules/')) packageRequests.push(pathname);
         });
-        await page.route('https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js', (route) => {
+        await page.route(alpineRuntime.cdnUrl, (route) => {
             // Fulfill the routed Alpine request from the local fixture
             return route.fulfill({
                 contentType: 'text/javascript',
@@ -379,9 +380,9 @@ test.describe('feature lab pages', () => {
         });
         expect(state.featureLab).toEqual(
             expect.objectContaining({
-                jumpOptions: 39,
-                usageDrawers: 38,
-                openUsageDrawers: 38,
+                jumpOptions: 40,
+                usageDrawers: 39,
+                openUsageDrawers: 39,
                 observed: true,
                 advancedScore: 88,
                 reflectedScore: '88',
@@ -479,7 +480,7 @@ test.describe('feature lab pages', () => {
                 expect.stringContaining('38. Browser Testing Utilities'),
             ]),
         );
-        expect(state.sourceDrawers).toHaveLength(38);
+        expect(state.sourceDrawers).toHaveLength(39);
         expect(
             state.sourceDrawers.filter(
                 // Select matching items
@@ -559,7 +560,7 @@ test.describe('feature lab pages', () => {
     test('complete feature lab runs with real Alpine and interactive bindings', async ({ page }) => {
         // Exercise the test scenario
         const errors = [],
-            alpineSource = await readFile(join(projectRoot, 'node_modules/alpinejs-315/dist/cdn.min.js'), 'utf8'),
+            alpineSource = await readFile(resolveAlpineFile(projectRoot), 'utf8'),
             fontAwesomeUrl = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
             confettiUrl = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js';
         page.on(
@@ -571,7 +572,7 @@ test.describe('feature lab pages', () => {
             // Handle the console event
             if (message.type() === 'error') errors.push(message.text());
         });
-        await page.route('https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js', (route) => {
+        await page.route(alpineRuntime.cdnUrl, (route) => {
             // Fulfill the routed Alpine request from the local fixture
             return route.fulfill({
                 contentType: 'text/javascript',
@@ -683,7 +684,7 @@ test.describe('feature lab pages', () => {
             )
             .toBe(1);
         expect(initialCacheCount).toBeGreaterThanOrEqual(1);
-        expect(await page.locator('#feature-jump option').count()).toBe(39);
+        expect(await page.locator('#feature-jump option').count()).toBe(40);
         expect(errors).toEqual([]);
     });
 
@@ -1005,7 +1006,7 @@ test.describe('feature lab pages', () => {
             feature23 = page.locator('#feature-23'),
             feature24Link = page.locator('#feature-24 > h2 > a.feature-heading-link'),
             featureJump = page.locator('#feature-jump');
-        await expect(featureLinks).toHaveCount(38);
+        await expect(featureLinks).toHaveCount(39);
         await expect(feature23.locator('h2 > a.feature-heading-link')).toHaveAttribute('href', '#feature-23');
         await expect(featureJump).toHaveValue('feature-23');
         await expect

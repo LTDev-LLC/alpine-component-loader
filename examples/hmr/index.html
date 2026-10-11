@@ -1,134 +1,152 @@
 <!doctype html>
 <html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="description" content="State-preserving template HMR example for AlpineComponentLoader" />
+        <title>Alpine Component Loader HMR Example</title>
+        <link href="./styles.css" rel="stylesheet" />
 
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="State-preserving template HMR example for AlpineComponentLoader">
-    <title>Alpine Component Loader HMR Example</title>
-    <link href="./styles.css" rel="stylesheet">
-    <script defer src="/__acl_hmr/alpine.js"></script>
-    <script type="importmap">
-        {
-            "imports": {
-                "alpine-component-loader": "/__acl_hmr/modules/index.min.js",
-                "alpine-component-loader/auto": "/__acl_hmr/modules/auto.min.js",
-                "alpine-component-loader/dev": "/__acl_hmr/modules/dev.min.js",
-                "alpine-component-loader/debugger": "/__acl_hmr/modules/debugger.min.js",
-                "alpine-component-loader/a11y": "/__acl_hmr/modules/a11y.min.js",
-                "alpine-component-loader/a11y-scanner": "/__acl_hmr/modules/a11y-scanner.min.js",
-                "alpine-component-loader/offline": "/__acl_hmr/modules/offline.min.js",
-                "alpine-component-loader/testing": "/__acl_hmr/modules/testing.min.js"
+        <script type="importmap">
+            {
+                "imports": {
+                    "alpine-component-loader": "/__acl_hmr/modules/index.min.js",
+                    "alpine-component-loader/core": "/__acl_hmr/modules/core.min.js",
+                    "alpine-component-loader/polyfills": "/__acl_hmr/modules/polyfills.min.js",
+                    "alpine-component-loader/auto": "/__acl_hmr/modules/auto.min.js",
+                    "alpine-component-loader/dev": "/__acl_hmr/modules/dev.min.js",
+                    "alpine-component-loader/debugger": "/__acl_hmr/modules/debugger.min.js",
+                    "alpine-component-loader/a11y": "/__acl_hmr/modules/a11y.min.js",
+                    "alpine-component-loader/a11y-scanner": "/__acl_hmr/modules/a11y-scanner.min.js",
+                    "alpine-component-loader/offline": "/__acl_hmr/modules/offline.min.js",
+                    "alpine-component-loader/testing": "/__acl_hmr/modules/testing.min.js"
+                }
             }
-        }
-    </script>
-</head>
+        </script>
+    </head>
 
-<body>
-    <header id="top" class="site-header">
-        <div>
-            <h1>AlpineComponentLoader</h1>
-            <div class="subtitle">
-                A lightweight, build-free component loader for
-                <a href="https://alpinejs.dev/" target="_blank" rel="noreferrer">Alpine.js</a>
-            </div>
-            <a class="github-link" href="https://github.com/LTDev-LLC/alpine-component-loader" target="_blank"
-                rel="noreferrer">View on GitHub</a>
-        </div>
-    </header>
-
-    <main>
-        <section class="lab-overview" aria-labelledby="overview-heading">
-            <p class="eyebrow">Focused example</p>
-            <h2 id="overview-heading">State-preserving template HMR</h2>
-            <p>Run the reusable development server here, then edit <code>components/live-card.html</code>. The injected
-                SSE client reloads only this component while keeping its counter, draft value, focus, and selection.</p>
-            <div class="metrics" aria-label="HMR capabilities">
-                <div class="metric"><strong>SSE</strong><span>Transport</span></div>
-                <div class="metric"><strong>1</strong><span>Targeted template</span></div>
-                <div class="metric"><strong>Live</strong><span>State preserved</span></div>
-            </div>
-            <div class="toolbar">
-                <span id="connection-status" class="status" data-state="connecting">Connecting…</span>
-            </div>
-        </section>
-
-        <section class="example-section" aria-labelledby="live-template-heading">
-            <h2 id="live-template-heading">Live component</h2>
-            <hmr-demo-card count="1"></hmr-demo-card>
-            <h3>Auto-observed inline definition</h3>
-            <auto-observed-note></auto-observed-note>
-            <h3>Reload event</h3>
-            <pre id="reload-log">Waiting for a template change…</pre>
-        </section>
-    </main>
-
-    <footer class="site-footer">
-        <div class="container">
-            <div class="inner">
-                <div class="meta">
-                    <div><strong>AlpineComponentLoader</strong> - A lightweight, build-free component loader for
-                        Alpine.js.</div>
-                    <div>&copy; 2026 LTDev LLC · MIT License</div>
-                </div>
-                <nav aria-label="Footer">
-                    <a href="https://github.com/LTDev-LLC/alpine-component-loader" target="_blank"
-                        rel="noreferrer">GitHub</a>
-                    <a href="https://github.com/LTDev-LLC/alpine-component-loader/issues" target="_blank"
-                        rel="noreferrer">Issues</a>
+    <body>
+        <header id="top" class="site-header">
+            <div>
+                <h1>AlpineComponentLoader</h1>
+                <div class="subtitle">
+                    A lightweight, build-free component loader for
                     <a href="https://alpinejs.dev/" target="_blank" rel="noreferrer">Alpine.js</a>
-                    <a href="#top">Back to top</a>
-                </nav>
+                </div>
+                <a
+                    class="github-link"
+                    href="https://github.com/LouisT/alpine-component-loader"
+                    target="_blank"
+                    rel="noreferrer"
+                    >View on GitHub</a
+                >
             </div>
-        </div>
-    </footer>
+        </header>
 
-    <script type="module">
-        import AlpineComponentLoader, { startAutoLoader } from 'alpine-component-loader/auto';
+        <main>
+            <section class="lab-overview" aria-labelledby="overview-heading">
+                <p class="eyebrow">Focused example</p>
+                <h2 id="overview-heading">State-preserving template HMR</h2>
+                <p>
+                    Run the reusable development server here, then edit <code>components/live-card.html</code>. The
+                    injected SSE client reloads only this component while keeping its counter, draft value, focus, and
+                    selection.
+                </p>
+                <div class="metrics" aria-label="HMR capabilities">
+                    <div class="metric"><strong>SSE</strong><span>Transport</span></div>
+                    <div class="metric"><strong>1</strong><span>Targeted template</span></div>
+                    <div class="metric"><strong>Live</strong><span>State preserved</span></div>
+                </div>
+                <div class="toolbar">
+                    <span id="connection-status" class="status" data-state="connecting">Connecting…</span>
+                </div>
+            </section>
 
-        const status = document.getElementById('connection-status');
-        const log = document.getElementById('reload-log');
+            <section class="example-section" aria-labelledby="live-template-heading">
+                <h2 id="live-template-heading">Live component</h2>
+                <hmr-demo-card count="1"></hmr-demo-card>
+                <h3>Auto-observed inline definition</h3>
+                <auto-observed-note></auto-observed-note>
+                <h3>Reload event</h3>
+                <pre id="reload-log">Waiting for a template change…</pre>
+            </section>
+            <section class="example-section" data-runtime-demos aria-labelledby="runtime-demos-heading">
+                <h2 id="runtime-demos-heading">Runtime capability experiments</h2>
+                <p>
+                    Each button opens a fresh document. Features load when requested; completion reports actual
+                    readiness. Timings are diagnostic.
+                </p>
+                <div class="button-row">
+                    <button type="button" data-demo="transformations">Optional capabilities</button
+                    ><button type="button" data-demo="requests">Shared request cancellation</button
+                    ><button type="button" data-demo-close>Close experiment</button>
+                </div>
+                <div data-demo-outlet></div>
+            </section>
+            <div class="example-section" aria-label="Startup variants">
+                <p>
+                    <a href="?polyfills=1">Await optional polyfills</a> ·
+                    <a href="?polyfills=1&amp;fallback=1">Self-hosted fallback fixture</a> ·
+                    <a href="?">Native default</a>
+                </p>
+                <p data-startup-status role="status">Waiting for application bootstrap</p>
+                <details>
+                    <summary>Startup milestones</summary>
+                    <pre data-startup-timeline></pre>
+                </details>
+            </div>
+            <section class="example-section" aria-labelledby="advanced-hmr-heading">
+                <h2 id="advanced-hmr-heading">Optional transformations and superseded loads</h2>
+                <p>
+                    Scripts execute only in this explicitly enabled authored probe. Edit its template to exercise
+                    styles, slots, and script recreation through the HMR channel.
+                </p>
+                <div class="button-row">
+                    <button id="mount-transform-probe" type="button">Mount transformation probe</button
+                    ><button id="reload-transform-probe" type="button">Reload while preserving draft</button
+                    ><button id="pending-reload" type="button">Reload a pending request</button
+                    ><button id="pending-remove" type="button">Remove a pending request</button>
+                </div>
+                <div id="advanced-hmr-fixture"></div>
+                <pre id="advanced-hmr-output" role="status">No probe activated</pre>
+            </section>
+        </main>
 
-        AlpineComponentLoader.config({ autoStart: true });
-        AlpineComponentLoader.define(
-            'hmr-demo-card',
-            '/components/live-card.html',
-            { shadow: true, attributes: { count: Number } }
-        );
-        await startAutoLoader();
+        <footer class="site-footer">
+            <div class="container">
+                <div class="inner">
+                    <div class="meta">
+                        <div>
+                            <strong>AlpineComponentLoader</strong> - A lightweight, build-free component loader for
+                            Alpine.js.
+                        </div>
+                        <div>&copy; 2026 LouisT · MIT License</div>
+                    </div>
+                    <nav aria-label="Footer">
+                        <a href="https://github.com/LouisT/alpine-component-loader" target="_blank" rel="noreferrer"
+                            >GitHub</a
+                        >
+                        <a
+                            href="https://github.com/LouisT/alpine-component-loader/issues"
+                            target="_blank"
+                            rel="noreferrer"
+                            >Issues</a
+                        >
+                        <a href="https://alpinejs.dev/" target="_blank" rel="noreferrer">Alpine.js</a>
+                        <a href="#top">Back to top</a>
+                    </nav>
+                </div>
+            </div>
+        </footer>
 
-        const observedTemplate = document.createElement('template');
-        observedTemplate.setAttribute('x-acl', 'auto-observed-note');
-        observedTemplate.innerHTML = '<p>Registered after startup by the auto entry observer.</p>';
-        document.body.appendChild(observedTemplate);
-
-        const bindInjectedConnection = () => {
-            const eventSource = window.__aclDevConnection?.eventSource;
-            if (!eventSource) {
-                requestAnimationFrame(bindInjectedConnection);
-                return;
-            }
-            const showConnected = () => {
-                status.dataset.state = 'connected';
-                status.textContent = 'HMR connected';
-            };
-            const showDisconnected = () => {
-                status.dataset.state = 'disconnected';
-                status.textContent = 'Reconnecting…';
-            };
-            eventSource.addEventListener('open', showConnected);
-            eventSource.addEventListener('error', showDisconnected);
-            if (eventSource.readyState === EventSource.OPEN)
-                showConnected();
-        };
-        bindInjectedConnection();
-
-        window.addEventListener('acl:dev-reload', event => {
-            window.__lastACLDevReload = event.detail;
-            log.textContent = JSON.stringify(event.detail, null, 2);
-        });
-        window.__aclHMRExample = { loader: AlpineComponentLoader };
-    </script>
-</body>
-
+        <script type="module" src="/__acl_hmr/examples/launcher.js"></script>
+        <script
+            type="module"
+            data-acl-bootstrap
+            data-app="./app.js"
+            data-alpine="/__acl_hmr/alpine.js"
+            src="/__acl_hmr/examples/bootstrap.js"
+        ></script>
+        <script type="module" src="./advanced.js"></script>
+    </body>
 </html>

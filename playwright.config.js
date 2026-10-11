@@ -20,10 +20,10 @@ export default defineConfig({
             workers: 1,
             use: { browserName: 'firefox' },
         },
-        // Split WebKit's long context sequence before its per-process navigation limit
+        // Keep the expanded WebKit suite below its per-process navigation limit
         {
             name: 'webkit',
-            workers: 2,
+            workers: 3,
             use: { browserName: 'webkit' },
         },
     ],

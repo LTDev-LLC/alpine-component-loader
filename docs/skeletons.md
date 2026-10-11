@@ -1,8 +1,9 @@
 # Skeleton loading UI
 
-ACL can capture the rendered geometry of your components and turn it into responsive loading skeletons. The generated placeholders reserve the component's mobile and desktop layout while its template, assets, and data load, reducing layout shifts without copying application content into the generated files.
+ACL captures rendered component geometry as responsive loading skeletons. Placeholders reserve mobile and desktop layout
+during loading, reducing shifts without copying application content.
 
-Skeletons are generated from a running page, not from `acl-manifest.json`. Capture a representative page after its components and fixture data can load successfully.
+Capture a running page with working components and fixture data; skeletons are not derived from the component manifest.
 
 ## Quick start
 
@@ -29,9 +30,9 @@ Link the generated stylesheet after your base styles and before the loader JavaS
 </head>
 ```
 
-The stylesheet applies to matching elements before their custom element is defined and while ACL exposes `aria-busy="true"`. It stops matching when the component is ready. No JavaScript registration is needed.
+CSS matches hosts before definition and while `aria-busy="true"`, stopping when ready. No registration is required.
 
-Run the command again whenever a component's loading geometry changes, then commit or publish the regenerated file with the application.
+Regenerate and publish skeletons when loading geometry changes.
 
 ## What capture does
 
@@ -49,17 +50,19 @@ For each selected route, the generator:
 4. Captures the first visible, non-zero-size instance of each tag at each viewport.
 5. Writes the requested artifacts only after capture succeeds.
 
-The generated masks and fragments contain anonymous rectangles. They do not retain text, form values, URLs, IDs, event attributes, or the application DOM structure. Their dimensions still reflect the rendered fixture data, so use realistic but non-sensitive states.
+Masks/fragments contain anonymous rectangles, excluding text, form values, URLs, IDs, events, and DOM structure.
+Dimensions reflect fixture data; use realistic, non-sensitive states.
 
-If the same tag appears in several layouts or routes, the first capturable instance for each viewport wins and the command reports a warning for later instances. Give materially different layouts separate component tags, or use `--include` and dedicated fixture pages to generate the intended variant.
+The first capturable instance of each tag wins per viewport; later variants produce warnings. Use separate tags or
+targeted fixture pages for different layouts.
 
 ## Choose an output mode
 
-| Mode | Generated files | Use it when |
-| --- | --- | --- |
-| `css` (default) | `acl-skeletons.css` | You want a placeholder before loader JavaScript runs and the simplest integration. |
-| `manifest` | `acl-skeletons.generated.js` and `acl-skeletons.generated.css` | You want ACL to mount generated loading markup through its normal loading-UI lifecycle. |
-| `both` | All three files | You want to evaluate or publish both delivery choices. Integrate only one choice on a page. |
+| Mode            | Generated files                                                | Use it when                                                                                 |
+| --------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `css` (default) | `acl-skeletons.css`                                            | You want a placeholder before loader JavaScript runs and the simplest integration.          |
+| `manifest`      | `acl-skeletons.generated.js` and `acl-skeletons.generated.css` | You want ACL to mount generated loading markup through its normal loading-UI lifecycle.     |
+| `both`          | All three files                                                | You want to evaluate or publish both delivery choices. Integrate only one choice on a page. |
 
 ### Standalone CSS mode
 
@@ -67,7 +70,8 @@ If the same tag appears in several layouts or routes, the first capturable insta
 npx alpine-component-loader skeleton ./public --mode css
 ```
 
-Link `acl-skeletons.css` in the document head as shown in the quick start. The CSS reserves captured host dimensions, hides unfinished child content, and paints responsive SVG masks. It also disables shimmer when the user prefers reduced motion.
+Link `acl-skeletons.css` in the head. It reserves host dimensions, hides unfinished children, and paints responsive SVG
+masks. Reduced-motion preferences disable shimmer.
 
 Customize its colors with CSS custom properties:
 
@@ -97,11 +101,13 @@ await AlpineComponentLoader.registerSkeletonManifest(skeletons);
 await AlpineComponentLoader.start();
 ```
 
-The generated manifest supplies fallback `loadingHtml` for captured tags. A component or global configuration with an authored `loadingTemplate` or `loadingHtml` keeps that authored loading UI. Registration affects eligible future loads; it does not replace a load already in progress.
+The manifest supplies fallback `loadingHtml`. Authored component/global `loadingTemplate` or `loadingHtml` takes
+precedence. Registration affects future loads, not work in progress.
 
 ## Capture routes and components
 
-With no `--route`, ACL captures the target entry page. Add `--route` once per application route you need. When any routes are supplied, only those routes are captured, so include the entry route explicitly if you still need it:
+Without `--route`, capture uses the entry page. Repeat it for routes; supplying routes replaces the default, so include
+the entry explicitly if needed:
 
 ```bash
 npx alpine-component-loader skeleton ./public \
@@ -111,9 +117,9 @@ npx alpine-component-loader skeleton ./public \
   --out-dir ./public/skeletons
 ```
 
-Routes resolve against the local temporary server or remote target origin. The route must render its ACL components without relying on an existing signed-in browser session.
+Routes resolve against the temporary server or remote origin and must work without an existing signed-in session.
 
-Filter capture by exact custom-element tag names. Values may be comma-separated or the options may be repeated:
+Filter by exact tags using repeated options or comma-separated values:
 
 ```bash
 npx alpine-component-loader skeleton ./public \
@@ -121,11 +127,11 @@ npx alpine-component-loader skeleton ./public \
   --exclude admin-panel
 ```
 
-`--include` is especially useful for a dedicated skeleton fixture: it makes a missing requested component a reported failure instead of silently omitting it.
+`--include` makes missing requested components fail capture, useful for fixtures.
 
 ## Responsive capture
 
-The defaults are a `390x844` mobile viewport, a `1440x900` desktop viewport, and a `768px` breakpoint. Override them together when they do not match the application's responsive design:
+Defaults are mobile `390x844`, desktop `1440x900`, and breakpoint `768px`. Adjust them to your responsive design:
 
 ```bash
 npx alpine-component-loader skeleton ./public \
@@ -134,11 +140,12 @@ npx alpine-component-loader skeleton ./public \
   --breakpoint 800
 ```
 
-The generated media query uses the mobile capture below the breakpoint and the desktop capture at or above it. If only one responsive variant succeeds, ACL reports a warning and reuses the available geometry for both sizes.
+Geometry switches at the breakpoint. If only one viewport succeeds, ACL warns and reuses that capture at both sizes.
 
 ## Failures and safe regeneration
 
-Capture is strict by default: a route, readiness, or requested-component failure prevents any output from being written. This preserves the previous valid artifacts. Use `--allow-partial` only when publishing the successful subset is intentional:
+Route, readiness, or requested-component failures preserve previous artifacts and prevent writes. Use `--allow-partial`
+to publish a successful subset:
 
 ```bash
 npx alpine-component-loader skeleton ./public \
@@ -147,7 +154,7 @@ npx alpine-component-loader skeleton ./public \
   --allow-partial
 ```
 
-Generated artifacts carry an ACL header and can be replaced by later runs. The command refuses to overwrite an unrecognized file with the same name; `--force` explicitly permits that replacement.
+ACL-marked generated files can be replaced automatically. Unrecognized outputs require `--force`.
 
 If capture fails:
 
@@ -157,4 +164,6 @@ If capture fails:
 - Increase `--timeout` for slow initialization or data loading.
 - Use `--include` with a small, deterministic fixture page to isolate a component.
 
-For every option and default, see the [CLI option reference](manifests-and-cli.md#cli-option-reference). For authored loading and error UI, see [Loading and fallback UI](components.md#loading-and-fallback-ui). The separate [skeleton manifest API](api.md#skeleton-manifests) documents runtime registration.
+See the [CLI reference](manifests-and-cli.md#cli-option-reference),
+[authored loading/fallback UI](components.md#loading-and-fallback-ui), and
+[skeleton registration API](api.md#skeleton-manifests).

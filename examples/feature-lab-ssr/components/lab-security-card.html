@@ -13,20 +13,24 @@
     }
 
     h3 {
-        margin: 0 0 .65rem;
+        margin: 0 0 0.65rem;
         color: #14532d;
-        font: 750 1rem system-ui, sans-serif;
+        font:
+            750 1rem system-ui,
+            sans-serif;
     }
 
     p,
     a {
         color: #166534;
-        font: .9rem/1.55 system-ui, sans-serif;
+        font:
+            0.9rem/1.55 system-ui,
+            sans-serif;
     }
 
     code {
-        padding: .12rem .35rem;
-        border-radius: .3rem;
+        padding: 0.12rem 0.35rem;
+        border-radius: 0.3rem;
         background: #dcfce7;
     }
 </style>
@@ -35,8 +39,12 @@
     <p>Scripts, inline handlers, and executable URLs are removed during SSR and checked again during hydration.</p>
     <a id="unsafe-link" href="java&#x09;script:alert(1)" onclick="window.__aclUnsafe = true">Unsafe URL removed</a>
     <template>
-        <script>window.__aclUnsafe = true</script>
+        <script>
+            window.__aclUnsafe = true;
+        </script>
         <p data-safe-nested>Nested template content remains safe.</p>
     </template>
-    <script>window.__aclUnsafe = true</script>
+    <script>
+        window.__aclUnsafe = true;
+    </script>
 </article>

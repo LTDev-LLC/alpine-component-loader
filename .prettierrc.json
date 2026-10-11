@@ -7,5 +7,20 @@
     "singleQuote": true,
     "tabWidth": 4,
     "trailingComma": "all",
-    "useTabs": false
+    "useTabs": false,
+    "overrides": [
+        {
+            "files": ["**/*.md", "**/*.markdown", "**/*.mdx"],
+            "options": {
+                "proseWrap": "always",
+                "embeddedLanguageFormatting": "off"
+            }
+        },
+        {
+            "files": "**/*.html.tmpl",
+            "options": {
+                "parser": "html"
+            }
+        }
+    ]
 }

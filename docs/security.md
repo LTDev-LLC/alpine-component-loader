@@ -1,10 +1,8 @@
 # Security and Trusted Types
 
-Component templates cross a rendering boundary and must be treated as content, not trusted executable code. Sanitization is enabled by default in both the browser and static SSR renderer.
+Templates are content crossing a rendering boundary. Browser and SSR sanitization is enabled by default.
 
-This boundary applies equally to fetched URLs, selector-backed DOM templates,
-`template[x-acl]`/`template[acl-component]` declarations, and JavaScript inline
-definitions:
+The same boundary covers fetched, selector-backed, declarative, and JavaScript inline templates:
 
 ```js
 AlpineComponentLoader.define('safe-inline-card', {
@@ -12,13 +10,17 @@ AlpineComponentLoader.define('safe-inline-card', {
 });
 ```
 
-The JavaScript string is parsed into inert detached content using the effective
-Trusted Types policy. Avoiding a network request does not make it trusted; the
-normal sanitizer and `executeScripts` policy still run when an instance renders.
+Inline strings are parsed as detached content through the effective Trusted Types policy. Sanitization and
+`executeScripts` rules still apply.
+
+[`/core`](core.md) uses the same security contracts. The [polyfill entry](polyfills.md) injects upstream classic
+scripts: its `trustedTypesPolicy.createScriptURL()` and `nonce` are separate from component parsing’s
+`security.trustedTypesPolicy.createHTML()`. CSP must allow nested bundle scripts and ShadyCSS styles. ShadyCSS receives
+sanitized content.
 
 ## Default sanitization
 
-The built-in browser sanitizer walks ordinary descendants and nested `<template>` content. It removes:
+The browser sanitizer visits descendants and nested `<template>` content, removing:
 
 - HTML and SVG `<script>` elements.
 - Inline event-handler attributes such as `onclick`.
@@ -27,7 +29,8 @@ The built-in browser sanitizer walks ordinary descendants and nested `<template>
 - Executable `javascript:`, `vbscript:`, and executable HTML/SVG data URLs.
 - Unsafe candidates in `srcset`.
 
-It checks navigation, media, form, object, and SVG URL attributes including `href`, `src`, `xlink:href`, `action`, `formaction`, `poster`, and `data`.
+URL checks cover navigation, media, forms, objects, and SVG attributes: `href`, `src`, `xlink:href`, `action`,
+`formaction`, `poster`, and `data`.
 
 Alpine directives, ordinary `data-*` and ARIA attributes, styles, SVG, and custom elements remain available:
 
@@ -38,7 +41,8 @@ Alpine directives, ordinary `data-*` and ARIA attributes, styles, SVG, and custo
 </article>
 ```
 
-URL checks normalize control characters, whitespace, casing, and parser-decoded entities before checking protocols. Obfuscated executable URLs are rejected rather than passed to application policy.
+Checks normalize control characters, whitespace, casing, and decoded entities. Obfuscated executable URLs are rejected
+before application policy.
 
 ## Add a URL allowlist
 
@@ -60,11 +64,12 @@ AlpineComponentLoader.config({
 });
 ```
 
-Returning `false` or throwing removes the URL attribute. A custom policy cannot restore a URL rejected by the built-in executable-protocol policy. Account for relative URLs by resolving against an explicit trusted base as shown above.
+`false` or an exception removes the attribute. Custom policy cannot restore executable URLs rejected by ACL. Resolve
+relative URLs against a trusted base.
 
 ## Trusted Types
 
-Under a Trusted Types Content Security Policy, create an application-owned policy and give it to the loader:
+For Trusted Types CSP, supply an application-owned policy:
 
 ```js
 const policy = trustedTypes.createPolicy('acl', {
@@ -78,25 +83,25 @@ AlpineComponentLoader.config({
 });
 ```
 
-The policy output is supplied to the HTML parsing sink. Sanitization still runs after parsing; a policy does not replace the loader's sanitizer.
+Policy output enters the HTML parsing sink; sanitization still follows.
 
-If the browser enforces Trusted Types and parsing a string without a configured policy throws, the loader reports an `ACLLoadError` with code `ACL_TRUSTED_TYPES_REQUIRED` and phase `sanitize`.
+Parsing blocked by Trusted Types without a configured policy reports `ACL_TRUSTED_TYPES_REQUIRED` with phase `sanitize`.
 
-Applications should create and review the policy themselves. Do not let template data choose a policy name or implementation.
+Create and review policies in application code; template data must not select their name or implementation.
 
-The `security` object has two public fields: `trustedTypesPolicy` supplies the
-application-owned HTML policy, and `urlPolicy` performs the additional URL
-allowlist check after ACL's executable-protocol rejection.
+The `security` fields are `trustedTypesPolicy` for HTML parsing and `urlPolicy` for URL restrictions after
+executable-protocol checks.
 
 ## Custom sanitizer
 
-A custom sanitizer receives a detached `DocumentFragment` plus component context. It may mutate and return that fragment, return another node, or return an HTML string:
+Custom sanitizers receive a detached `DocumentFragment` and context. They may mutate/return it, return another node, or
+return HTML:
 
 ```js
 AlpineComponentLoader.define('profile-card', '/components/profile-card.html', {
     async sanitize(fragment, { el, props, tagName }) {
-        fragment.querySelectorAll('[data-private]').forEach(node => node.remove());
-        fragment.querySelectorAll('a[target="_blank"]').forEach(link => {
+        fragment.querySelectorAll('[data-private]').forEach((node) => node.remove());
+        fragment.querySelectorAll('a[target="_blank"]').forEach((link) => {
             link.rel = 'noopener noreferrer';
         });
 
@@ -106,15 +111,14 @@ AlpineComponentLoader.define('profile-card', '/components/profile-card.html', {
 });
 ```
 
-Selecting a custom sanitizer replaces the built-in browser sanitizer for that definition. It must independently remove scripts, inline handlers, `srcdoc`, refresh/base elements, and executable URLs if those protections are still required. Returning a string reparses it with the configured Trusted Types policy but does not automatically apply the built-in sanitizer afterward.
+A custom sanitizer replaces the built-in browser sanitizer for that definition. It owns script, handler, `srcdoc`,
+refresh/base, and executable-URL removal. Returned HTML is reparsed through Trusted Types without a subsequent built-in
+sanitization pass.
 
-Prefer composing a well-reviewed sanitizer at the application boundary rather than adding ad hoc allow rules to individual components.
+Use a reviewed sanitizer at the application boundary.
 
-The browser sanitizer context exposes the host `el`, rendered `root`, current
-`props`, and component `tagName`. URL-policy calls add the candidate `element`
-and `attribute`. Treat these values as read-only diagnostic context; mutate the
-detached fragment passed to the sanitizer instead of mutating the live host
-during sanitization.
+Context includes `el`, `root`, `props`, and `tagName`; URL policy also receives `element` and `attribute`. Treat context
+as read-only and mutate the detached fragment, not the live host.
 
 ## Sanitization and script execution are separate
 
@@ -122,7 +126,8 @@ during sanitization.
 
 - With default sanitization, scripts are removed before rendering.
 - With `executeScripts: false` (the default), any script left by a custom sanitizer is also removed.
-- A script executes only when it survives the selected sanitizer and `executeScripts: true` recreates it in the rendered root.
+- A script executes only when it survives the selected sanitizer and `executeScripts: true` recreates it in the rendered
+  root.
 
 ```js
 AlpineComponentLoader.define('trusted-vendor-widget', '/trusted/widget.html', {
@@ -131,7 +136,8 @@ AlpineComponentLoader.define('trusted-vendor-widget', '/trusted/widget.html', {
 });
 ```
 
-The example above is an explicit high-trust opt-out. Do not use it for user-authored, remote, tenant-controlled, or otherwise untrusted templates. Prefer modules loaded by application code, Alpine data registrations, and `externalScripts` descriptors over scripts embedded in template markup.
+This high-trust opt-out is unsafe for user-authored, remote, or tenant-controlled templates. Prefer application modules,
+Alpine data registrations, and `externalScripts` over embedded scripts.
 
 ## CSP-compatible components
 
@@ -153,13 +159,15 @@ Alpine.data('profileCard', () => ({
 </article>
 ```
 
-Use the Alpine CSP build when the application's policy requires it. Supply nonces and integrity metadata through application script/style delivery or supported external asset descriptors. Avoid `unsafe-inline`, executable template URLs, and dynamic code construction.
+Use Alpine’s CSP build when required. Deliver nonces/integrity through application assets or supported descriptors.
+Avoid `unsafe-inline`, executable template URLs, and dynamic code construction.
 
-The loader does not add telemetry or bypass the page's CSP. A strict CSP remains an important second boundary around templates, imported modules, remote assets, and API connections.
+ACL respects page CSP. Strict CSP adds a boundary around templates, modules, assets, and API connections.
 
 ## SSR and hydration parity
 
-The static SSR renderer applies the same executable-markup boundaries to component templates and supplied slot HTML. It removes scripts, inline handlers, `<base>`, refresh metadata, `srcdoc`, and executable URLs before emitting markup.
+SSR applies equivalent executable-markup checks to templates and slot HTML, removing scripts, handlers, base/refresh
+elements, `srcdoc`, and executable URLs.
 
 ```js
 const renderer = createSSRRenderer({
@@ -173,9 +181,10 @@ const renderer = createSSRRenderer({
 });
 ```
 
-The browser sanitizes an adopted SSR shadow tree again before Alpine initialization. This protects the client boundary even if server-rendered HTML passes through middleware or storage before hydration.
+The browser sanitizes hydrated shadow content again before Alpine, including HTML changed by middleware or storage.
 
-The server URL-policy context contains serializable element and attribute names rather than browser `Element` objects. Keep shared policies dependent on URL, tag name, element name, and attribute name rather than browser-only APIs.
+SSR URL policy receives serializable element/attribute names rather than DOM objects. Shared policies should use names
+and URLs, not browser-only APIs.
 
 ## Repository security automation
 
@@ -187,29 +196,27 @@ npm run security:audit
 npx playwright test tests/sanitizer-parity.spec.js --project=chromium
 ```
 
-The static check scans `src/`, `server/`, and `bin/` for prohibited dynamic-code and unsafe parsing patterns. The seeded fast-check corpus compares security-relevant browser and SSR sanitizer output across scripts, event handlers, executable URLs, SVG, nested templates, unusual quoting, and malformed markup.
+Static checks scan `src/`, `server/`, and `bin/` for dynamic code and unsafe parsing. Seeded property tests compare
+browser/SSR sanitizer output for executable markup, SVG, nested templates, unusual quoting, and malformed HTML.
 
-GitHub Actions runs the authored-source checks above and executes the full
-cross-browser validation on protected pushes. CodeQL and dependency review run
-when GitHub Advanced Security is enabled and the repository variable
-`ACL_GHAS_ENABLED` is set to `true`; otherwise, their workflows report the
-unavailable service without failing unrelated validation. Report suspected
-vulnerabilities privately through the root [security policy](../SECURITY.md),
-not a public issue.
+GitHub Actions runs source checks and cross-browser validation on protected pushes. CodeQL and dependency review require
+Advanced Security and `ACL_GHAS_ENABLED=true`; otherwise they report unavailability. Report vulnerabilities privately
+through the [security policy](../SECURITY.md).
 
 ## Failure handling
 
 Sanitizer and Trusted Types failures are reported through `acl:error`:
 
 ```js
-addEventListener('acl:error', event => {
+addEventListener('acl:error', (event) => {
     if (event.detail.phase === 'sanitize') {
         reportTemplateSecurityFailure(event.detail.error);
     }
 });
 ```
 
-Do not include raw template content, credentials, headers, or user data in security logs. ACL observability and debugger exports already redact credential-like fields and sensitive URL queries.
+Exclude templates, credentials, headers, and user data from logs. Observability/debugger exports redact credential-like
+fields and sensitive queries.
 
 ## Security checklist
 
@@ -221,4 +228,5 @@ Do not include raw template content, credentials, headers, or user data in secur
 - Regenerate and verify SSR template revisions after trusted template changes.
 - Test nested `<template>` content, SVG attributes, `srcset`, slots, and fallback/loading templates.
 
-For server-specific path and network controls see [Static SSR and hydration](ssr.md). For redaction behavior see [Observability](observability.md).
+For server-specific path and network controls see [Static SSR and hydration](ssr.md). For redaction behavior see
+[Observability](observability.md).

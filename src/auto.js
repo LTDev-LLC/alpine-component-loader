@@ -1,8 +1,8 @@
 // @license AlpineComponentLoader
-// Copyright (c) LTDev LLC
+// Copyright (c) LouisT
 // Licensed under the MIT license in the repository root
 
-// Propagate jsDelivr's generated minified entry suffix to package-owned dependencies
+// Propagate the prebuilt minified entry suffix to package-owned dependencies
 const min = new URL(import.meta.url).pathname.endsWith('.min.js'),
     resolveLocalModule = (specifier) => (min ? specifier.replace(/\.js$/, '.min.js') : specifier),
     importLocalModule = (specifier) => import(/* @vite-ignore */ resolveLocalModule(specifier)),

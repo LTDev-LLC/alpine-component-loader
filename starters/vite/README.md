@@ -1,6 +1,10 @@
 # ACL Vite starter
 
-This starter is a route-aware reference application for `alpine-component-loader/vite`. It keeps component HTML independently fetchable, generates version-one component and route manifests, registers only the active route shard, and leaves ACL outside the application bundle.
+A route-aware starter using native ACL modules outside the application bundle. Root is default; bootstrap query options
+select core and polyfills.
+
+The plugin generates component/route manifests, maps optional entries, and registers the active shard while leaving
+templates fetchable.
 
 ## Run it
 
@@ -9,9 +13,10 @@ npm install
 npm run dev
 ```
 
-Open the printed Vite URL and move between **Home** and **Account**. The Home route demonstrates a form-associated quantity control; Account demonstrates a group-rooted shard with an inferred Shadow DOM dependency. The diagnostics panel shows the most recent redacted ACL records.
+Open the Vite URL. **Home** demonstrates form association; **Account** uses a group shard and inferred Shadow DOM
+dependency. Diagnostics show redacted records.
 
-Edit any file under `public/components/` while the development server is running. The plugin regenerates affected artifacts and sends a targeted HMR event; ACL reloads matching component hosts while preserving public props, form values, focus, and selection.
+Template edits regenerate artifacts and trigger state-preserving HMR for affected hosts.
 
 ## Project layout
 
@@ -27,6 +32,8 @@ Edit any file under `public/components/` while the development server is running
 │       ├── profile-avatar.{html,acl.json}
 │       └── quantity-field.{html,acl.json}
 ├── src/
+│   ├── bootstrap.js
+│   ├── bootstrap-polyfills.js
 │   ├── main.js
 │   ├── router.js
 │   └── styles.css
@@ -95,9 +102,9 @@ import { registerRoute } from 'virtual:alpine-component-loader/routes';
 await registerRoute('account');
 ```
 
-The lookup is exact. `home` registers the dependency-expanded Home shard and `account` registers the Account shard. Relative component sources resolve from the fetched shard/index URL.
+`home` and `account` select exact, dependency-expanded shards. Component URLs resolve from the fetched shard/index.
 
-The route configuration intentionally uses two root styles:
+Routes can use component or group roots:
 
 ```js
 routes: {
@@ -108,11 +115,12 @@ routes: {
 }
 ```
 
-Safe template inference discovers `<quantity-field>` inside `home-dashboard` and `<profile-avatar>` inside `account-dashboard`. Sidecars remain authoritative for props, groups, form configuration, events, descriptions, and other authored fields. Run `npm run acl:infer` to see likely prop/event diagnostics without writing them.
+Safe inference finds nested `<quantity-field>` and `<profile-avatar>`. Sidecars own props, groups, forms, events, and
+descriptions. `acl:infer` reports tentative contracts without writing them.
 
 ## Runtime examples
 
-The application registers `<acl-boundary>` explicitly before starting its small router. The nearest boundary owns descendant `acl:error` events and exposes `retry()` through the fallback button.
+An explicitly registered `<acl-boundary>` catches descendant errors and exposes `retry()` through its fallback.
 
 `quantity-field.acl.json` opts into the native form lifecycle:
 
@@ -128,13 +136,15 @@ The application registers `<acl-boundary>` explicitly before starting its small 
 }
 ```
 
-Its reactive `quantity` prop contributes to `FormData`, participates in reset/state restoration, and uses ACL's hidden-input submission fallback when `ElementInternals` is unavailable.
+Reactive `quantity` joins `FormData` and reset/restoration, with hidden-input fallback when `ElementInternals` is
+unavailable.
 
-`src/main.js` enables a 100-record observability buffer and a six-record UI projection. To deliver those already-redacted records, import `createBeaconExporter()` or a caller-owned OpenTelemetry/Sentry adapter from `alpine-component-loader/observability-exporters`; the plugin includes that demand-loaded entry in its import map.
+`main.js` keeps 100 observability records and displays six. `/observability-exporters` can send redacted records through
+Beacon or caller-owned OpenTelemetry/Sentry clients.
 
 ## CLI workflows
 
-The CLI and Vite plugin read the same project configuration:
+CLI and Vite share project configuration:
 
 ```bash
 npm run acl:manifest   # safely update generated manifest fields
@@ -146,7 +156,7 @@ npm run acl:validate   # validate the generated component manifest
 npm run acl:watch      # serialized filesystem-backed generation outside Vite
 ```
 
-CLI flags have highest precedence, followed by plugin options, project configuration, and defaults. Browser-backed crawling, skeleton generation, and audits remain explicit rather than joining the default watch loop.
+Precedence: CLI → plugin → project → defaults. Browser crawling, skeletons, and audits are opt-in watch tasks.
 
 The checked-in audit policy starts empty:
 
@@ -155,7 +165,8 @@ npm run acl:audit
 npm run acl:audit:update
 ```
 
-`acl:audit:update` atomically replaces the baseline with current unsuppressed findings. Subsequent audits fail for new findings, expired suppressions, or page errors.
+`acl:audit:update` atomically refreshes reviewed unsuppressed findings. Later audits fail on new findings, expired
+suppressions, or page errors.
 
 ## Production delivery and non-root bases
 
@@ -172,9 +183,10 @@ Test a non-root deployment:
 ACL_BASE=/component-demo/ npm run build
 ```
 
-The router uses `import.meta.env.BASE_URL`, so its navigation URLs match the plugin's import map and copied route paths. Configure the production server to return `index.html` for direct client-route requests such as `/component-demo/account`.
+Navigation follows `import.meta.env.BASE_URL`. Production must serve `index.html` for client routes such as
+`/component-demo/account`.
 
-The default `vite.moduleDelivery: 'copy'` makes the build self-contained. For application-managed delivery:
+`vite.moduleDelivery: 'copy'` provides packaged modules. For application-managed delivery:
 
 ```js
 alpineComponentLoader({
@@ -185,4 +197,46 @@ alpineComponentLoader({
 
 Pin the external module directory to the same ACL release used to generate the application.
 
-For isolated application registries or tests, use `createLoader()` and the Playwright/Vitest fixtures documented in [Testing utilities](../../docs/testing.md).
+## Startup variants and preload hints
+
+Page links select root/core and optional polyfills through `bootstrap.js`, before Alpine/application imports. Startup
+failures expose retry; status separates registration from readiness.
+
+Boundary and route registration are explicit, so core needs no discovery. Register later declarative/dynamic built-ins
+explicitly. The virtual route helper shares the default context without starting root discovery. See
+[core startup](../../docs/core.md).
+
+To generate hints for the initial Home route, boundary, styles, and slots:
+
+```bash
+ACL_PRELOAD=core npm run build
+# Or select the default entry:
+ACL_PRELOAD=default npm run build
+```
+
+`preload.entry`, `tags`, and `features` select hints, not application imports. Other routes prefetch on hover/focus;
+navigation cancels obsolete subscriptions. Select content-dependent features when the manifest cannot infer them.
+
+## Optional Web Components polyfills
+
+`?entry=core&polyfills=1` or `bootstrap-polyfills.js` loads fallbacks before Alpine/application evaluation. Native
+browsers skip upstream scripts; ESM/ES2022 requirements remain.
+
+Self-host webcomponentsjs 2.8.0's loader, full bundle, and `bundles/` under `public/vendor/webcomponents/`, then set:
+
+```js
+await loadPolyfills({
+    url: import.meta.env.BASE_URL + 'vendor/webcomponents/webcomponents-loader.js',
+});
+```
+
+Preserve vendor filenames; the plugin copies only ACL. See [self-hosting](../../docs/polyfills.md#self-hosted-delivery)
+for CSP and readiness options. `features: ['polyfills']` hints the wrapper without activating it.
+
+For independent registries and test cleanup, use `createLoader()` and [testing fixtures](../../docs/testing.md).
+
+Vite 5-8 is supported. Manifest options infer environmental dependencies; imperative behavior can add
+`features: ['environment']`. `hydrationScheduler` remains opt-in.
+
+The compatibility matrix tests pinned Vite 5.0-8.0 and the development version with routing, non-root bases, and
+copied/external production modules.

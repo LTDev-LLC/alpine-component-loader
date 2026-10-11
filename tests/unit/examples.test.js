@@ -12,11 +12,10 @@ const examplesRoot = resolve('examples'),
         ['hmr', { importMap: 'index.html' }],
         ['offline', { importMap: null }],
         ['playground', { importMap: null }],
-        ['ssr', { importMap: null }],
     ]),
     browserFileExtensions = new Set(['.html', '.js', '.json', '.tmpl']),
     packageUrlPattern =
-        /(["'`])(?<url>(?:(?:https:\/\/cdn\.jsdelivr\.net\/(?:npm\/alpine-component-loader|gh\/LTDev-LLC\/alpine-component-loader)@[^/]+)?\/(?:dist|__acl_hmr\/modules)\/|(?:\.\.?\/)*dist\/)[^"'`\s]+\.js(?:[?#][^"'`\s]*)?)\1/g;
+        /(["'`])(?<url>(?:(?:https:\/\/cdn\.jsdelivr\.net\/(?:npm\/alpine-component-loader|gh\/LouisT\/alpine-component-loader)@[^/]+)?\/(?:dist|__acl_hmr\/modules)\/|(?:\.\.?\/)*dist\/)[^"'`\s]+\.js(?:[?#][^"'`\s]*)?)\1/g;
 
 // Read every browser-facing source and generated artifact below one example
 const readBrowserFiles = async (directory) => {
@@ -56,7 +55,6 @@ test('every maintained example uses the Feature Lab product header and footer', 
             ['hmr', 'index.html'],
             ['offline', 'index.html'],
             ['playground', 'index.html'],
-            ['ssr', 'index.html.tmpl'],
         ]),
         productDescription = /A lightweight,\s*build-free component loader for\s*(?:<a[^>]*>)?Alpine\.js(?:<\/a>)?\.?/g;
     // Inspect each maintained static or server-rendered page source
@@ -69,11 +67,11 @@ test('every maintained example uses the Feature Lab product header and footer', 
         assert.match(source, /class="subtitle"/, `${name} must use the Feature Lab header subtitle`);
         assert.match(source, /class="github-link"[^>]*target="_blank"[^>]*rel="noreferrer"/);
         assert.match(source, /class="container"[\s\S]*class="inner"[\s\S]*class="meta"/);
-        assert.match(source, /LTDev LLC · MIT License/);
-        assert.match(source, />GitHub<\/a>/);
-        assert.match(source, />Issues<\/a>/);
-        assert.match(source, />Alpine\.js<\/a>/);
-        assert.match(source, /href="#top">Back to top<\/a>/);
+        assert.match(source, /LouisT · MIT License/);
+        assert.match(source, />GitHub<\/a\s*>/);
+        assert.match(source, />Issues<\/a\s*>/);
+        assert.match(source, />Alpine\.js<\/a\s*>/);
+        assert.match(source, /href="#top">Back to top<\/a\s*>/);
         // Verify the stable visual tokens shared by the header and footer
         for (const visualContract of [
             /padding:\s*clamp\(1rem,\s*3vw,\s*2rem\)/,
@@ -143,7 +141,9 @@ test('every runnable browser example selects the minified package family', async
                 ([specifier]) =>
                     specifier === 'alpine-component-loader' || specifier.startsWith('alpine-component-loader/'),
             );
-        assert.equal(packageMappings.length, 11, `${name} must expose every injected browser entry`);
+        assert.equal(packageMappings.length, 13, `${name} must expose every injected browser entry`);
+        assert.match(injectedMap.imports['alpine-component-loader/core'], /\/core\.min\.js$/);
+        assert.match(injectedMap.imports['alpine-component-loader/polyfills'], /\/polyfills\.min\.js$/);
         packageMappings.forEach(
             // Keep the injected application and HMR client on one minified identity
             ([specifier, url]) =>
@@ -156,14 +156,14 @@ test('every runnable browser example selects the minified package family', async
     }
 
     const offlinePage = await readFile(join(examplesRoot, 'offline', 'index.html'), 'utf8');
-    assert.match(offlinePage, /src="\.\/app\.min\.js"/);
+    assert.match(offlinePage, /data-app="\.\/app\.min\.js"/);
 
     // Keep the focused examples aligned with newly documented opt-in workflows
     const offlinePolicy = JSON.parse(await readFile(join(examplesRoot, 'offline', 'acl-offline.json'), 'utf8')),
         generatedOfflineManifest = JSON.parse(
             await readFile(join(examplesRoot, 'offline', 'acl-precache-manifest.json'), 'utf8'),
         ),
-        ssrServer = await readFile(join(examplesRoot, 'ssr', 'server.mjs'), 'utf8'),
+        ssrServer = await readFile(join(examplesRoot, 'feature-lab-ssr', 'server.mjs'), 'utf8'),
         playground = await readFile(join(examplesRoot, 'playground', 'playground.js'), 'utf8'),
         accessibilityReadme = await readFile(join(examplesRoot, 'a11y', 'README.md'), 'utf8'),
         accessibilityBaseline = JSON.parse(
@@ -175,9 +175,9 @@ test('every runnable browser example selects the minified package family', async
     assert.equal(offlinePolicy.navigation.strategy, 'network-first');
     assert.equal(offlinePolicy.runtimeRoutes[0].maxEntries, 4);
     assert.equal(generatedOfflineManifest.config.runtimeRoutes[0].cacheName, 'example-runtime');
-    assert.match(ssrServer, /dataResolver/);
-    assert.match(ssrServer, /dataPolicy/);
-    assert.match(ssrServer, /hydrate/);
+    assert.match(ssrServer, /renderer\.renderMany/);
+    assert.match(ssrServer, /streamDemo/);
+    assert.match(ssrServer, /data-acl-revision/);
     assert.match(playground, /createLoader/);
     assert.match(playground, /loader\.dispose/);
     assert.match(accessibilityReadme, /alpine-component-loader audit/);
