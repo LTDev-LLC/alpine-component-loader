@@ -232,12 +232,61 @@ test('SSR stream controls preserve order, bound work, cancel, and isolate parsed
     await page.locator('#run-batch').click();
     await expect(page.locator('#stream-summary')).toContainText('"mode": "batch"');
     await expect(page.locator('#stream-results > article')).toHaveCount(12);
+
+    await page.evaluate(() => {
+        // Hold the real response after one record so cancellation cannot race transport buffering or UI latency
+        const originalFetch = window.fetch;
+        window.fetch = async (input, options) => {
+            // Gate only the next stream request and leave background data requests unchanged
+            if (!String(input).startsWith('/demo-stream?mode=stream'))
+                return originalFetch.call(window, input, options);
+            window.fetch = originalFetch;
+            const response = await originalFetch.call(window, input, options),
+                reader = response.body.getReader(),
+                decoder = new TextDecoder(),
+                encoder = new TextEncoder(),
+                signal = options.signal,
+                body = new ReadableStream({
+                    async start(stream) {
+                        // Abort a pending consumer read and release the real upstream response
+                        const abort = () => {
+                            window.streamCancelObserved = signal.aborted;
+                            stream.error(signal.reason);
+                            void reader.cancel().catch(
+                                // The native fetch may already have rejected the upstream reader on abort
+                                () => {},
+                            );
+                        };
+                        signal.addEventListener('abort', abort, { once: true });
+                        if (signal.aborted) {
+                            abort();
+                            return;
+                        }
+                        let buffered = '';
+                        // Preserve arbitrary chunk boundaries while admitting exactly one complete NDJSON record
+                        while (!buffered.includes('\n')) {
+                            const chunk = await reader.read();
+                            buffered += decoder.decode(chunk.value || new Uint8Array(), { stream: !chunk.done });
+                            if (chunk.done && !buffered.includes('\n'))
+                                throw new Error('The stream ended before its first record');
+                        }
+                        stream.enqueue(encoder.encode(buffered.slice(0, buffered.indexOf('\n') + 1)));
+                    },
+                });
+            return new Response(body, { headers: response.headers });
+        };
+    });
     await page.locator('#run-stream').click();
-    await expect(page.locator('#stream-results > article').first()).toBeVisible();
+    await expect(page.locator('#stream-results > article')).toHaveCount(1);
     await page.locator('#cancel-stream').click();
     await expect(page.locator('#stream-summary')).toContainText('Canceled');
-    expect(await page.locator('#stream-results > article').count()).toBeGreaterThan(0);
-    expect(await page.locator('#stream-results > article').count()).toBeLessThan(12);
+    await expect(page.locator('#stream-results > article')).toHaveCount(1);
+    expect(
+        await page.evaluate(
+            // Verify the cancel control propagated through the request signal
+            () => window.streamCancelObserved,
+        ),
+    ).toBe(true);
     await page.locator('#run-reuse').click();
     await expect(page.locator('#reuse-results')).toContainText('"isolated": true');
     expect((await request.get(baseUrl + '/demo-stream?concurrency=0')).status()).toBe(400);

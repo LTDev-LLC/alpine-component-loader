@@ -1,7 +1,7 @@
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, realpath, stat, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
@@ -366,14 +366,29 @@ test('manifest URL loading deduplicates per loader, resolves paths, retries fail
     );
 });
 
-test('watch coordinator orders configured tasks and recovers after a failed generator', async () => {
-    // Run this operation
-    let queueRecovery = false,
-        queuedRun = null;
-    const root = await mkdtemp(join(tmpdir(), 'acl-watch-')),
-        manifestFile = join(root, 'acl-manifest.json'),
-        declarations = join(root, 'acl-components.d.ts'),
-        events = [],
+test(
+    'watch coordinator orders configured tasks and recovers after a failed generator',
+    { timeout: 30_000 },
+    async (t) => {
+        // Run this operation
+        let queueRecovery = false,
+            queuedRun = null,
+            watcher;
+        const root = await mkdtemp(join(tmpdir(), 'acl-watch-')),
+            manifestFile = join(root, 'acl-manifest.json'),
+            declarations = join(root, 'acl-components.d.ts'),
+            events = [];
+        t.after(async () => {
+            // Close live filesystem subscriptions even when assertions or generation fail
+            try {
+                await watcher?.close();
+            } finally {
+                await rm(root, {
+                    recursive: true,
+                    force: true,
+                });
+            }
+        });
         watcher = await startProjectWatcher({
             config: {
                 root,
@@ -385,6 +400,8 @@ test('watch coordinator orders configured tasks and recovers after a failed gene
                 },
             },
             tasks: ['types'],
+            debounce: 0,
+            pollInterval: 5,
             // Run this operation
             onProgress: ({ task, status }) => {
                 events.push(`${task}:${status}`);
@@ -397,25 +414,26 @@ test('watch coordinator orders configured tasks and recovers after a failed gene
                 }
             },
         });
-    assert.ok(watcher.results.types.error);
-    await writeFile(manifestFile, `${JSON.stringify(manifest('example-card.html'))}\n`);
-    queueRecovery = true;
-    await watcher.run('recovery');
-    await queuedRun;
-    assert.equal(watcher.results.types.error, undefined);
-    assert.deepEqual(events, [
-        'types:start',
-        'types:error',
-        'types:start',
-        'types:complete',
-        'types:start',
-        'types:complete',
-    ]);
-    assert.ok((await stat(declarations)).isFile());
-    await watcher.close();
-    assert.equal(await watcher.run('closed'), watcher.results);
-    await watcher.close();
-});
+        assert.ok(watcher.results.types.error);
+        await writeFile(manifestFile, `${JSON.stringify(manifest('example-card.html'))}\n`);
+        queueRecovery = true;
+        await watcher.run('recovery');
+        await queuedRun;
+        assert.equal(watcher.results.types.error, undefined);
+        assert.deepEqual(events, [
+            'types:start',
+            'types:error',
+            'types:start',
+            'types:complete',
+            'types:start',
+            'types:complete',
+        ]);
+        assert.ok((await stat(declarations)).isFile());
+        await watcher.close();
+        assert.equal(await watcher.run('closed'), watcher.results);
+        await watcher.close();
+    },
+);
 
 test('watch coordinator rejects missing configuration and empty task graphs', async () => {
     // Cover validation before the filesystem watcher boundary
@@ -872,6 +890,10 @@ test('Vite development and production integration preserve native external modul
         } catch {
             response.writeHead(404).end();
         }
+    });
+    t.after(async () => {
+        // Release the HTTP listener if browser launch, assertions, or browser cleanup fail
+        await new Promise((resolveClose) => productionServer.close(resolveClose));
     });
     // Inspect the controlled fixture and its completion
     await new Promise((resolve) => productionServer.listen(0, '127.0.0.1', resolve));

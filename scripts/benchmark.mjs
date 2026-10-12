@@ -49,7 +49,6 @@ const libraryRoot = resolve('.'),
 // Resolve this operation and preserve independent ownership
 await new Promise((resolveListen) => server.listen(0, '127.0.0.1', resolveListen));
 const baseUrl = `http://127.0.0.1:${server.address().port}`,
-    browser = await chromium.launch(),
     scenarios = [
         {
             name: 'cold-first',
@@ -86,10 +85,12 @@ const baseUrl = `http://127.0.0.1:${server.address().port}`,
         },
     ],
     results = {};
+let browser;
 // Reduce a measured series to stable percentiles without gating wall-clock time
 const percentile = (samples, fraction) => [...samples].sort((a, b) => a - b)[Math.ceil(samples.length * fraction) - 1];
 // Release resources on both success and failure
 try {
+    browser = await chromium.launch();
     // Measure every scenario in fresh contexts so module and persistent caches are isolated
     for (const scenario of scenarios) {
         const samples = [];
@@ -305,7 +306,11 @@ try {
     if (Object.values(results).some((result) => result.retainedObservers !== 0 || result.retainedListeners !== 0))
         throw new Error('Benchmark resource ownership did not return to baseline');
 } finally {
-    await browser.close();
-    // Resolve this operation and preserve independent ownership
-    await new Promise((resolveClose) => server.close(resolveClose));
+    // Failed browser startup or teardown must still release the benchmark listener
+    try {
+        await browser?.close();
+    } finally {
+        // Close the HTTP server after every success and failure path
+        await new Promise((resolveClose) => server.close(resolveClose));
+    }
 }

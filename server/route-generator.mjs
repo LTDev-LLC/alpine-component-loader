@@ -118,8 +118,12 @@ const crawlRoutes = // Run this operation
             }
             return result;
         } finally {
-            await browser?.close();
-            await app.close();
+            // A browser teardown failure must still release the local route server
+            try {
+                await browser?.close();
+            } finally {
+                await app.close();
+            }
         }
     };
 

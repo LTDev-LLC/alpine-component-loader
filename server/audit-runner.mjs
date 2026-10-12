@@ -592,8 +592,12 @@ export const runAccessibilityAudit = async ({
             outFile,
         };
     } finally {
-        await browser?.close();
-        await app?.close();
+        // A browser teardown failure must still release the local HTTP server
+        try {
+            await browser?.close();
+        } finally {
+            await app?.close();
+        }
     }
 };
 

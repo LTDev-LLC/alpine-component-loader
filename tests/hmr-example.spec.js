@@ -61,13 +61,21 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
     // Clean up the completed test group
-    await app?.close();
-    await exampleApp?.close();
-    if (projectRoot)
-        await rm(projectRoot, {
-            recursive: true,
-            force: true,
-        });
+    // Release both listeners even when one server's teardown fails
+    try {
+        await app?.close();
+    } finally {
+        // Remove the fixture directory after both server cleanup attempts
+        try {
+            await exampleApp?.close();
+        } finally {
+            if (projectRoot)
+                await rm(projectRoot, {
+                    recursive: true,
+                    force: true,
+                });
+        }
+    }
 });
 
 test('checked-in HMR page shell has no serious accessibility violations', async ({ page }) => {

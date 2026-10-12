@@ -898,6 +898,11 @@ test('static server injects only the primary index and enforces its HTTP boundar
 
     assert.equal(await application.broadcastChange(root), null);
     assert.equal(await application.broadcastChange(join(root, '.secret.html')), null);
+    assert.equal(await application.broadcastChange(join(application.root, `app.css.acl-tmp-${process.pid}-123`)), null);
+    assert.equal(
+        (await application.broadcastChange(join(application.root, 'app.css.acl-tmp-authored'))).message.source,
+        '/app.css.acl-tmp-authored',
+    );
     assert.equal(application.broadcast({ type: 'test' }).clients, 0);
     assert.equal(application.clients, 0);
 });
@@ -1094,7 +1099,7 @@ test('recursive watcher publishes component and page reload messages over SSE', 
     await reader.cancel();
 });
 
-test('recursive watcher validates polling and supports disabled safety scans with idempotent close', async () => {
+test('recursive watcher validates polling and supports disabled safety scans with idempotent close', async (t) => {
     // Exercise watcher option validation and disabled periodic scans
     const root = await createProject();
     await assert.rejects(
@@ -1114,6 +1119,10 @@ test('recursive watcher validates polling and supports disabled safety scans wit
         },
         debounce: 0,
         pollInterval: 0,
+    });
+    t.after(() => {
+        // Release the standalone watcher even if a backend assertion fails
+        watcher.close();
     });
     assert.ok(['recursive', 'directory'].includes(watcher.backend));
     assert.equal(watcher.pollInterval, 0);

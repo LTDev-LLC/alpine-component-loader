@@ -15,6 +15,7 @@ jobs:
   static:
     name: Static validation
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7.0.0
@@ -27,6 +28,7 @@ jobs:
       - run: npm run build
       - run: npm run playwright:install:ci -- chromium
       - run: npm run test:unit
+        timeout-minutes: 5
       - run: npm run test:types
       - run: npm run test:implementation-types
       - run: npm run check:size
@@ -49,6 +51,7 @@ jobs:
   vite-compatibility:
     name: Vite compatibility
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7.0.0
@@ -63,6 +66,7 @@ jobs:
   coverage:
     name: Main coverage and Chromium
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7.0.0
@@ -77,6 +81,7 @@ jobs:
   node-compatibility:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -91,10 +96,12 @@ jobs:
       - run: npm run build
       - run: npm run playwright:install:ci -- chromium
       - run: npm run test:unit
+        timeout-minutes: 5
       - run: npm run test:types
 
   browsers:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:

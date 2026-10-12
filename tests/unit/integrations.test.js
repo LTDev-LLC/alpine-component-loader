@@ -1,15 +1,121 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { Server } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
+import { chromium } from 'playwright';
 import { formatAuditReport, runAccessibilityAudit } from '../../server/audit-runner.mjs';
 import { createStarterProject } from '../../server/starter-generator.mjs';
 import { startACLTestServer } from '../../server/testing-server.mjs';
+import { generateRouteManifests } from '../../server/route-generator.mjs';
 import { createACLVitestFixture } from '../../src/testing-vitest.js';
 
 const projectRoot = resolve(fileURLToPath(new URL('../..', import.meta.url)));
+
+// Exercise every browser-backed server owner under a failing teardown
+for (const operation of ['audit', 'routes']) {
+    test(`${operation} releases its HTTP server when browser setup and cleanup fail`, async (t) => {
+        // Keep deliberate browser failures from leaking a server into the unit-test worker
+        const root = await mkdtemp(join(tmpdir(), `acl-${operation}-cleanup-`)),
+            closeError = new Error('Deliberate browser teardown failure'),
+            originalListen = Server.prototype.listen;
+        let ownedServer;
+        t.after(async () => {
+            // Also close an unexpectedly leaked listener so a regression reports failure without hanging
+            try {
+                if (ownedServer?.listening) {
+                    ownedServer.closeAllConnections?.();
+                    await new Promise(
+                        // Settle the fallback HTTP cleanup before removing its files
+                        (resolveClose) => ownedServer.close(resolveClose),
+                    );
+                }
+            } finally {
+                await rm(root, {
+                    recursive: true,
+                    force: true,
+                });
+            }
+        });
+        t.mock.method(Server.prototype, 'listen', function (...args) {
+            // Retain the actual server so its listener ownership can be asserted
+            ownedServer = this;
+            return originalListen.apply(this, args);
+        });
+        t.mock.method(chromium, 'launch', async () => {
+            // Fail before page creation and again during teardown without starting an external browser
+            return {
+                newPage() {
+                    // Force the application into its browser cleanup path
+                    throw new Error('Deliberate page setup failure');
+                },
+                close() {
+                    // Verify a failed browser close cannot bypass HTTP cleanup
+                    throw closeError;
+                },
+            };
+        });
+        const manifestFile = join(root, 'acl-manifest.json');
+        await writeFile(join(root, 'index.html'), '<!doctype html><title>Cleanup fixture</title>');
+        await writeFile(
+            manifestFile,
+            JSON.stringify({
+                version: 1,
+                components: { 'cleanup-card': '/card.html' },
+            }),
+        );
+        await assert.rejects(
+            operation === 'audit'
+                ? runAccessibilityAudit({ root })
+                : generateRouteManifests({
+                      root,
+                      target: 'index.html',
+                      manifestFile,
+                      outDir: join(root, 'routes'),
+                      entries: [
+                          {
+                              key: 'home',
+                              path: '/',
+                              discover: true,
+                          },
+                      ],
+                  }),
+            // Preserve the teardown error while releasing independent server ownership
+            (error) => error === closeError,
+        );
+        assert.ok(ownedServer);
+        assert.equal(ownedServer.listening, false);
+    });
+}
+
+test('benchmark startup exits after browser launch fails instead of retaining its server', async (t) => {
+    // An empty browser path gives the real command a controlled launch failure
+    const root = await mkdtemp(join(tmpdir(), 'acl-benchmark-cleanup-')),
+        run = promisify(execFile);
+    t.after(() =>
+        // Remove the empty fixture after the child exits on either assertion path
+        rm(root, {
+            recursive: true,
+            force: true,
+        }),
+    );
+    await assert.rejects(
+        run(process.execPath, ['scripts/benchmark.mjs'], {
+            cwd: projectRoot,
+            env: {
+                ...process.env,
+                PLAYWRIGHT_BROWSERS_PATH: root,
+            },
+            timeout: 10_000,
+        }),
+        // A normal error exit proves the HTTP listener was closed without killing the child
+        (error) => error.code === 1 && !error.killed && /Executable doesn't exist/.test(error.stderr),
+    );
+});
 
 test('audit formatter emits console, JSON, JUnit, and SARIF diagnostics', () => {
     // Exercise every supported formatter against a normalized report

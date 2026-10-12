@@ -116,14 +116,14 @@ globalThis.__aclDevConnection = connection;
 addEventListener('beforeunload', () => connection.close(), { once: true });
 `;
 
-// Enforce path containment and exclude hidden or dependency directories
+// Exclude hidden paths, dependencies, and the intermediate files used by atomic project writes
 const isContained = (root, candidate) => candidate === root || candidate.startsWith(`${root}${sep}`),
     isIgnoredPath = (path) =>
         relative(path.root, path.file)
             .split(sep)
             .some(
                 // Check the current item
-                (part) => ignoredDirectories.has(part) || part.startsWith('.'),
+                (part) => ignoredDirectories.has(part) || part.startsWith('.') || /\.acl-tmp-\d+-\d+$/.test(part),
             );
 
 // Convert a platform path into an encoded root-relative browser path
